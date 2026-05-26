@@ -12,9 +12,11 @@ import {
 } from "@/lib/scoring/ledger";
 import { mapEventRow } from "@/lib/scoring/events";
 import { getStoredEditKey, storeEditKey } from "@/lib/editKey";
+import { storeRecentSession } from "@/lib/recentSession";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
+const SCORE_PRESETS = [3900, 5200, 7700, 8000, 12000];
 
 function seatLabel(seat: Seat) {
   if (seat === "E") return "East";
@@ -57,9 +59,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   });
 
   const [riichiSeat, setRiichiSeat] = useState<Seat>("E");
-  const [riichiValue, setRiichiValue] = useState(1000);
 
-  const [eventNote, setEventNote] = useState("");
   const [manualDelta, setManualDelta] = useState<Record<Seat, number>>({ E: 0, S: 0, W: 0, N: 0 });
 
   const [winType, setWinType] = useState<"ron" | "tsumo">("ron");
@@ -87,7 +87,9 @@ export function SessionClient({ shareId }: { shareId: string }) {
       error?: string;
     };
     if (!res.ok) throw new Error(json.error ?? "Failed to load session");
-    setTitle(json.session?.title ?? "Session");
+    const sessionTitle = json.session?.title ?? "Session";
+    setTitle(sessionTitle);
+    storeRecentSession(shareId, sessionTitle);
     setRules(json.session?.rules_json ?? defaultRules());
     setEvents((json.events ?? []).map((r) => mapEventRow(r)));
 
@@ -246,194 +248,292 @@ export function SessionClient({ shareId }: { shareId: string }) {
       winType === "ron" ? buildRonDeltas(winner, fromSeat, total) : buildTsumoDeltas(winner, total);
     void postEvent("win", {
       deltas,
-      note: `${winType.toUpperCase()} ${total.toLocaleString()}${honba ? ` (honba ${honba})` : ""}${eventNote.trim() ? ` — ${eventNote.trim()}` : ""}`,
-    }).catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+      note: `${winType.toUpperCase()} ${total.toLocaleString()}${honba ? ` (honba ${honba})` : ""}`,
+    })
+      .then(() => {
+        setHonba(0);
+        setError(null);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
   }
 
   return (
-    <main className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-            Share: <span className="font-mono">/s/{shareId}</span>
-          </div>
+    <main className="space-y-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {canEdit ? "You can record hands" : "Viewing live scores"}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          {canEdit ? (
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
-              Editing enabled
-            </span>
-          ) : (
-            <span className="rounded-full bg-zinc-100 px-3 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-              View-only
-            </span>
-          )}
-          {canEdit ? (
-            <button
-              onClick={() => void onClaim()}
-              className="rounded-full border border-zinc-200 px-3 py-1 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-            >
-              Claim session
-            </button>
-          ) : null}
-        </div>
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => void onClaim()}
+            className="shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800"
+          >
+            Claim
+          </button>
+        ) : null}
       </div>
 
       {claimStatus ? <div className="text-sm text-emerald-700 dark:text-emerald-300">{claimStatus}</div> : null}
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="text-sm font-medium">Share and editing</div>
-        <div className="mt-3 space-y-3 text-sm">
-          <div className="rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs text-zinc-500">Viewer link</div>
-              <button
-                type="button"
-                onClick={() => void copyText("Viewer link", shareUrl)}
-                className="text-xs underline"
-              >
-                Copy
-              </button>
-            </div>
-            <div className="mt-1 break-all font-mono text-xs">{shareUrl}</div>
-          </div>
-          {editUrl ? (
-            <div className="rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs text-zinc-500">Editor link</div>
-                <button
-                  type="button"
-                  onClick={() => void copyText("Editor link", editUrl)}
-                  className="text-xs underline"
-                >
-                  Copy
-                </button>
-              </div>
-              <div className="mt-1 break-all font-mono text-xs">{editUrl}</div>
-            </div>
-          ) : null}
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              value={editKeyInput}
-              onChange={(e) => setEditKeyInput(e.target.value)}
-              placeholder="Paste edit key"
-              className="h-10 flex-1 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-            />
-            <button
-              onClick={saveEditKeyFromInput}
-              className="h-10 rounded-lg border border-zinc-200 px-3 text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-900"
-            >
-              Enable editing on this device
-            </button>
-          </div>
-        </div>
-      </div>
-
       {!canEdit ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-          To edit on this device, open the original “create session” link once (it includes an edit key), or ask
-          the host to share the edit URL.
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+          View-only. Ask the scorekeeper to share the editor link, or paste the edit key under{" "}
+          <span className="font-medium">Share with table</span> below.
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <label className="text-xs">
-          Session title
-          <input
-            disabled={!canEdit}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-          />
-        </label>
-        <div className="text-sm font-medium">Rules</div>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <label className="text-xs">
-            Starting
-            <input
-              type="number"
-              disabled={!canEdit}
-              value={rules.startingPoints}
-              onChange={(e) => setRules((r) => ({ ...r, startingPoints: Number(e.target.value) }))}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-            />
-          </label>
-          <label className="text-xs">
-            Return
-            <input
-              type="number"
-              disabled={!canEdit}
-              value={rules.returnPoints}
-              onChange={(e) => setRules((r) => ({ ...r, returnPoints: Number(e.target.value) }))}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-            />
-          </label>
-          <label className="text-xs">
-            Riichi stick
-            <input
-              type="number"
-              disabled={!canEdit}
-              value={rules.riichiStickValue}
-              onChange={(e) => setRules((r) => ({ ...r, riichiStickValue: Number(e.target.value) }))}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-            />
-          </label>
-          <label className="text-xs">
-            Honba (each)
-            <input
-              type="number"
-              disabled={!canEdit}
-              value={rules.honbaValue}
-              onChange={(e) => setRules((r) => ({ ...r, honbaValue: Number(e.target.value) }))}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-            />
-          </label>
+      <section className="sticky top-[52px] z-30 -mx-1 rounded-2xl border border-zinc-200 bg-white p-3 shadow-md dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {seats.map((s) => (
+            <div
+              key={s}
+              className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <div className="text-[10px] uppercase tracking-wide text-zinc-500">{seatLabel(s)}</div>
+              {seatPlayerName[s] ? (
+                <div className="truncate text-sm font-semibold">{seatPlayerName[s]}</div>
+              ) : (
+                <div className="text-sm text-zinc-400">—</div>
+              )}
+              <div className="font-mono text-2xl font-semibold tabular-nums tracking-tight">
+                {totals[s].toLocaleString()}
+              </div>
+            </div>
+          ))}
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Rules are stored in the session record.
-        </p>
-        <button
-          disabled={!canEdit}
-          onClick={() =>
-            void onSaveSessionMeta().catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-          }
-          className="mt-3 h-10 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
-        >
-          Save title and rules
-        </button>
-      </div>
+      </section>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="text-sm font-medium">Seats (player assignment)</div>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {seats.map((seat) => (
-            <label key={seat} className="text-xs">
-              {seatLabel(seat)}
+      <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="text-sm font-medium">Record hand</div>
+        <div className="mt-3 space-y-4">
+          <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Win (ron / tsumo)</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SCORE_PRESETS.map((pts) => (
+                <button
+                  key={pts}
+                  type="button"
+                  onClick={() => setWinPoints(pts)}
+                  className={`h-9 rounded-lg border px-2 text-xs font-medium tabular-nums ${
+                    winPoints === pts
+                      ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
+                      : "border-zinc-200 dark:border-zinc-700"
+                  }`}
+                >
+                  {pts.toLocaleString()}
+                </button>
+              ))}
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <select
-                disabled={!canEdit}
-                value={seatPlayerId[seat]}
-                onChange={(e) => {
-                  const playerId = e.target.value;
-                  const player = players.find((p) => p.id === playerId);
-                  setSeatPlayerId((s) => ({ ...s, [seat]: playerId }));
-                  setSeatPlayerName((n) => ({ ...n, [seat]: player?.display_name ?? "" }));
-                }}
-                className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                value={winType}
+                onChange={(e) => setWinType(e.target.value as "ron" | "tsumo")}
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
               >
-                <option value="">—</option>
-                {players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.display_name}
+                <option value="ron">Ron</option>
+                <option value="tsumo">Tsumo</option>
+              </select>
+              <input
+                type="number"
+                value={winPoints}
+                onChange={(e) => setWinPoints(Number(e.target.value))}
+                placeholder="Hand points"
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              />
+              <select
+                value={winner}
+                onChange={(e) => setWinner(e.target.value as Seat)}
+                className="h-11 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                {seats.map((s) => (
+                  <option key={s} value={s}>
+                    Winner: {seatLabel(s)}
                   </option>
                 ))}
               </select>
+              {winType === "ron" ? (
+                <select
+                  value={fromSeat}
+                  onChange={(e) => setFromSeat(e.target.value as Seat)}
+                  className="h-11 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  {seats.map((s) => (
+                    <option key={s} value={s}>
+                      From: {seatLabel(s)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+            </div>
+            <label className="mt-2 block text-xs">
+              Honba sticks on table (0 if none)
+              <input
+                type="number"
+                min={0}
+                value={honba}
+                onChange={(e) => setHonba(Number(e.target.value))}
+                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              />
             </label>
-          ))}
+            <button
+              type="button"
+              disabled={!canEdit}
+              onClick={onAddWin}
+              className="mt-3 h-12 w-full rounded-xl bg-zinc-950 text-sm font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
+            >
+              Record win
+            </button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              <div className="text-xs font-medium">Riichi stick</div>
+              <div className="mt-2 flex gap-2">
+                <select
+                  value={riichiSeat}
+                  onChange={(e) => setRiichiSeat(e.target.value as Seat)}
+                  className="h-11 min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  {seats.map((s) => (
+                    <option key={s} value={s}>
+                      {seatLabel(s)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!canEdit}
+                  onClick={() =>
+                    void postEvent("riichi", {
+                      seat: riichiSeat,
+                      value: rules.riichiStickValue,
+                    }).catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+                  }
+                  className="h-11 shrink-0 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
+                >
+                  −{rules.riichiStickValue}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+              <div className="text-xs font-medium">Manual score change</div>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+                Add or subtract points for each seat. Use for mistakes, chombo, or anything{" "}
+                <span className="font-medium text-zinc-600 dark:text-zinc-400">Record win</span> does not cover.
+              </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Example: East <span className="font-mono">+8000</span>, South{" "}
+                <span className="font-mono">−8000</span>, others <span className="font-mono">0</span>.
+              </p>
+              <div className="mt-2 grid grid-cols-4 gap-1">
+                {seats.map((s) => (
+                  <label key={s} className="text-center text-[10px]">
+                    <span className="text-zinc-500">{seatLabel(s)}</span>
+                    <span className="block text-[9px] text-zinc-400">+/− pts</span>
+                    <input
+                      type="number"
+                      value={manualDelta[s]}
+                      onChange={(e) => setManualDelta((d) => ({ ...d, [s]: Number(e.target.value) }))}
+                      className="mt-0.5 h-9 w-full rounded border border-zinc-200 px-1 text-xs dark:border-zinc-800 dark:bg-zinc-950"
+                    />
+                  </label>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={!canEdit}
+                onClick={() =>
+                  void postEvent("manual_adjustment", { deltaBySeat: manualDelta })
+                    .then(() => setManualDelta({ E: 0, S: 0, W: 0, N: 0 }))
+                    .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+                }
+                className="mt-2 h-9 w-full rounded-lg border border-zinc-200 text-xs font-medium dark:border-zinc-800"
+              >
+                Apply score change
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2">
+      </section>
+
+      <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Game setup (players & rules)</summary>
+        <div className="space-y-4 border-t border-zinc-200 px-4 py-4 dark:border-zinc-800">
+          <label className="block text-xs">
+            Session title
+            <input
+              disabled={!canEdit}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+            />
+          </label>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(
+              [
+                ["startingPoints", "Starting"],
+                ["returnPoints", "Return"],
+                ["riichiStickValue", "Riichi stick"],
+                ["honbaValue", "Honba each"],
+              ] as const
+            ).map(([key, label]) => (
+              <label key={key} className="text-xs">
+                {label}
+                <input
+                  type="number"
+                  disabled={!canEdit}
+                  value={rules[key]}
+                  onChange={(e) => setRules((r) => ({ ...r, [key]: Number(e.target.value) }))}
+                  className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                />
+              </label>
+            ))}
+          </div>
           <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() =>
+              void onSaveSessionMeta().catch((e) => setError(e instanceof Error ? e.message : "Failed"))
+            }
+            className="h-10 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
+          >
+            Save title and rules
+          </button>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {seats.map((seat) => (
+              <label key={seat} className="text-xs">
+                {seatLabel(seat)}
+                <select
+                  disabled={!canEdit}
+                  value={seatPlayerId[seat]}
+                  onChange={(e) => {
+                    const playerId = e.target.value;
+                    const player = players.find((p) => p.id === playerId);
+                    setSeatPlayerId((s) => ({ ...s, [seat]: playerId }));
+                    setSeatPlayerName((n) => ({ ...n, [seat]: player?.display_name ?? "" }));
+                  }}
+                  className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <option value="">—</option>
+                  {players.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
             disabled={!canEdit}
             onClick={() =>
               void fetch(`/api/sessions/${shareId}/players`, {
@@ -453,190 +553,71 @@ export function SessionClient({ shareId }: { shareId: string }) {
           >
             Save seat assignments
           </button>
+          <p className="text-xs text-zinc-500">
+            Add names on <Link href="/players" className="underline">Players</Link> first.
+          </p>
         </div>
-        <p className="mt-2 text-xs text-zinc-500">
-          Add players on the <Link href="/players" className="underline">Players</Link> page first.
-        </p>
-      </div>
+      </details>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="text-sm font-medium">Scoreboard</div>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {seats.map((s) => (
-              <div
-                key={s}
-                className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <div className="text-xs text-zinc-500">{seatLabel(s)}</div>
-                {seatPlayerName[s] ? (
-                  <div className="truncate text-sm font-medium">{seatPlayerName[s]}</div>
-                ) : null}
-                <div className="mt-1 font-mono text-lg">{totals[s].toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="text-sm font-medium">Add event</div>
-          <div className="mt-3 space-y-4">
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <div className="text-xs font-medium">Win (ron / tsumo)</div>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                <select
-                  value={winType}
-                  onChange={(e) => setWinType(e.target.value as "ron" | "tsumo")}
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                >
-                  <option value="ron">Ron</option>
-                  <option value="tsumo">Tsumo</option>
-                </select>
-                <input
-                  type="number"
-                  value={winPoints}
-                  onChange={(e) => setWinPoints(Number(e.target.value))}
-                  placeholder="Hand points"
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                />
-                <select
-                  value={winner}
-                  onChange={(e) => setWinner(e.target.value as Seat)}
-                  className="h-10 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                >
-                  {seats.map((s) => (
-                    <option key={s} value={s}>
-                      Winner: {seatLabel(s)}
-                    </option>
-                  ))}
-                </select>
-                {winType === "ron" ? (
-                  <select
-                    value={fromSeat}
-                    onChange={(e) => setFromSeat(e.target.value as Seat)}
-                    className="h-10 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                  >
-                    {seats.map((s) => (
-                      <option key={s} value={s}>
-                        From: {seatLabel(s)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div />
-                )}
-              </div>
-              <label className="mt-2 block text-xs">
-                Honba sticks on table (0 if none)
-                <input
-                  type="number"
-                  min={0}
-                  value={honba}
-                  onChange={(e) => setHonba(Number(e.target.value))}
-                  className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                />
-              </label>
-              <p className="mt-1 text-xs text-zinc-500">
-                Adds honba × {rules.honbaValue} × {winType === "ron" ? "1" : "3"} to hand points.
-              </p>
-              <input
-                value={eventNote}
-                onChange={(e) => setEventNote(e.target.value)}
-                placeholder="Optional note"
-                className="mt-2 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-              />
-              <button
-                disabled={!canEdit}
-                onClick={onAddWin}
-                className="mt-2 h-10 w-full rounded-lg bg-zinc-950 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
-              >
-                Record win
+      <details className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">Share with table</summary>
+        <div className="space-y-3 border-t border-zinc-200 px-4 py-4 text-sm dark:border-zinc-800">
+          <div className="rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-zinc-500">Viewer link (for everyone else)</div>
+              <button type="button" onClick={() => void copyText("Viewer link", shareUrl)} className="text-xs underline">
+                Copy
               </button>
             </div>
-
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <div className="text-xs font-medium">Riichi stick placed</div>
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-                <select
-                  value={riichiSeat}
-                  onChange={(e) => setRiichiSeat(e.target.value as Seat)}
-                  className="h-10 flex-1 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                >
-                  {seats.map((s) => (
-                    <option key={s} value={s}>
-                      {seatLabel(s)}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="number"
-                  value={riichiValue}
-                  onChange={(e) => setRiichiValue(Number(e.target.value))}
-                  className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950 sm:w-28"
-                />
-                <button
-                  disabled={!canEdit}
-                  onClick={() =>
-                    void postEvent("riichi", { seat: riichiSeat, value: riichiValue }).catch((e) =>
-                      setError(e instanceof Error ? e.message : "Failed")
-                    )
-                  }
-                  className="h-10 rounded-lg bg-zinc-950 px-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
-                >
-                  Add
+            <div className="mt-1 break-all font-mono text-xs">{shareUrl}</div>
+          </div>
+          {editUrl ? (
+            <div className="rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs text-zinc-500">Editor link (scorekeeper only)</div>
+                <button type="button" onClick={() => void copyText("Editor link", editUrl)} className="text-xs underline">
+                  Copy
                 </button>
               </div>
+              <div className="mt-1 break-all font-mono text-xs">{editUrl}</div>
             </div>
-
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <div className="text-xs font-medium">Manual adjustment</div>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {seats.map((s) => (
-                  <label key={s} className="text-xs">
-                    {s}
-                    <input
-                      type="number"
-                      value={manualDelta[s]}
-                      onChange={(e) => setManualDelta((d) => ({ ...d, [s]: Number(e.target.value) }))}
-                      className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-                    />
-                  </label>
-                ))}
-              </div>
-              <button
-                disabled={!canEdit}
-                onClick={() =>
-                  void postEvent("manual_adjustment", {
-                    deltaBySeat: manualDelta,
-                    note: eventNote.trim() || undefined,
-                  }).catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-                }
-                className="mt-2 h-10 w-full rounded-lg bg-zinc-950 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
-              >
-                Add adjustment
-              </button>
-            </div>
+          ) : null}
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={editKeyInput}
+              onChange={(e) => setEditKeyInput(e.target.value)}
+              placeholder="Paste edit key"
+              className="h-10 flex-1 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+            />
+            <button
+              type="button"
+              onClick={saveEditKeyFromInput}
+              className="h-10 rounded-lg border border-zinc-200 px-3 text-sm dark:border-zinc-800"
+            >
+              Enable editing
+            </button>
           </div>
         </div>
-      </div>
+      </details>
 
       <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
         <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-          <div className="text-sm font-medium">History</div>
+          <div className="text-sm font-medium">Hand history</div>
           <button
+            type="button"
             disabled={!canEdit || events.length === 0}
             onClick={() =>
               void onUndoLastEvent().catch((e) =>
                 setError(e instanceof Error ? e.message : "Failed to undo")
               )
             }
-            className="h-8 rounded-lg border border-zinc-200 px-2 text-xs disabled:opacity-40 dark:border-zinc-800"
+            className="h-9 rounded-lg border border-zinc-200 px-3 text-xs font-medium disabled:opacity-40 dark:border-zinc-800"
           >
-            Undo last event
+            Undo last
           </button>
         </div>
         <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {events.map((ev, idx) => (
+          {[...events].reverse().map((ev, idx) => (
             <li key={idx} className="px-4 py-3 text-sm">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="font-medium">{ev.type}</div>
@@ -648,7 +629,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
             </li>
           ))}
           {events.length === 0 ? (
-            <li className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-300">No events yet.</li>
+            <li className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-300">No hands recorded yet.</li>
           ) : null}
         </ul>
       </div>

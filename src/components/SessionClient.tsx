@@ -11,9 +11,10 @@ import {
   defaultRules,
 } from "@/lib/scoring/ledger";
 import { mapEventRow } from "@/lib/scoring/events";
-import { getStoredEditKey, storeEditKey } from "@/lib/editKey";
+import { storeEditKey } from "@/lib/editKey";
 import { storeRecentSession } from "@/lib/recentSession";
 import { getSupabaseClient } from "@/lib/supabase/client";
+import { useEditKey, useOrigin } from "@/hooks/useClientStorage";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
 const SCORE_PRESETS = [3900, 5200, 7700, 8000, 12000];
@@ -27,17 +28,6 @@ function seatLabel(seat: Seat) {
 
 type PlayerOption = { id: string; display_name: string };
 
-function getInitialEditKey(shareId: string) {
-  if (typeof window === "undefined") return undefined;
-  const params = new URLSearchParams(window.location.search);
-  const fromUrl = params.get("editKey");
-  if (fromUrl) {
-    storeEditKey(shareId, fromUrl);
-    return fromUrl;
-  }
-  return getStoredEditKey(shareId);
-}
-
 export function SessionClient({ shareId }: { shareId: string }) {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
@@ -45,7 +35,10 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [rules, setRules] = useState<Rules>(defaultRules());
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [editKey, setEditKey] = useState<string | undefined>(() => getInitialEditKey(shareId));
+  const storedEditKey = useEditKey(shareId);
+  const [manualEditKey, setManualEditKey] = useState<string | undefined>(undefined);
+  const editKey = manualEditKey ?? storedEditKey;
+  const origin = useOrigin();
   const [editKeyInput, setEditKeyInput] = useState("");
   const [claimStatus, setClaimStatus] = useState<string | null>(null);
 
@@ -134,7 +127,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
   const totals = computeTotals(seats, rules, events);
   const canEdit = Boolean(editKey);
-  const shareUrl = typeof window === "undefined" ? `/s/${shareId}` : `${window.location.origin}/s/${shareId}`;
+  const shareUrl = origin ? `${origin}/s/${shareId}` : `/s/${shareId}`;
   const editUrl = canEdit ? `${shareUrl}?editKey=${encodeURIComponent(editKey ?? "")}` : null;
 
   async function postEvent(type: string, payload: Record<string, unknown>) {
@@ -200,7 +193,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       return;
     }
     storeEditKey(shareId, trimmed);
-    setEditKey(trimmed);
+    setManualEditKey(trimmed);
     setError(null);
   }
 

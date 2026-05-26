@@ -5,16 +5,32 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getSupabaseClient } from "@/lib/supabase/client";
 
+function readAuthErrorFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  const urlError = new URLSearchParams(window.location.search).get("error");
+  if (!urlError) return null;
+  if (urlError === "missing_code") {
+    return "Sign-in did not finish. Confirm Supabase redirect URLs include /auth/callback for this site.";
+  }
+  if (urlError === "supabase_config") return "Supabase is not configured on the server.";
+  return decodeURIComponent(urlError);
+}
+
 export default function LoginPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(readAuthErrorFromUrl);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
+
+    if (window.location.search.includes("error=")) {
+      window.history.replaceState({}, "", "/login");
+    }
+
     void supabase.auth.getUser().then(({ data }) => {
       setUserEmail(data.user?.email ?? null);
     });

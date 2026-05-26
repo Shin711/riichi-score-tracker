@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { CreateSessionButton } from "@/components/CreateSessionButton";
 import type { SessionRow } from "@/lib/db/types";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -50,45 +51,61 @@ export default function MySessionsPage() {
   if (signedIn === false) {
     return (
       <main className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">My sessions</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">My games</h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-300">
-          Please <Link className="underline" href="/login">sign in</Link> to see claimed sessions.
+          Optional: <Link className="underline" href="/login">sign in</Link> to save claimed games to your
+          account. You can still play without an account — tap <span className="font-medium">New game</span>{" "}
+          anytime.
         </p>
+        <CreateSessionButton label="New game" fullWidth />
       </main>
     );
   }
 
   return (
     <main className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My sessions</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-          Sessions you claimed while signed in.
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My games</h1>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+            Games you claimed while signed in. Most players just resume from the home screen.
+          </p>
+        </div>
+        <CreateSessionButton label="New game" />
       </div>
 
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
 
-      <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-          {sessions.map((s) => (
-            <li key={s.id} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <div className="font-medium">{s.title ?? "Session"}</div>
-                <div className="text-xs text-zinc-500">{new Date(s.created_at).toLocaleString()}</div>
-              </div>
-              <Link className="text-sm underline" href={`/s/${s.share_id}`}>
-                Open
-              </Link>
-            </li>
-          ))}
-          {sessions.length === 0 && signedIn ? (
-            <li className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-300">
-              No claimed sessions yet. Open a session and click “Claim session”.
-            </li>
-          ) : null}
-        </ul>
-      </div>
+      {sessions.length === 0 && signedIn ? (
+        <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-8 text-center dark:border-zinc-700 dark:bg-zinc-900">
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">No saved games on your account yet.</p>
+          <p className="mt-2 text-xs text-zinc-500">
+            Start a game, then tap <span className="font-medium">Claim session</span> inside it to save here.
+          </p>
+          <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <CreateSessionButton label="Start new game" fullWidth />
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+            {sessions.map((s) => (
+              <li key={s.id}>
+                <Link
+                  href={`/s/${s.share_id}`}
+                  className="flex items-center justify-between px-4 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-950/50"
+                >
+                  <div>
+                    <div className="font-medium">{s.title ?? "Session"}</div>
+                    <div className="text-xs text-zinc-500">{new Date(s.created_at).toLocaleString()}</div>
+                  </div>
+                  <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Open →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </main>
   );
 }

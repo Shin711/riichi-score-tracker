@@ -38,8 +38,18 @@ export default function LoginPage() {
       options: { emailRedirectTo: `${window.location.origin}/login` },
     });
 
-    if (error) setError(error.message);
-    else setStatus("Check your email for the magic link.");
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes("rate limit") || msg.includes("email rate")) {
+        setError(
+          "Email limit reached. Supabase’s built-in mail allows ~2/hour — set up free Resend SMTP (see docs/auth-email-setup.md in the repo). You can still play without signing in."
+        );
+      } else {
+        setError(error.message);
+      }
+      return;
+    }
+    setStatus("Check your email for the magic link (and spam folder).");
   }
 
   async function onSignOut() {
@@ -53,7 +63,7 @@ export default function LoginPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-          Optional sign-in to claim sessions you created.
+          Optional — claim games to your account. Scoring works without signing in.
         </p>
       </div>
 
@@ -80,6 +90,10 @@ export default function LoginPage() {
       ) : (
         <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <label className="text-sm font-medium">Email (magic link)</label>
+          <p className="mt-1 text-xs text-zinc-500">
+            Requires Resend SMTP in Supabase for reliable delivery — see{" "}
+            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">docs/auth-email-setup.md</code>.
+          </p>
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}

@@ -19,7 +19,8 @@ Web app to track Riichi Mahjong sessions: player profiles, shareable session lin
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (recommended for API writes)
 4. Enable **Email** auth in Supabase (Authentication → Providers) for magic-link sign-in.
-5. Install and run:
+5. **Fix magic-link rate limits:** configure free **[Resend](https://resend.com)** SMTP in Supabase — see [`docs/auth-email-setup.md`](docs/auth-email-setup.md). (Built-in Supabase email allows ~2/hour.)
+6. Install and run:
 
 ```bash
 npm install

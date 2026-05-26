@@ -1,15 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
-import { getRecentSession, type RecentSession } from "@/lib/recentSession";
+import { useIsClient } from "@/hooks/useClientStorage";
+import { getRecentSession } from "@/lib/recentSession";
 
 export function RecentSessionCard() {
-  const [recent] = useState<RecentSession | null>(() =>
-    typeof window === "undefined" ? null : getRecentSession()
-  );
+  const isClient = useIsClient();
+  if (!isClient) return null;
 
+  const recent = getRecentSession();
   if (!recent) return null;
 
   return (

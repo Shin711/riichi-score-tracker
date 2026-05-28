@@ -24,5 +24,12 @@ export function mapEventRow(row: EventRow): SessionEvent {
 
   const deltas = (payload.deltas ?? {}) as Record<Seat, number>;
   const note = typeof payload.note === "string" ? payload.note : undefined;
-  return { type: "win", createdAt, deltas, note };
+  const winType =
+    payload.winType === "ron" || payload.winType === "tsumo" ? payload.winType : undefined;
+  const winner = asSeat(payload.winner) ?? undefined;
+  const fromSeat = asSeat(payload.fromSeat) ?? undefined;
+  const han = typeof payload.han === "number" ? payload.han : undefined;
+  const fu = typeof payload.fu === "number" ? payload.fu : undefined;
+  const winnerIsDealer = payload.winnerIsDealer === true;
+  return { type: "win", createdAt, deltas, note, winType, winner, fromSeat, han, fu, winnerIsDealer };
 }

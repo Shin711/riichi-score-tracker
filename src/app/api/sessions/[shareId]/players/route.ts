@@ -34,8 +34,16 @@ export async function POST(
     .map(([seat, player_id]) => ({
       session_id: session.id,
       seat,
-      player_id,
+      player_id: player_id as string,
     }));
+
+  const playerIds = rows.map((r) => r.player_id);
+  if (new Set(playerIds).size !== playerIds.length) {
+    return NextResponse.json(
+      { error: "Each player can only sit in one seat." },
+      { status: 400 }
+    );
+  }
 
   const seatsToClear = (["E", "S", "W", "N"] as Seat[]).filter((seat) => !assignments[seat]);
 

@@ -40,6 +40,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Usage
 
 - **Players**: add names on `/players`.
+- **Leaderboard**: `/leaderboard` ranks players by net points across all games with seat assignments.
 - **New session**: click **Create session** on the home page. The edit key is stored in this browser’s `localStorage`.
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).

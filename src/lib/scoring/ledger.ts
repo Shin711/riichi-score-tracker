@@ -25,6 +25,12 @@ export type SessionEvent =
       createdAt: string;
       deltas: Record<Seat, number>;
       note?: string;
+      winType?: "ron" | "tsumo";
+      winner?: Seat;
+      fromSeat?: Seat;
+      han?: number;
+      fu?: number;
+      winnerIsDealer?: boolean;
     };
 
 export function defaultRules(): Rules {

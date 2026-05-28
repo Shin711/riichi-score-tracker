@@ -14,6 +14,7 @@ Web app to track Riichi Mahjong sessions: player profiles, shareable session lin
 2. In the Supabase SQL editor, run these migrations in order:
    - [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql)
    - [`supabase/migrations/002_rls_minimal_and_constraints.sql`](supabase/migrations/002_rls_minimal_and_constraints.sql)
+   - [`supabase/migrations/003_session_ended_at.sql`](supabase/migrations/003_session_ended_at.sql)
 3. Copy [`.env.local.example`](.env.local.example) to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -40,6 +41,8 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Usage
 
 - **Players**: add names on `/players`.
+- **Leaderboard**: `/leaderboard` ranks players by cumulative points — sum of (ending score − starting stack) per finished game, ÷ 1,000 (same as the Riichi Leaderboard spreadsheet).
+- **End game**: on a session you edit, tap **End game** when play is over — locks score entry and counts the game on the leaderboard. Use **Reopen** if you ended by mistake.
 - **New session**: click **Create session** on the home page. The edit key is stored in this browser’s `localStorage`.
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).

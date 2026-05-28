@@ -137,8 +137,7 @@ export default function LoginPage() {
               {googleLoading ? "Redirecting…" : "Continue with Google"}
             </button>
             <p className="mt-2 text-xs text-zinc-500">
-              Recommended — no email setup required. Setup guide:{" "}
-              <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">docs/google-sign-in-setup.md</code>
+              Recommended — no email setup required.
             </p>
           </div>
 

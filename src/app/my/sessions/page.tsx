@@ -9,7 +9,9 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 
 export default function MySessionsPage() {
   const supabase = useMemo(() => getSupabaseClient(), []);
-  const [sessions, setSessions] = useState<Pick<SessionRow, "id" | "share_id" | "title" | "created_at">[]>([]);
+  const [sessions, setSessions] = useState<
+    Pick<SessionRow, "id" | "share_id" | "title" | "created_at" | "ended_at">[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
 
@@ -33,7 +35,7 @@ export default function MySessionsPage() {
 
       const { data, error } = await supabase
         .from("sessions")
-        .select("id, share_id, title, created_at")
+        .select("id, share_id, title, created_at, ended_at")
         .eq("owner_user_id", userData.user.id)
         .order("created_at", { ascending: false });
 
@@ -96,7 +98,18 @@ export default function MySessionsPage() {
                   className="flex items-center justify-between px-4 py-4 hover:bg-zinc-50 dark:hover:bg-zinc-950/50"
                 >
                   <div>
-                    <div className="font-medium">{s.title ?? "Session"}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{s.title ?? "Session"}</span>
+                      {s.ended_at ? (
+                        <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                          Ended
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                          Active
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-zinc-500">{new Date(s.created_at).toLocaleString()}</div>
                   </div>
                   <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">Open →</span>

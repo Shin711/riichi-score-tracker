@@ -15,6 +15,7 @@ export type SessionRow = {
   edit_key: string;
   owner_user_id: string | null;
   created_at: string;
+  ended_at: string | null;
 };
 
 export type EventRow = {

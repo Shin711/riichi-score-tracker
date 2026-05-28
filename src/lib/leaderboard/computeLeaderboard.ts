@@ -7,15 +7,18 @@ import {
   type Seat,
 } from "@/lib/scoring/ledger";
 
+import { gameScoreDelta, LEADERBOARD_POINTS_DIVISOR } from "@/lib/leaderboard/points";
+
 const seats: Seat[] = ["E", "S", "W", "N"];
 
 export type LeaderboardEntry = {
   playerId: string;
   displayName: string;
   gamesPlayed: number;
+  /** Sum of (ending score − starting stack) across finished games. */
   totalDelta: number;
-  averageDelta: number;
-  firstPlaces: number;
+  /** totalDelta ÷ 1,000 — same units as Riichi Leaderboard.xlsx. */
+  points: number;
 };
 
 export type SessionSnapshot = {
@@ -50,7 +53,7 @@ export function computeLeaderboard(
 ): LeaderboardEntry[] {
   const byPlayer = new Map<
     string,
-    { playerId: string; displayName: string; gamesPlayed: number; totalDelta: number; firstPlaces: number }
+    { playerId: string; displayName: string; gamesPlayed: number; totalDelta: number }
   >();
 
   for (const { id, display_name } of allPlayers) {
@@ -59,7 +62,6 @@ export function computeLeaderboard(
       displayName: display_name,
       gamesPlayed: 0,
       totalDelta: 0,
-      firstPlaces: 0,
     });
   }
 
@@ -76,11 +78,9 @@ export function computeLeaderboard(
       })
     );
     const totals = computeTotals(seats, session.rules, mappedEvents);
-    const maxTotal = Math.max(...seats.map((s) => totals[s]));
-    const winners = new Set(seats.filter((s) => totals[s] === maxTotal));
 
     for (const { seat, playerId, displayName } of session.assignments) {
-      const delta = totals[seat] - session.rules.startingPoints;
+      const delta = gameScoreDelta(totals[seat], session.rules.startingPoints);
       let entry = byPlayer.get(playerId);
       if (!entry) {
         entry = {
@@ -88,27 +88,23 @@ export function computeLeaderboard(
           displayName,
           gamesPlayed: 0,
           totalDelta: 0,
-          firstPlaces: 0,
         };
         byPlayer.set(playerId, entry);
       }
       entry.displayName = displayName;
       entry.gamesPlayed += 1;
       entry.totalDelta += delta;
-      if (winners.has(seat)) entry.firstPlaces += 1;
     }
   }
 
   return Array.from(byPlayer.values())
     .map((entry) => ({
       ...entry,
-      averageDelta:
-        entry.gamesPlayed > 0 ? Math.round(entry.totalDelta / entry.gamesPlayed) : 0,
+      points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
     }))
     .sort(
       (a, b) =>
-        b.totalDelta - a.totalDelta ||
-        b.firstPlaces - a.firstPlaces ||
+        b.points - a.points ||
         b.gamesPlayed - a.gamesPlayed ||
         a.displayName.localeCompare(b.displayName)
     );

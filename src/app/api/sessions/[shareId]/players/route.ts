@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getSessionForEdit } from "@/lib/api/sessionEdit";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 type Seat = "E" | "S" | "W" | "N";
@@ -22,21 +23,11 @@ export async function POST(
   const body = (await req.json()) as { assignments: Partial<Record<Seat, string>> };
   const assignments = body.assignments ?? {};
 
-  const { data: session, error: sessionErr } = await supabase
-    .from("sessions")
-    .select("id, edit_key")
-    .eq("share_id", shareId)
-    .maybeSingle();
-
-  if (sessionErr) {
-    return NextResponse.json({ error: sessionErr.message }, { status: 400 });
+  const sessionResult = await getSessionForEdit(supabase, shareId, editKey);
+  if ("error" in sessionResult) {
+    return NextResponse.json({ error: sessionResult.error }, { status: sessionResult.status });
   }
-  if (!session) {
-    return NextResponse.json({ error: "Session not found." }, { status: 404 });
-  }
-  if (session.edit_key !== editKey) {
-    return NextResponse.json({ error: "Invalid edit key." }, { status: 403 });
-  }
+  const session = sessionResult.session;
 
   const rows = Object.entries(assignments)
     .filter(([, playerId]) => Boolean(playerId))

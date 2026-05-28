@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getSessionForEdit } from "@/lib/api/sessionEdit";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 type EventBody = { type?: string; payload?: Record<string, unknown> };
@@ -27,21 +28,11 @@ export async function POST(
     return NextResponse.json({ error: "Missing event payload." }, { status: 400 });
   }
 
-  const { data: session, error: sessionErr } = await supabase
-    .from("sessions")
-    .select("id, edit_key")
-    .eq("share_id", shareId)
-    .maybeSingle();
-
-  if (sessionErr) {
-    return NextResponse.json({ error: sessionErr.message }, { status: 400 });
+  const sessionResult = await getSessionForEdit(supabase, shareId, editKey);
+  if ("error" in sessionResult) {
+    return NextResponse.json({ error: sessionResult.error }, { status: sessionResult.status });
   }
-  if (!session) {
-    return NextResponse.json({ error: "Session not found." }, { status: 404 });
-  }
-  if (session.edit_key !== editKey) {
-    return NextResponse.json({ error: "Invalid edit key." }, { status: 403 });
-  }
+  const session = sessionResult.session;
 
   const { data, error } = await supabase
     .from("events")
@@ -75,21 +66,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Missing x-edit-key header." }, { status: 401 });
   }
 
-  const { data: session, error: sessionErr } = await supabase
-    .from("sessions")
-    .select("id, edit_key")
-    .eq("share_id", shareId)
-    .maybeSingle();
-
-  if (sessionErr) {
-    return NextResponse.json({ error: sessionErr.message }, { status: 400 });
+  const sessionResult = await getSessionForEdit(supabase, shareId, editKey);
+  if ("error" in sessionResult) {
+    return NextResponse.json({ error: sessionResult.error }, { status: sessionResult.status });
   }
-  if (!session) {
-    return NextResponse.json({ error: "Session not found." }, { status: 404 });
-  }
-  if (session.edit_key !== editKey) {
-    return NextResponse.json({ error: "Invalid edit key." }, { status: 403 });
-  }
+  const session = sessionResult.session;
 
   const { data: lastEvent, error: lastErr } = await supabase
     .from("events")

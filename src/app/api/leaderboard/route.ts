@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   const [sessionsRes, playersRes, sessionPlayersRes, eventsRes] = await Promise.all([
-    supabase.from("sessions").select("id, rules_json"),
+    supabase.from("sessions").select("id, rules_json, ended_at").not("ended_at", "is", null),
     supabase.from("players").select("id, display_name"),
     supabase
       .from("session_players")

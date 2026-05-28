@@ -30,6 +30,13 @@ export function getRecentSession(): RecentSession | null {
   }
 }
 
+export function clearRecentSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(key);
+  cachedRaw = undefined;
+  cachedValue = null;
+}
+
 export function storeRecentSession(shareId: string, title: string) {
   if (typeof window === "undefined") return;
   const entry: RecentSession = {

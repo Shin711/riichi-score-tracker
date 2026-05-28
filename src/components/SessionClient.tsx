@@ -12,7 +12,8 @@ import {
 } from "@/lib/scoring/ledger";
 import { mapEventRow } from "@/lib/scoring/events";
 import { storeEditKey } from "@/lib/editKey";
-import { storeRecentSession } from "@/lib/recentSession";
+import { clearRecentSession, storeRecentSession } from "@/lib/recentSession";
+import { isSessionEnded } from "@/lib/session/status";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { useEditKey, useOrigin } from "@/hooks/useClientStorage";
 
@@ -32,6 +33,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const supabase = useMemo(() => getSupabaseClient(), []);
 
   const [title, setTitle] = useState("Session");
+  const [endedAt, setEndedAt] = useState<string | null>(null);
   const [rules, setRules] = useState<Rules>(defaultRules());
   const [events, setEvents] = useState<SessionEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const load = useCallback(async () => {
     const res = await fetch(`/api/sessions/${shareId}`);
     const json = (await res.json()) as {
-      session?: { title: string | null; rules_json: Rules };
+      session?: { title: string | null; rules_json: Rules; ended_at: string | null };
       events?: Array<{
         type: string;
         payload_json: Record<string, unknown>;
@@ -81,8 +83,12 @@ export function SessionClient({ shareId }: { shareId: string }) {
     };
     if (!res.ok) throw new Error(json.error ?? "Failed to load session");
     const sessionTitle = json.session?.title ?? "Session";
+    const sessionEndedAt = json.session?.ended_at ?? null;
     setTitle(sessionTitle);
-    storeRecentSession(shareId, sessionTitle);
+    setEndedAt(sessionEndedAt);
+    if (!isSessionEnded(sessionEndedAt)) {
+      storeRecentSession(shareId, sessionTitle);
+    }
     setRules(json.session?.rules_json ?? defaultRules());
     setEvents((json.events ?? []).map((r) => mapEventRow(r)));
 
@@ -126,13 +132,70 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }, [supabase]);
 
   const totals = computeTotals(seats, rules, events);
+  const isEnded = isSessionEnded(endedAt);
   const canEdit = Boolean(editKey);
+  const canRecord = canEdit && !isEnded;
   const shareUrl = origin ? `${origin}/s/${shareId}` : `/s/${shareId}`;
   const editUrl = canEdit ? `${shareUrl}?editKey=${encodeURIComponent(editKey ?? "")}` : null;
+
+  async function patchSession(body: Record<string, unknown>) {
+    if (!editKey) {
+      setError("Editing is not enabled on this device (missing edit key).");
+      return;
+    }
+    const res = await fetch(`/api/sessions/${shareId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-edit-key": editKey },
+      body: JSON.stringify(body),
+    });
+    const json = (await res.json()) as {
+      session?: { title: string | null; rules_json: Rules; ended_at: string | null };
+      error?: string;
+    };
+    if (!res.ok) throw new Error(json.error ?? "Failed to update session");
+    if (json.session) {
+      setTitle(json.session.title ?? "Session");
+      setRules(json.session.rules_json ?? defaultRules());
+      setEndedAt(json.session.ended_at ?? null);
+    }
+    return json.session;
+  }
+
+  async function onEndGame() {
+    if (!canEdit || isEnded) return;
+    const ok = window.confirm(
+      "End this game? Scores stay visible but no more hands can be recorded. The game will count toward the leaderboard."
+    );
+    if (!ok) return;
+    setError(null);
+    try {
+      await patchSession({ end: true });
+      clearRecentSession();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to end game");
+    }
+  }
+
+  async function onReopenGame() {
+    if (!canEdit || !isEnded) return;
+    const ok = window.confirm("Reopen this game for more score entry?");
+    if (!ok) return;
+    setError(null);
+    try {
+      await patchSession({ reopen: true });
+      storeRecentSession(shareId, title);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to reopen game");
+    }
+  }
 
   async function postEvent(type: string, payload: Record<string, unknown>) {
     if (!editKey) {
       setError("Editing is not enabled on this device (missing edit key).");
+      return;
+    }
+    if (isEnded) {
+      setError("This game has ended. Reopen it to record more hands.");
       return;
     }
     const res = await fetch(`/api/sessions/${shareId}/events`, {
@@ -216,18 +279,12 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }
 
   async function onSaveSessionMeta() {
-    if (!editKey) {
-      setError("Editing is not enabled on this device.");
-      return;
-    }
     setError(null);
-    const res = await fetch(`/api/sessions/${shareId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-edit-key": editKey },
-      body: JSON.stringify({ title, rules_json: rules }),
-    });
-    const json = (await res.json()) as { error?: string };
-    if (!res.ok) throw new Error(json.error ?? "Failed to save rules");
+    try {
+      await patchSession({ title, rules_json: rules });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save rules");
+    }
   }
 
   function onAddWin() {
@@ -256,27 +313,66 @@ export function SessionClient({ shareId }: { shareId: string }) {
         <div className="min-w-0">
           <h1 className="truncate text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {canEdit ? "You can record hands" : "Viewing live scores"}
+            {isEnded
+              ? `Game ended${endedAt ? ` · ${new Date(endedAt).toLocaleString()}` : ""}`
+              : canRecord
+                ? "You can record hands"
+                : "Viewing live scores"}
           </p>
         </div>
-        {canEdit ? (
-          <button
-            type="button"
-            onClick={() => void onClaim()}
-            className="shrink-0 rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800"
-          >
-            Claim
-          </button>
-        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {canEdit && !isEnded ? (
+            <button
+              type="button"
+              onClick={() => void onEndGame()}
+              className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-800 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-200"
+            >
+              End game
+            </button>
+          ) : null}
+          {canEdit && isEnded ? (
+            <button
+              type="button"
+              onClick={() => void onReopenGame()}
+              className="rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800"
+            >
+              Reopen
+            </button>
+          ) : null}
+          {canEdit ? (
+            <button
+              type="button"
+              onClick={() => void onClaim()}
+              className="rounded-lg border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-800"
+            >
+              Claim
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {claimStatus ? <div className="text-sm text-emerald-700 dark:text-emerald-300">{claimStatus}</div> : null}
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
 
+      {isEnded ? (
+        <div className="rounded-xl border border-zinc-300 bg-zinc-100 px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+          This game is finished. Final scores are below. Ended games count on the{" "}
+          <Link href="/leaderboard" className="font-medium underline">
+            leaderboard
+          </Link>
+          .
+        </div>
+      ) : null}
+
       {!canEdit ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
           View-only. Ask the scorekeeper to share the editor link, or paste the edit key under{" "}
           <span className="font-medium">Share with table</span> below.
+        </div>
+      ) : canEdit && isEnded ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+          You have the edit key but this game is ended. Tap <span className="font-medium">Reopen</span> to
+          record more hands.
         </div>
       ) : null}
 
@@ -377,7 +473,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
             </label>
             <button
               type="button"
-              disabled={!canEdit}
+              disabled={!canRecord}
               onClick={onAddWin}
               className="mt-3 h-12 w-full rounded-xl bg-zinc-950 text-sm font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
             >
@@ -402,7 +498,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 </select>
                 <button
                   type="button"
-                  disabled={!canEdit}
+                  disabled={!canRecord}
                   onClick={() =>
                     void postEvent("riichi", {
                       seat: riichiSeat,
@@ -442,7 +538,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
               </div>
               <button
                 type="button"
-                disabled={!canEdit}
+                disabled={!canRecord}
                 onClick={() =>
                   void postEvent("manual_adjustment", { deltaBySeat: manualDelta })
                     .then(() => setManualDelta({ E: 0, S: 0, W: 0, N: 0 }))
@@ -463,7 +559,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           <label className="block text-xs">
             Session title
             <input
-              disabled={!canEdit}
+              disabled={!canRecord}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
@@ -482,7 +578,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 {label}
                 <input
                   type="number"
-                  disabled={!canEdit}
+                  disabled={!canRecord}
                   value={rules[key]}
                   onChange={(e) => setRules((r) => ({ ...r, [key]: Number(e.target.value) }))}
                   className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
@@ -492,7 +588,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           </div>
           <button
             type="button"
-            disabled={!canEdit}
+            disabled={!canRecord}
             onClick={() =>
               void onSaveSessionMeta().catch((e) => setError(e instanceof Error ? e.message : "Failed"))
             }
@@ -505,7 +601,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
               <label key={seat} className="text-xs">
                 {seatLabel(seat)}
                 <select
-                  disabled={!canEdit}
+                  disabled={!canRecord}
                   value={seatPlayerId[seat]}
                   onChange={(e) => {
                     const playerId = e.target.value;
@@ -527,7 +623,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           </div>
           <button
             type="button"
-            disabled={!canEdit}
+            disabled={!canRecord}
             onClick={() =>
               void fetch(`/api/sessions/${shareId}/players`, {
                 method: "POST",
@@ -598,7 +694,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           <div className="text-sm font-medium">Hand history</div>
           <button
             type="button"
-            disabled={!canEdit || events.length === 0}
+            disabled={!canRecord || events.length === 0}
             onClick={() =>
               void onUndoLastEvent().catch((e) =>
                 setError(e instanceof Error ? e.message : "Failed to undo")

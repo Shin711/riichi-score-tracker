@@ -1,6 +1,8 @@
-# Riichi Score Tracker
+# Flushing Riichi Mahjong Club
 
-Web app to track Riichi Mahjong sessions: player profiles, shareable session links, round-by-round events, and live totals.
+Web app for **Flushing Riichi Mahjong Club**: player profiles, shareable session links, round-by-round scoring, monthly leaderboard, and Mahjong Soul imports.
+
+**Production URL:** `https://flushing-riichi-mahjong-club.vercel.app` (set the Vercel project name to `flushing-riichi-mahjong-club`).
 
 ## Stack
 
@@ -38,8 +40,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 1. Push this repo to GitHub.
 2. Import the repo in [Vercel](https://vercel.com).
-3. Add the same environment variables in Vercel project settings.
-4. Deploy. For the **monthly leaderboard archive**, also follow [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md) (`CRON_SECRET` + production redeploy).
+3. Set the Vercel **project name** to `flushing-riichi-mahjong-club` (Settings → General → Project Name) so the default URL matches the club.
+4. Add the same environment variables in Vercel project settings.
+5. Deploy. For the **monthly leaderboard archive**, also follow [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md) (`CRON_SECRET` + production redeploy).
+
+After renaming an existing deployment, update **Google OAuth** authorized origins and any Supabase **Site URL** / redirect URLs to the new hostname.
 
 ## Usage
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionForEdit } from "@/lib/api/sessionEdit";
+import { DEFAULT_SESSION_TITLE } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function GET(
@@ -79,7 +80,7 @@ export async function PATCH(
   const session = sessionResult.session;
 
   const updates: Record<string, unknown> = {};
-  if (typeof body.title === "string") updates.title = body.title.trim() || "Riichi session";
+  if (typeof body.title === "string") updates.title = body.title.trim() || DEFAULT_SESSION_TITLE;
   if (body.rules_json && typeof body.rules_json === "object") updates.rules_json = body.rules_json;
   if (body.end === true) updates.ended_at = new Date().toISOString();
   if (body.reopen === true) updates.ended_at = null;

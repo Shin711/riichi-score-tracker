@@ -36,7 +36,7 @@ Your project ref (`drgzoyntsgrqdwzbrkjf`) will differ — use **your** URL exact
 1. Go to [Google Cloud Console](https://console.cloud.google.com/).
 2. Sign in with the Google account you want to own the OAuth app (can be personal).
 3. Top bar → **Select a project** → **New Project**.
-4. Name it e.g. `riichi-score-tracker` → **Create**.
+4. Name it e.g. `flushing-riichi-mahjong-club` → **Create**.
 5. Wait until created, then select that project in the top bar.
 
 ### B2. Configure the OAuth consent screen (required first)
@@ -44,7 +44,7 @@ Your project ref (`drgzoyntsgrqdwzbrkjf`) will differ — use **your** URL exact
 1. Left menu → **APIs & Services** → **OAuth consent screen**.
 2. **User Type** → choose **External** → **Create**.
 3. **App information**
-   - **App name:** `Riichi Score Tracker` (or your club name)
+   - **App name:** `Flushing Riichi Mahjong Club`
    - **User support email:** your email
    - **Developer contact email:** your email
 4. **Save and Continue**.
@@ -75,7 +75,7 @@ You do **not** need to enable any extra Google APIs for basic Google sign-in.
 1. Left menu → **APIs & Services** → **Credentials**.
 2. **+ Create Credentials** → **OAuth client ID**.
 3. **Application type:** **Web application**.
-4. **Name:** `Riichi Score Tracker Web`.
+4. **Name:** `Flushing Riichi Mahjong Club Web`.
 
 5. **Authorized JavaScript origins** — click **+ Add URI** for each:
 
@@ -84,7 +84,7 @@ You do **not** need to enable any extra Google APIs for basic Google sign-in.
    | Local dev | `http://localhost:3000` |
    | Production | `https://YOUR-VERCEL-APP.vercel.app` |
 
-   Example production: `https://riichi-score-tracker.vercel.app`
+   Example production: `https://flushing-riichi-mahjong-club.vercel.app`
 
    No trailing slash. No path (not `/login`).
 

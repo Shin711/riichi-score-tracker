@@ -1,4 +1,4 @@
--- Riichi Score Tracker schema (MVP)
+-- Flushing Riichi Mahjong Club schema (MVP)
 
 create extension if not exists "pgcrypto";
 

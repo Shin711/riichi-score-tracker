@@ -1,15 +1,13 @@
 import { CreateSessionCard } from "@/components/CreateSessionCard";
 import { RecentSessionCard } from "@/components/RecentSessionCard";
+import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 export default function Home() {
   return (
     <main className="space-y-6 font-sans">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Riichi score tracker</h1>
-        <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          Built for in-person games — quick score entry at the table, live scoreboard for everyone watching on
-          their phones.
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{SITE_NAME}</h1>
+        <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">{SITE_DESCRIPTION}</p>
       </div>
 
       <RecentSessionCard />

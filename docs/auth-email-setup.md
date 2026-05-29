@@ -29,7 +29,7 @@ Use Resend’s test sender **`onboarding@resend.dev`**.
 1. In Resend → **Domains** → **Add Domain** (e.g. `yourdomain.com` or a subdomain like `mail.yourdomain.com`).
 2. Add the DNS records Resend shows (SPF, DKIM — usually at your domain registrar or Cloudflare).
 3. Wait until status is **Verified**.
-4. Use a sender like `Riichi Tracker <noreply@yourdomain.com>`.
+4. Use a sender like `Flushing Riichi Mahjong Club <noreply@yourdomain.com>`.
 
 If you only have a Vercel URL and no domain, you still need **some** domain you control for Resend to mail arbitrary addresses.
 
@@ -44,7 +44,7 @@ If you only have a Vercel URL and no domain, you still need **some** domain you 
 | Field | Value |
 |--------|--------|
 | **Sender email** | `onboarding@resend.dev` (test) or `noreply@yourdomain.com` (production) |
-| **Sender name** | `Riichi Score Tracker` |
+| **Sender name** | `Flushing Riichi Mahjong Club` |
 | **Host** | `smtp.resend.com` |
 | **Port** | `465` |
 | **Username** | `resend` |

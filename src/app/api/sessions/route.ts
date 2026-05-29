@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { randomBase64Url } from "@/lib/ids";
 import { defaultRules } from "@/lib/scoring/ledger";
+import { DEFAULT_SESSION_TITLE } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
   }
   const shareId = randomBase64Url(12);
   const editKey = randomBase64Url(18);
-  const title = body.title?.trim() || "Riichi session";
+  const title = body.title?.trim() || DEFAULT_SESSION_TITLE;
   const rules_json = defaultRules();
 
   const { data, error } = await supabase

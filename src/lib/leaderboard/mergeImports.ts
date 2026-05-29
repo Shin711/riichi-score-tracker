@@ -1,5 +1,6 @@
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import { gameScoreDelta, LEADERBOARD_POINTS_DIVISOR } from "@/lib/leaderboard/points";
+import { isHumanImportEntry } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 
 export function mergeImportedGamesIntoLeaderboard(
@@ -13,9 +14,7 @@ export function mergeImportedGamesIntoLeaderboard(
   }
 
   for (const game of imports) {
-    const players = (game.entries_json ?? []).filter(
-      (e) => e.player_id && Number.isFinite(e.final_score)
-    );
+    const players = (game.entries_json ?? []).filter(isHumanImportEntry);
     if (players.length === 0) continue;
 
     for (const row of players) {

@@ -15,10 +15,11 @@ type SeatForm = {
   playerId: string;
   displayName: string;
   finalScore: string;
+  isAi: boolean;
 };
 
 function defaultSeats(): SeatForm[] {
-  return seatLabels.map(() => ({ playerId: "", displayName: "", finalScore: "" }));
+  return seatLabels.map(() => ({ playerId: "", displayName: "", finalScore: "", isAi: false }));
 }
 
 function toDatetimeLocalValue(date: Date) {
@@ -71,6 +72,17 @@ export function ImportGameForm() {
 
   const paipuValid = !mjsPaipuUrl.trim() || isValidMjsPaipuUrl(mjsPaipuUrl);
 
+  const scoreSumWarning = useMemo(() => {
+    const scores = seats.map((s) => Number(s.finalScore));
+    if (scores.some((n) => !Number.isFinite(n))) return null;
+    const expected = startingPoints * 4;
+    const sum = scores.reduce((a, b) => a + b, 0);
+    if (sum !== expected) {
+      return `Scores sum to ${sum.toLocaleString()}, but four × ${startingPoints.toLocaleString()} = ${expected.toLocaleString()}. Double-check for typos.`;
+    }
+    return null;
+  }, [seats, startingPoints]);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -79,6 +91,29 @@ export function ImportGameForm() {
     if (!paipuValid) {
       setError("Paste a valid Mahjong Soul log link, or leave it empty.");
       return;
+    }
+
+    const humanSeats = seats.filter((s) => !s.isAi);
+    if (humanSeats.length === 0) {
+      setError("Mark at least one seat as a human player.");
+      return;
+    }
+
+    for (const seat of humanSeats) {
+      const name = seat.playerId
+        ? players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName
+        : seat.displayName.trim();
+      if (!name) {
+        setError("Each human seat needs a player name.");
+        return;
+      }
+    }
+
+    for (const seat of seats) {
+      if (!Number.isFinite(Number(seat.finalScore))) {
+        setError("Enter a final score for every seat (including AI).");
+        return;
+      }
     }
 
     setSubmitting(true);
@@ -91,11 +126,16 @@ export function ImportGameForm() {
           startingPoints,
           mjsPaipuUrl: mjsPaipuUrl.trim() || undefined,
           seats: seats.map((s) => ({
-            playerId: s.playerId || undefined,
-            displayName: s.playerId
-              ? players.find((p) => p.id === s.playerId)?.display_name ?? s.displayName
-              : s.displayName.trim(),
-            finalScore: Number(s.finalScore),
+            isAi: s.isAi,
+            ...(s.isAi
+              ? { finalScore: Number(s.finalScore) }
+              : {
+                  playerId: s.playerId || undefined,
+                  displayName: s.playerId
+                    ? players.find((p) => p.id === s.playerId)?.display_name ?? s.displayName
+                    : s.displayName.trim(),
+                  finalScore: Number(s.finalScore),
+                }),
           })),
         }),
       });
@@ -144,9 +184,9 @@ export function ImportGameForm() {
       >
         <div className="text-sm font-medium">Import friendly match</div>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-          Enter final scores from Mahjong Soul or any friendly table. Points use the same rule as
-          in-person games: (final score − starting stack) ÷ 1,000, counted in the month played
-          (US Eastern).
+          Enter final scores from Mahjong Soul or any friendly table. Mark bot seats as{" "}
+          <span className="font-medium">AI</span> — only human scores count on the leaderboard.
+          Points: (final score − starting stack) ÷ 1,000, in the month played (US Eastern).
         </p>
 
         <div className="mt-4 space-y-4">
@@ -193,37 +233,60 @@ export function ImportGameForm() {
             {seatLabels.map((wind, index) => (
               <div
                 key={wind}
-                className="grid grid-cols-[4.5rem_1fr_6.5rem] items-center gap-2 rounded-xl border border-zinc-200 p-2 dark:border-zinc-800"
+                className="grid grid-cols-[4.5rem_1fr_6.5rem] items-start gap-2 rounded-xl border border-zinc-200 p-2 dark:border-zinc-800"
               >
-                <span className="text-xs font-medium text-zinc-500">{wind}</span>
+                <span className="pt-2 text-xs font-medium text-zinc-500">{wind}</span>
                 <div className="min-w-0 space-y-1">
-                  <select
-                    value={seats[index].playerId}
-                    onChange={(e) => {
-                      const playerId = e.target.value;
-                      const player = players.find((p) => p.id === playerId);
-                      updateSeat(index, {
-                        playerId,
-                        displayName: player?.display_name ?? seats[index].displayName,
-                      });
-                    }}
-                    className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-                  >
-                    <option value="">New name…</option>
-                    {players.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.display_name}
-                      </option>
-                    ))}
-                  </select>
-                  {!seats[index].playerId ? (
+                  <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
                     <input
-                      value={seats[index].displayName}
-                      onChange={(e) => updateSeat(index, { displayName: e.target.value })}
-                      placeholder="Player name"
-                      className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      type="checkbox"
+                      checked={seats[index].isAi}
+                      onChange={(e) =>
+                        updateSeat(index, {
+                          isAi: e.target.checked,
+                          playerId: "",
+                          displayName: "",
+                        })
+                      }
+                      className="h-4 w-4 rounded border-zinc-300"
                     />
-                  ) : null}
+                    AI bot
+                  </label>
+                  {seats[index].isAi ? (
+                    <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-200 px-2 text-sm text-zinc-500 dark:border-zinc-700">
+                      AI ({wind})
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={seats[index].playerId}
+                        onChange={(e) => {
+                          const playerId = e.target.value;
+                          const player = players.find((p) => p.id === playerId);
+                          updateSeat(index, {
+                            playerId,
+                            displayName: player?.display_name ?? seats[index].displayName,
+                          });
+                        }}
+                        className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                      >
+                        <option value="">New name…</option>
+                        {players.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.display_name}
+                          </option>
+                        ))}
+                      </select>
+                      {!seats[index].playerId ? (
+                        <input
+                          value={seats[index].displayName}
+                          onChange={(e) => updateSeat(index, { displayName: e.target.value })}
+                          placeholder="Player name"
+                          className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        />
+                      ) : null}
+                    </>
+                  )}
                 </div>
                 <input
                   type="number"
@@ -234,6 +297,9 @@ export function ImportGameForm() {
                 />
               </div>
             ))}
+            {scoreSumWarning ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300">{scoreSumWarning}</p>
+            ) : null}
           </div>
         </div>
 
@@ -281,9 +347,13 @@ export function ImportGameForm() {
                       {new Date(row.played_at).toLocaleString()} · MJS import
                     </div>
                     <ul className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
-                      {(row.entries_json ?? []).map((e) => (
-                        <li key={e.player_id}>
-                          {e.display_name}: {e.final_score.toLocaleString()}
+                      {(row.entries_json ?? []).map((e, entryIndex) => (
+                        <li
+                          key={e.player_id ?? `${e.display_name}-${entryIndex}`}
+                          className={e.is_ai ? "text-zinc-400 dark:text-zinc-500" : undefined}
+                        >
+                          {e.display_name}
+                          {e.is_ai ? " (AI)" : ""}: {e.final_score.toLocaleString()}
                         </li>
                       ))}
                     </ul>

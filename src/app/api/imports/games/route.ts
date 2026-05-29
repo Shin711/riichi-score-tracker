@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
+import { humanImportEntries } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -13,6 +14,7 @@ type ImportBody = {
     playerId?: string;
     displayName?: string;
     finalScore?: number;
+    isAi?: boolean;
   }>;
 };
 
@@ -84,14 +86,21 @@ export async function POST(req: Request) {
   }
 
   try {
+    const seatLabels = ["East", "South", "West", "North"] as const;
     const entries = await resolveImportPlayers(
       supabase,
-      seats.map((s) => ({
+      seats.map((s, index) => ({
         playerId: s.playerId,
         displayName: s.displayName ?? "",
         finalScore: Number(s.finalScore),
+        isAi: s.isAi === true,
+        windLabel: seatLabels[index],
       }))
     );
+
+    if (humanImportEntries({ entries_json: entries }).length === 0) {
+      return NextResponse.json({ error: "At least one human seat is required." }, { status: 400 });
+    }
 
     const { data, error } = await supabase
       .from("imported_games")

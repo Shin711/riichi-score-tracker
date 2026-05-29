@@ -22,6 +22,46 @@ export function mapEventRow(row: EventRow): SessionEvent {
     return { type: "manual_adjustment", createdAt, deltaBySeat, note };
   }
 
+  if (row.type === "draw") {
+    const dealerTenpai = payload.dealerTenpai === true;
+    const note = typeof payload.note === "string" ? payload.note : undefined;
+    const drawKind =
+      payload.drawKind === "four_riichi" ||
+      payload.drawKind === "four_kans" ||
+      payload.drawKind === "nagashi_mangan"
+        ? payload.drawKind
+        : "standard";
+    const tenpaiSeats = (Array.isArray(payload.tenpaiSeats) ? payload.tenpaiSeats : [])
+      .map((s) => asSeat(s))
+      .filter((s): s is Seat => s !== null);
+    const nagashiSeat = asSeat(payload.nagashiSeat) ?? undefined;
+    const rawDeltas = payload.deltas;
+    const deltas =
+      rawDeltas && typeof rawDeltas === "object"
+        ? ({
+            E: Number((rawDeltas as Record<string, number>).E) || 0,
+            S: Number((rawDeltas as Record<string, number>).S) || 0,
+            W: Number((rawDeltas as Record<string, number>).W) || 0,
+            N: Number((rawDeltas as Record<string, number>).N) || 0,
+          } as Record<Seat, number>)
+        : undefined;
+    return {
+      type: "draw",
+      createdAt,
+      dealerTenpai,
+      drawKind,
+      tenpaiSeats,
+      nagashiSeat,
+      deltas,
+      note,
+    };
+  }
+
+  if (row.type === "round_advance") {
+    const roundWind = payload.roundWind === "south" ? "south" : "east";
+    return { type: "round_advance", createdAt, roundWind };
+  }
+
   const deltas = (payload.deltas ?? {}) as Record<Seat, number>;
   const note = typeof payload.note === "string" ? payload.note : undefined;
   const winType =
@@ -31,5 +71,21 @@ export function mapEventRow(row: EventRow): SessionEvent {
   const han = typeof payload.han === "number" ? payload.han : undefined;
   const fu = typeof payload.fu === "number" ? payload.fu : undefined;
   const winnerIsDealer = payload.winnerIsDealer === true;
-  return { type: "win", createdAt, deltas, note, winType, winner, fromSeat, han, fu, winnerIsDealer };
+  const riichiCollected =
+    typeof payload.riichiCollected === "number" && payload.riichiCollected > 0
+      ? payload.riichiCollected
+      : undefined;
+  return {
+    type: "win",
+    createdAt,
+    deltas,
+    note,
+    winType,
+    winner,
+    fromSeat,
+    han,
+    fu,
+    winnerIsDealer,
+    riichiCollected,
+  };
 }

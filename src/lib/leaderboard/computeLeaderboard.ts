@@ -44,6 +44,14 @@ export function parseRules(rulesJson: unknown): Rules {
     riichiStickValue:
       typeof r.riichiStickValue === "number" ? r.riichiStickValue : defaults.riichiStickValue,
     honbaValue: typeof r.honbaValue === "number" ? r.honbaValue : defaults.honbaValue,
+    gameLength:
+      r.gameLength === "east" || r.gameLength === "hanchan" ? r.gameLength : defaults.gameLength,
+    roundWind:
+      r.roundWind === "east" || r.roundWind === "south" ? r.roundWind : defaults.roundWind,
+    dealerSeat:
+      r.dealerSeat === "E" || r.dealerSeat === "S" || r.dealerSeat === "W" || r.dealerSeat === "N"
+        ? r.dealerSeat
+        : defaults.dealerSeat,
   };
 }
 

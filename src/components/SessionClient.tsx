@@ -7,12 +7,29 @@ import type { Rules, Seat, SessionEvent } from "@/lib/scoring/ledger";
 import {
   buildRonDeltas,
   buildTsumoDeltas,
+  applyRiichiSticksToWin,
   computeTotals,
+  pendingRiichiBySeat,
+  pendingRiichiPool,
   defaultRules,
 } from "@/lib/scoring/ledger";
 import { formatHandHistoryEntry } from "@/lib/scoring/eventDisplay";
 import { mapEventRow } from "@/lib/scoring/events";
 import { applyHonbaToDeltas, scoreFromHanFu } from "@/lib/scoring/hanFu";
+import {
+  type DrawKind,
+  computeExhaustiveDrawDeltas,
+  computeNagashiManganDeltas,
+  describeStandardDrawRule,
+  drawKindLabel,
+  formatDrawPaymentPreview,
+} from "@/lib/scoring/draw";
+import {
+  deriveTableState,
+  gameLengthLabel,
+  parseSessionRules,
+  roundWindLabel,
+} from "@/lib/scoring/tableState";
 import { storeEditKey } from "@/lib/editKey";
 import { clearRecentSession, storeRecentSession } from "@/lib/recentSession";
 import { isSessionEnded } from "@/lib/session/status";
@@ -67,9 +84,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
     N: "",
   });
 
-  const [riichiSeat, setRiichiSeat] = useState<Seat>("E");
-
   const [manualDelta, setManualDelta] = useState<Record<Seat, number>>({ E: 0, S: 0, W: 0, N: 0 });
+  const [recordTab, setRecordTab] = useState<"win" | "draw" | "adjust">("win");
 
   const [winType, setWinType] = useState<"ron" | "tsumo">("ron");
   const [winner, setWinner] = useState<Seat>("E");
@@ -78,8 +94,16 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [winScoreMode, setWinScoreMode] = useState<"points" | "hanfu">("points");
   const [winHan, setWinHan] = useState(2);
   const [winFu, setWinFu] = useState(30);
-  const [winnerIsDealer, setWinnerIsDealer] = useState(false);
   const [honba, setHonba] = useState(0);
+  const [drawKind, setDrawKind] = useState<DrawKind>("standard");
+  const [drawTenpai, setDrawTenpai] = useState<Record<Seat, boolean>>({
+    E: false,
+    S: false,
+    W: false,
+    N: false,
+  });
+  const [nagashiSeat, setNagashiSeat] = useState<Seat>("E");
+  const [abortDealerTenpai, setAbortDealerTenpai] = useState(true);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/sessions/${shareId}`);
@@ -107,8 +131,11 @@ export function SessionClient({ shareId }: { shareId: string }) {
     if (!isSessionEnded(sessionEndedAt)) {
       storeRecentSession(shareId, sessionTitle);
     }
-    setRules(json.session?.rules_json ?? defaultRules());
-    setEvents((json.events ?? []).map((r) => mapEventRow(r)));
+    const parsedRules = parseSessionRules(json.session?.rules_json);
+    const mappedEvents = (json.events ?? []).map((r) => mapEventRow(r));
+    setRules(parsedRules);
+    setEvents(mappedEvents);
+    setHonba(deriveTableState(json.session?.rules_json, mappedEvents).honba);
 
     const nextSeats: Record<Seat, string> = { E: "", S: "", W: "", N: "" };
     const nextNames: Record<Seat, string> = { E: "", S: "", W: "", N: "" };
@@ -150,6 +177,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }, [supabase]);
 
   const totals = computeTotals(seats, rules, events);
+  const tableState = useMemo(() => deriveTableState(rules, events), [rules, events]);
+  const dealerSeat = tableState.dealerSeat;
   const isEnded = isSessionEnded(endedAt);
   const canEdit = Boolean(editKey);
   const canRecord = canEdit && !isEnded;
@@ -174,7 +203,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
     if (!res.ok) throw new Error(json.error ?? "Failed to update session");
     if (json.session) {
       setTitle(json.session.title ?? "Session");
-      setRules(json.session.rules_json ?? defaultRules());
+      setRules(parseSessionRules(json.session.rules_json));
       setEndedAt(json.session.ended_at ?? null);
     }
     return json.session;
@@ -224,7 +253,14 @@ export function SessionClient({ shareId }: { shareId: string }) {
     });
     const json = (await res.json()) as { event?: { type: string; payload_json: Record<string, unknown>; created_at: string; id: string; session_id: string }; error?: string };
     if (!res.ok) throw new Error(json.error ?? "Failed to add event");
-    if (json.event) setEvents((prev) => [...prev, mapEventRow(json.event!)]);
+    if (json.event) {
+      const mapped = mapEventRow(json.event);
+      setEvents((prev) => {
+        const next = [...prev, mapped];
+        setHonba(deriveTableState(rules, next).honba);
+        return next;
+      });
+    }
   }
 
   async function onClaim() {
@@ -345,6 +381,20 @@ export function SessionClient({ shareId }: { shareId: string }) {
     }
   }
 
+  const winnerIsDealer = winner === dealerSeat;
+
+  const riichiPool = useMemo(() => pendingRiichiPool(events), [events]);
+  const riichiOnTable = useMemo(() => pendingRiichiBySeat(events), [events]);
+
+  async function onDeclareRiichi(seat: Seat) {
+    setError(null);
+    try {
+      await postEvent("riichi", { seat, value: rules.riichiStickValue });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to record riichi");
+    }
+  }
+
   const hanFuPreview = useMemo(() => {
     if (winScoreMode !== "hanfu") return null;
     if (winType === "ron" && winner === fromSeat) return null;
@@ -356,10 +406,16 @@ export function SessionClient({ shareId }: { shareId: string }) {
         winner,
         fromSeat: winType === "ron" ? fromSeat : undefined,
         winnerIsDealer,
+        dealerSeat,
       });
       const withHonba = applyHonbaToDeltas(scored.deltas, honba, rules.honbaValue, winType);
-      const total = withHonba[winner] ?? scored.total;
-      return { ...scored, deltas: withHonba, total, note: scored.note };
+      const withRiichi =
+        riichiPool > 0 ? applyRiichiSticksToWin(withHonba, winner, riichiPool) : withHonba;
+      const total = withRiichi[winner] ?? scored.total;
+      const noteParts = [scored.note];
+      if (honba > 0) noteParts.push(`honba ${honba}`);
+      if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
+      return { ...scored, deltas: withRiichi, total, note: noteParts.join(" · ") };
     } catch {
       return null;
     }
@@ -371,8 +427,10 @@ export function SessionClient({ shareId }: { shareId: string }) {
     winner,
     fromSeat,
     winnerIsDealer,
+    dealerSeat,
     honba,
     rules.honbaValue,
+    riichiPool,
   ]);
 
   function onAddWin() {
@@ -382,7 +440,6 @@ export function SessionClient({ shareId }: { shareId: string }) {
     }
 
     let deltas: Record<Seat, number>;
-    let total: number;
     let note: string;
     let payloadExtras: Record<string, unknown> = {
       winType,
@@ -399,10 +456,16 @@ export function SessionClient({ shareId }: { shareId: string }) {
           winner,
           fromSeat: winType === "ron" ? fromSeat : undefined,
           winnerIsDealer,
+          dealerSeat,
         });
         deltas = applyHonbaToDeltas(scored.deltas, honba, rules.honbaValue, winType);
-        total = deltas[winner] ?? scored.total;
-        note = `${scored.note}${honba ? ` (honba ${honba})` : ""}`;
+        if (riichiPool > 0) {
+          deltas = applyRiichiSticksToWin(deltas, winner, riichiPool);
+        }
+        const noteParts = [scored.note];
+        if (honba > 0) noteParts.push(`honba ${honba}`);
+        if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
+        note = noteParts.join(" · ");
         payloadExtras = {
           ...payloadExtras,
           han: winHan,
@@ -415,18 +478,99 @@ export function SessionClient({ shareId }: { shareId: string }) {
       }
     } else {
       const honbaPay = honba * rules.honbaValue * (winType === "ron" ? 1 : 3);
-      total = winPoints + honbaPay;
+      const handTotal = winPoints + honbaPay;
       deltas =
-        winType === "ron" ? buildRonDeltas(winner, fromSeat, total) : buildTsumoDeltas(winner, total);
-      note = `${winType.toUpperCase()} ${total.toLocaleString()}${honba ? ` (honba ${honba})` : ""}`;
+        winType === "ron"
+          ? buildRonDeltas(winner, fromSeat, handTotal)
+          : buildTsumoDeltas(winner, handTotal);
+      if (riichiPool > 0) {
+        deltas = applyRiichiSticksToWin(deltas, winner, riichiPool);
+      }
+      const noteParts = [`${winType.toUpperCase()} ${handTotal.toLocaleString()}`];
+      if (honba > 0) noteParts.push(`honba ${honba}`);
+      if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
+      note = noteParts.join(" · ");
+    }
+
+    if (riichiPool > 0) {
+      payloadExtras = { ...payloadExtras, riichiCollected: riichiPool };
     }
 
     void postEvent("win", { deltas, note, ...payloadExtras })
-      .then(() => {
-        setHonba(0);
-        setError(null);
-      })
+      .then(() => setError(null))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+  }
+
+  const drawTenpaiSeats = useMemo(
+    () => seats.filter((s) => drawTenpai[s]),
+    [drawTenpai]
+  );
+  const drawDeltas = useMemo(() => {
+    if (drawKind === "nagashi_mangan") return computeNagashiManganDeltas(nagashiSeat);
+    if (drawKind === "standard") return computeExhaustiveDrawDeltas(drawTenpaiSeats);
+    return null;
+  }, [drawKind, drawTenpaiSeats, nagashiSeat]);
+  const drawPaymentPreview = useMemo(
+    () =>
+      formatDrawPaymentPreview(drawDeltas, seatPlayerName, seatLabel, {
+        emptyMessage:
+          drawKind === "standard"
+            ? "All four tenpai or all four noten — no point payments."
+            : "No score payments for this abort.",
+      }),
+    [drawDeltas, seatPlayerName, drawKind]
+  );
+  const drawDealerTenpai =
+    drawKind === "nagashi_mangan"
+      ? nagashiSeat === dealerSeat
+      : drawKind === "standard"
+        ? drawTenpai[dealerSeat]
+        : abortDealerTenpai;
+
+  const drawRuleHint = useMemo(() => {
+    if (drawKind === "nagashi_mangan") {
+      return `Nagashi mangan: ${seatLabel(nagashiSeat)} collects 8,000 from each opponent (24,000 total).`;
+    }
+    if (drawKind === "four_riichi") {
+      return "Four riichi declared — hand aborts with no score change. Confirm whether dealer was tenpai.";
+    }
+    if (drawKind === "four_kans") {
+      return "Four kans on the table — hand aborts with no score change. Confirm whether dealer was tenpai.";
+    }
+    return describeStandardDrawRule(drawTenpaiSeats.length);
+  }, [drawKind, drawTenpaiSeats.length, nagashiSeat]);
+
+  function onAddDraw() {
+    const dealerTenpai = drawDealerTenpai;
+    const noteParts = [
+      drawKindLabel(drawKind),
+      drawDeltas ? drawPaymentPreview : "No payments",
+      dealerTenpai ? "dealer continues" : "dealer passes",
+    ];
+
+    void postEvent("draw", {
+      drawKind,
+      dealerTenpai,
+      ...(drawKind === "standard" ? { tenpaiSeats: drawTenpaiSeats } : {}),
+      ...(drawKind === "nagashi_mangan" ? { nagashiSeat } : {}),
+      ...(drawDeltas ? { deltas: drawDeltas } : {}),
+      note: noteParts.join(" · "),
+    })
+      .then(() => setError(null))
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+  }
+
+  async function onAdvanceToSouth() {
+    if (rules.gameLength !== "hanchan" || tableState.roundWind !== "east") return;
+    setError(null);
+    try {
+      await postEvent("round_advance", { roundWind: "south" });
+      await patchSession({
+        rules_json: { ...rules, roundWind: "south" },
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to advance round");
+    }
   }
 
   return (
@@ -441,6 +585,19 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 ? "You can record hands"
                 : "Viewing live scores"}
           </p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <span className="rounded-md bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {gameLengthLabel(tableState.gameLength)}
+            </span>
+            <span className="rounded-md bg-zinc-200 px-2 py-0.5 text-[10px] font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {roundWindLabel(tableState.roundWind)}
+            </span>
+            {honba > 0 ? (
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                Honba {honba}
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {canEdit && !isEnded ? (
@@ -500,7 +657,10 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
       <section className="sticky top-[52px] z-30 -mx-1 rounded-2xl border border-zinc-200 bg-white p-3 shadow-md dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Table</div>
+          <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+            Table · dealer: {seatLabel(dealerSeat)}
+            {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
+          </div>
           {canRecord && !allSeatsAssigned ? (
             <span className="text-[10px] text-amber-700 dark:text-amber-300">Assign a player to each seat</span>
           ) : null}
@@ -515,8 +675,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">
                   {seatLabel(s)}
                 </div>
-                {s === "E" ? (
-                  <span className="rounded bg-zinc-200 px-1 py-0.5 text-[9px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+                {s === dealerSeat ? (
+                  <span className="rounded bg-amber-200 px-1 py-0.5 text-[9px] font-semibold text-amber-900 dark:bg-amber-900/60 dark:text-amber-100">
                     Dealer
                   </span>
                 ) : null}
@@ -547,9 +707,59 @@ export function SessionClient({ shareId }: { shareId: string }) {
               <div className="mt-1.5 font-mono text-2xl font-semibold tabular-nums tracking-tight">
                 {totals[s].toLocaleString()}
               </div>
+              {canRecord && !isEnded ? (
+                <button
+                  type="button"
+                  disabled={riichiOnTable[s] > 0}
+                  onClick={() => void onDeclareRiichi(s)}
+                  title={
+                    riichiOnTable[s] > 0
+                      ? "Already declared riichi this hand"
+                      : `Place ${rules.riichiStickValue.toLocaleString()} pt riichi stick (${seatLabel(s)})`
+                  }
+                  className={`mt-2 h-8 w-full rounded-lg border text-[10px] font-semibold ${
+                    riichiOnTable[s] > 0
+                      ? "border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+                      : "border-amber-200/80 text-amber-900 hover:bg-amber-50 dark:border-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-950/30"
+                  } disabled:opacity-100`}
+                >
+                  {riichiOnTable[s] > 0 ? "Riichi declared" : `Riichi −${rules.riichiStickValue.toLocaleString()}`}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
+        {canRecord ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-100/80 px-2.5 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-800/80">
+            <label className="flex items-center gap-1.5 font-medium text-zinc-600 dark:text-zinc-300">
+              Honba
+              <input
+                type="number"
+                min={0}
+                value={honba}
+                onChange={(e) => setHonba(Math.max(0, Number(e.target.value) || 0))}
+                className="h-8 w-14 rounded-md border border-zinc-200 bg-white px-1.5 text-center font-mono text-sm tabular-nums dark:border-zinc-600 dark:bg-zinc-950"
+                aria-label="Honba sticks on table"
+              />
+            </label>
+            <span className="hidden h-4 w-px bg-zinc-300 sm:inline dark:bg-zinc-600" aria-hidden />
+            {riichiPool > 0 ? (
+              <span className="rounded-md bg-amber-100 px-2 py-1 font-medium text-amber-950 dark:bg-amber-950/50 dark:text-amber-100">
+                Riichi {riichiPool.toLocaleString()} on table
+                <span className="ml-1 font-normal text-amber-800 dark:text-amber-200">
+                  (
+                  {seats
+                    .filter((s) => riichiOnTable[s] > 0)
+                    .map((s) => seatLabel(s))
+                    .join(", ")}
+                  )
+                </span>
+              </span>
+            ) : (
+              <span className="text-zinc-500">No riichi sticks — tap Riichi on a seat when declared</span>
+            )}
+          </div>
+        ) : null}
         {canRecord && players.length === 0 ? (
           <p className="mt-2 text-xs text-zinc-500">
             No players yet.{" "}
@@ -562,16 +772,41 @@ export function SessionClient({ shareId }: { shareId: string }) {
       </section>
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="text-sm font-medium">Record hand</div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-sm font-medium">Record hand</div>
+          <div className="flex rounded-lg border border-zinc-200 p-0.5 text-xs dark:border-zinc-700">
+            {(
+              [
+                ["win", "Win"],
+                ["draw", "Draw"],
+                ["adjust", "Adjust"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setRecordTab(id)}
+                className={`rounded-md px-3 py-1.5 font-medium ${
+                  recordTab === id
+                    ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
+                    : "text-zinc-600 dark:text-zinc-400"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         {canRecord && !allSeatsAssigned ? (
           <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
             Assign all four seats above before recording hands (needed for the leaderboard).
           </p>
         ) : null}
         <div className="mt-3 space-y-4">
+          {recordTab === "win" ? (
           <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Win (ron / tsumo)</div>
+              <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Ron / tsumo</div>
               <div className="flex rounded-lg border border-zinc-200 p-0.5 text-xs dark:border-zinc-700">
                 <button
                   type="button"
@@ -617,8 +852,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
               </div>
             ) : (
               <p className="mt-2 text-xs leading-relaxed text-zinc-500">
-                Standard riichi scoring from han/fu. East is treated as dealer for tsumo splits. Honba
-                sticks are added on top.
+                Standard riichi scoring from han/fu using the current dealer seat ({seatLabel(dealerSeat)}
+                ). Honba and riichi sticks on the table are added to the winner (ron or tsumo).
               </p>
             )}
 
@@ -695,38 +930,30 @@ export function SessionClient({ shareId }: { shareId: string }) {
               )}
             </div>
 
-            {winScoreMode === "hanfu" ? (
-              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={winnerIsDealer}
-                  onChange={(e) => setWinnerIsDealer(e.target.checked)}
-                  className="rounded border-zinc-300"
-                />
-                Dealer won (East is dealer)
-              </label>
+            {winScoreMode === "hanfu" && winnerIsDealer ? (
+              <p className="mt-2 text-xs text-zinc-500">Winner is dealer — dealer continues next hand.</p>
+            ) : winScoreMode === "hanfu" ? (
+              <p className="mt-2 text-xs text-zinc-500">Non-dealer win — dealer passes after this hand.</p>
             ) : null}
 
             {hanFuPreview ? (
               <div className="mt-2 rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
                 <span className="font-medium">Score preview:</span> {hanFuPreview.note}
-                {honba > 0 ? ` · includes ${honba} honba` : ""}
               </div>
+            ) : winScoreMode === "points" && riichiPool > 0 ? (
+              <p className="mt-2 text-xs text-zinc-500">
+                Hand points are from opponents only; add {riichiPool.toLocaleString()} riichi on win.
+              </p>
             ) : winScoreMode === "hanfu" && winType === "ron" && winner === fromSeat ? (
               <div className="mt-2 text-xs text-red-600 dark:text-red-400">
                 Winner and discarder must be different seats.
               </div>
             ) : null}
-            <label className="mt-2 block text-xs">
-              Honba sticks on table (0 if none)
-              <input
-                type="number"
-                min={0}
-                value={honba}
-                onChange={(e) => setHonba(Number(e.target.value))}
-                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
-              />
-            </label>
+            {riichiPool > 0 ? (
+              <p className="mt-2 text-xs text-amber-800 dark:text-amber-200">
+                Winner collects {riichiPool.toLocaleString()} pts in riichi sticks (see table above).
+              </p>
+            ) : null}
             <button
               type="button"
               disabled={!canRecord}
@@ -736,15 +963,104 @@ export function SessionClient({ shareId }: { shareId: string }) {
               Record win
             </button>
           </div>
+          ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
-              <div className="text-xs font-medium">Riichi stick</div>
-              <div className="mt-2 flex gap-2">
+          {recordTab === "draw" ? (
+          <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
+            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">Exhaustive draw</div>
+            <label className="mt-2 block text-xs">
+              Draw type
+              <select
+                value={drawKind}
+                onChange={(e) => setDrawKind(e.target.value as DrawKind)}
+                className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="standard">Standard (tenpai / noten)</option>
+                <option value="four_riichi">Four riichi — abort</option>
+                <option value="four_kans">Four kans — abort</option>
+                <option value="nagashi_mangan">Nagashi mangan</option>
+              </select>
+            </label>
+            <p className="mt-2 text-xs leading-relaxed text-zinc-500">{drawRuleHint}</p>
+            {drawKind === "standard" && drawTenpaiSeats.length > 0 && drawTenpaiSeats.length < 4 ? (
+              <p className="mt-1 text-[10px] text-zinc-400">
+                Standard: 3,000 pt total from noten → tenpai (not 3,000 per noten player).
+              </p>
+            ) : null}
+
+            {drawKind === "standard" ? (
+              <>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDrawTenpai({ E: true, S: true, W: true, N: true })
+                    }
+                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-zinc-700"
+                  >
+                    All tenpai
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDrawTenpai({ E: false, S: false, W: false, N: false })}
+                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-zinc-700"
+                  >
+                    All noten
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDrawTenpai({
+                        E: dealerSeat === "E",
+                        S: dealerSeat === "S",
+                        W: dealerSeat === "W",
+                        N: dealerSeat === "N",
+                      })
+                    }
+                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-zinc-700"
+                  >
+                    Dealer only
+                  </button>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {seats.map((s) => (
+                    <label
+                      key={s}
+                      className={`flex cursor-pointer flex-col rounded-lg border px-2 py-2 text-xs ${
+                        drawTenpai[s]
+                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
+                          : "border-zinc-200 dark:border-zinc-700"
+                      }`}
+                    >
+                      <span className="font-medium text-zinc-700 dark:text-zinc-200">
+                        {seatLabel(s)}
+                        {s === dealerSeat ? " · dealer" : ""}
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-zinc-500">
+                        {seatPlayerName[s] || "—"}
+                      </span>
+                      <span className="mt-2 flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={drawTenpai[s]}
+                          onChange={(e) =>
+                            setDrawTenpai((prev) => ({ ...prev, [s]: e.target.checked }))
+                          }
+                          className="h-4 w-4 rounded border-zinc-300"
+                        />
+                        Tenpai
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </>
+            ) : drawKind === "nagashi_mangan" ? (
+              <label className="mt-2 block text-xs">
+                Nagashi winner
                 <select
-                  value={riichiSeat}
-                  onChange={(e) => setRiichiSeat(e.target.value as Seat)}
-                  className="h-11 min-w-0 flex-1 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                  value={nagashiSeat}
+                  onChange={(e) => setNagashiSeat(e.target.value as Seat)}
+                  className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
                 >
                   {seats.map((s) => (
                     <option key={s} value={s}>
@@ -752,22 +1068,38 @@ export function SessionClient({ shareId }: { shareId: string }) {
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
-                  disabled={!canRecord}
-                  onClick={() =>
-                    void postEvent("riichi", {
-                      seat: riichiSeat,
-                      value: rules.riichiStickValue,
-                    }).catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-                  }
-                  className="h-11 shrink-0 rounded-lg bg-zinc-950 px-4 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
-                >
-                  −{rules.riichiStickValue}
-                </button>
-              </div>
-            </div>
+              </label>
+            ) : (
+              <label className="mt-2 flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+                <input
+                  type="checkbox"
+                  checked={abortDealerTenpai}
+                  onChange={(e) => setAbortDealerTenpai(e.target.checked)}
+                  className="h-4 w-4 rounded border-zinc-300"
+                />
+                Dealer was tenpai (usually yes when four riichi)
+              </label>
+            )}
 
+            <div className="mt-2 rounded-lg bg-zinc-100 px-3 py-2 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+              <span className="font-medium">Payments:</span> {drawPaymentPreview}
+              <span className="mt-1 block text-zinc-500">
+                Dealer ({seatLabel(dealerSeat)}):{" "}
+                {drawDealerTenpai ? "stays · honba +1" : "passes · honba +1"}
+              </span>
+            </div>
+            <button
+              type="button"
+              disabled={!canRecord}
+              onClick={onAddDraw}
+              className="mt-3 h-11 w-full rounded-xl border border-zinc-200 text-sm font-medium dark:border-zinc-700"
+            >
+              Record draw
+            </button>
+          </div>
+          ) : null}
+
+          {recordTab === "adjust" ? (
             <div className="rounded-xl border border-zinc-200 p-3 dark:border-zinc-800">
               <div className="text-xs font-medium">Manual score change</div>
               <p className="mt-1 text-xs leading-relaxed text-zinc-500">
@@ -805,7 +1137,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 Apply score change
               </button>
             </div>
-          </div>
+          ) : null}
         </div>
       </section>
 
@@ -821,6 +1153,37 @@ export function SessionClient({ shareId }: { shareId: string }) {
               className="mt-1 h-10 w-full rounded-lg border border-zinc-200 px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
             />
           </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-xs">
+              Match length
+              <select
+                disabled={!canRecord}
+                value={rules.gameLength}
+                onChange={(e) =>
+                  setRules((r) => ({
+                    ...r,
+                    gameLength: e.target.value as Rules["gameLength"],
+                    roundWind: e.target.value === "east" ? "east" : r.roundWind,
+                  }))
+                }
+                className="mt-1 h-10 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <option value="east">East only (tonpuu)</option>
+                <option value="hanchan">East + South (hanchan)</option>
+              </select>
+            </label>
+            {canRecord && rules.gameLength === "hanchan" && tableState.roundWind === "east" ? (
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => void onAdvanceToSouth()}
+                  className="h-10 w-full rounded-lg border border-zinc-200 px-3 text-sm font-medium dark:border-zinc-800"
+                >
+                  Start South round
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
               [

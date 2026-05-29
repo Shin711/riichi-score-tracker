@@ -37,6 +37,8 @@ export function ImportGameForm() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadImports = useCallback(async () => {
     const res = await fetch("/api/imports/games");
@@ -112,15 +114,22 @@ export function ImportGameForm() {
     }
   }
 
-  async function onDelete(id: string) {
+  async function confirmDelete(id: string) {
     setError(null);
-    const res = await fetch(`/api/imports/games/${id}`, { method: "DELETE" });
-    const json = (await res.json()) as { error?: string };
-    if (!res.ok) {
-      setError(json.error ?? "Failed to delete");
-      return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/imports/games/${id}`, { method: "DELETE" });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setError(json.error ?? "Failed to delete");
+        return;
+      }
+      setConfirmDeleteId(null);
+      setStatus(null);
+      await loadImports();
+    } finally {
+      setDeletingId(null);
     }
-    await loadImports();
   }
 
   function updateSeat(index: number, patch: Partial<SeatForm>) {
@@ -289,13 +298,40 @@ export function ImportGameForm() {
                       </a>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void onDelete(row.id)}
-                    className="shrink-0 text-xs text-red-600 underline dark:text-red-400"
-                  >
-                    Remove
-                  </button>
+                  {confirmDeleteId === row.id ? (
+                    <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
+                      <p className="text-xs leading-5 text-red-900 dark:text-red-200">
+                        Remove this import? It will leave the leaderboard for that month. This cannot
+                        be undone.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={deletingId === row.id}
+                          onClick={() => setConfirmDeleteId(null)}
+                          className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingId === row.id}
+                          onClick={() => void confirmDelete(row.id)}
+                          className="h-9 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                        >
+                          {deletingId === row.id ? "Removing…" : "Yes, remove"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(row.id)}
+                      className="shrink-0 text-xs text-red-600 underline dark:text-red-400"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </div>
               </li>
             ))}

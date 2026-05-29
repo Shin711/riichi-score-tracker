@@ -71,16 +71,15 @@ function limitTsumoSplitKo(tier: 5 | 6 | 8 | 11 | 13) {
   return table[tier];
 }
 
-function calcBasicPoints(han: number, fu: number) {
+function cappedBasePoints(han: number, fu: number): number {
   const roundedFu = roundFu(fu);
   const raw = roundedFu * 2 ** (han + 2);
-  const capped = han <= 4 && raw > 2000 ? 2000 : raw;
-  return roundUp100(capped);
+  return han <= 4 && raw > 2000 ? 2000 : raw;
 }
 
 function buildTsumoDeltas(
   winner: Seat,
-  basic: number,
+  cappedBase: number,
   winnerIsDealer: boolean,
   dealerSeat: Seat
 ): Record<Seat, number> {
@@ -91,11 +90,11 @@ function buildTsumoDeltas(
     if (seat === winner) continue;
     let payment: number;
     if (winnerIsDealer) {
-      payment = roundUp100(basic * 2);
+      payment = roundUp100(cappedBase * 2);
     } else if (seat === dealerSeat) {
-      payment = roundUp100(basic * 2);
+      payment = roundUp100(cappedBase * 2);
     } else {
-      payment = roundUp100(basic);
+      payment = roundUp100(cappedBase);
     }
     deltas[seat] = -payment;
     collected += payment;
@@ -167,16 +166,17 @@ export function scoreFromHanFu(input: HanFuInput): HanFuScore {
       total = deltas[input.winner];
     }
   } else {
-    basicPoints = calcBasicPoints(han, fu);
+    const cappedBase = cappedBasePoints(han, fu);
+    basicPoints = roundUp100(cappedBase);
     if (input.winType === "ron") {
       if (!input.fromSeat) throw new Error("Ron requires a discarder seat.");
       const mult = winnerIsDealer ? 6 : 4;
-      total = roundUp100(basicPoints * mult);
+      total = roundUp100(cappedBase * mult);
       deltas = { E: 0, S: 0, W: 0, N: 0 };
       deltas[input.winner] = total;
       deltas[input.fromSeat] = -total;
     } else {
-      deltas = buildTsumoDeltas(input.winner, basicPoints, winnerIsDealer, dealerSeat);
+      deltas = buildTsumoDeltas(input.winner, cappedBase, winnerIsDealer, dealerSeat);
       total = deltas[input.winner];
     }
   }

@@ -15,10 +15,12 @@ Web app to track Riichi Mahjong sessions: player profiles, shareable session lin
    - [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql)
    - [`supabase/migrations/002_rls_minimal_and_constraints.sql`](supabase/migrations/002_rls_minimal_and_constraints.sql)
    - [`supabase/migrations/003_session_ended_at.sql`](supabase/migrations/003_session_ended_at.sql)
+   - [`supabase/migrations/004_leaderboard_monthly_archives.sql`](supabase/migrations/004_leaderboard_monthly_archives.sql)
 3. Copy [`.env.local.example`](.env.local.example) to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY` (recommended for API writes)
+   - `CRON_SECRET` (optional; secures the monthly archive cron on Vercel)
 4. Enable **Email** auth in Supabase (Authentication → Providers) for magic-link sign-in.
 5. **Google sign-in (recommended):** follow [`docs/google-sign-in-setup.md`](docs/google-sign-in-setup.md) — no email SMTP needed.
 6. **Email magic links (optional):** configure **[Resend](https://resend.com)** SMTP — see [`docs/auth-email-setup.md`](docs/auth-email-setup.md).
@@ -36,12 +38,12 @@ Open [http://localhost:3000](http://localhost:3000).
 1. Push this repo to GitHub.
 2. Import the repo in [Vercel](https://vercel.com).
 3. Add the same environment variables in Vercel project settings.
-4. Deploy.
+4. Deploy. For the **monthly leaderboard archive**, also follow [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md) (`CRON_SECRET` + production redeploy).
 
 ## Usage
 
 - **Players**: add names on `/players`.
-- **Leaderboard**: `/leaderboard` ranks players by cumulative points — sum of (ending score − starting stack) per finished game, ÷ 1,000 (same as the Riichi Leaderboard spreadsheet).
+- **Leaderboard**: `/leaderboard` ranks players for the **current calendar month (US Eastern)**. When a month ends, standings are archived and downloadable under **Past months**. Setup: [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md).
 - **End game**: on a session you edit, tap **End game** when play is over — locks score entry and counts the game on the leaderboard. Use **Reopen** if you ended by mistake.
 - **New session**: click **Create session** on the home page. The edit key is stored in this browser’s `localStorage`.
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.

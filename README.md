@@ -16,6 +16,7 @@ Web app to track Riichi Mahjong sessions: player profiles, shareable session lin
    - [`supabase/migrations/002_rls_minimal_and_constraints.sql`](supabase/migrations/002_rls_minimal_and_constraints.sql)
    - [`supabase/migrations/003_session_ended_at.sql`](supabase/migrations/003_session_ended_at.sql)
    - [`supabase/migrations/004_leaderboard_monthly_archives.sql`](supabase/migrations/004_leaderboard_monthly_archives.sql)
+   - [`supabase/migrations/005_imported_games.sql`](supabase/migrations/005_imported_games.sql)
 3. Copy [`.env.local.example`](.env.local.example) to `.env.local` and fill in:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
@@ -44,6 +45,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - **Players**: add names on `/players`.
 - **Leaderboard**: `/leaderboard` ranks players for the **current calendar month (US Eastern)**. When a month ends, standings are archived and downloadable under **Past months**. Setup: [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md).
+- **Import game**: `/import` — add a finished friendly / Mahjong Soul match (final scores + optional paipu link). Counts on the same leaderboard.
 - **End game**: on a session you edit, tap **End game** when play is over — locks score entry and counts the game on the leaderboard. Use **Reopen** if you ended by mistake.
 - **New session**: click **Create session** on the home page. The edit key is stored in this browser’s `localStorage`.
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.

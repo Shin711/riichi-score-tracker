@@ -12,12 +12,14 @@ export async function GET() {
 
   try {
     await ensureMonthlyArchivesUpToDate(supabase);
-    const { entries, gamesWithPlayers, period } = await buildCurrentMonthLeaderboard(supabase);
+    const result = await buildCurrentMonthLeaderboard(supabase);
 
     return NextResponse.json({
-      entries,
-      gamesWithPlayers,
-      period,
+      entries: result.entries,
+      gamesWithPlayers: result.gamesWithPlayers,
+      sessionGames: result.sessionGames,
+      importedGames: result.importedGames,
+      period: result.period,
       updatedAt: new Date().toISOString(),
     });
   } catch (e) {

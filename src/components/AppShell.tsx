@@ -66,6 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <nav className="hidden items-center gap-4 sm:flex">
             <NavLink href="/players" label="Players" />
             <NavLink href="/leaderboard" label="Leaderboard" />
+            <NavLink href="/import" label="Import" />
             <NavLink href="/my/sessions" label="My games" />
             <NavLink href="/login" label="Account" />
             <CreateSessionButton label="New game" />

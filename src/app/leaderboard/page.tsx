@@ -144,7 +144,7 @@ export default function LeaderboardPage() {
           href="/import"
           className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
         >
-          Import MJS game
+          Import game
         </Link>
       </div>
 

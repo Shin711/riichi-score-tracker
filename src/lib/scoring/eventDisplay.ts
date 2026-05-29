@@ -1,3 +1,4 @@
+import { drawKindLabel } from "@/lib/scoring/draw";
 import type { Seat, SessionEvent } from "@/lib/scoring/ledger";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
@@ -52,6 +53,49 @@ function parseWinTypeFromNote(note?: string): "ron" | "tsumo" | undefined {
 }
 
 export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): HandHistoryLine {
+  if (ev.type === "draw") {
+    const kind = ev.drawKind ?? "standard";
+    const title =
+      kind === "nagashi_mangan"
+        ? "Nagashi mangan"
+        : kind === "four_riichi"
+          ? "Four riichi (abort)"
+          : kind === "four_kans"
+            ? "Four kans (abort)"
+            : "Exhaustive draw";
+
+    const paymentParts =
+      ev.deltas &&
+      seats
+        .filter((s) => (ev.deltas![s] ?? 0) !== 0)
+        .map((s) => `${playerAtSeat(s, names)} ${formatSignedPoints(ev.deltas![s] ?? 0)}`);
+
+    const dealerPart = ev.dealerTenpai
+      ? "Dealer tenpai · dealer continues · honba +1"
+      : "Dealer not tenpai · dealer passes · honba +1";
+
+    const detailParts: string[] = [];
+    if (kind !== "standard") detailParts.push(drawKindLabel(kind));
+    if (ev.nagashiSeat) detailParts.push(playerAtSeat(ev.nagashiSeat, names));
+    if (paymentParts && paymentParts.length > 0) detailParts.push(paymentParts.join(" · "));
+    else if (kind === "four_riichi" || kind === "four_kans") {
+      detailParts.push("No score payments");
+    }
+    detailParts.push(dealerPart);
+
+    return {
+      title,
+      detail: detailParts.join(" · "),
+    };
+  }
+
+  if (ev.type === "round_advance") {
+    return {
+      title: "Round change",
+      detail: ev.roundWind === "south" ? "South round started" : "East round",
+    };
+  }
+
   if (ev.type === "riichi") {
     return {
       title: "Riichi",
@@ -106,6 +150,9 @@ export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): Hand
   const honbaMatch = ev.note?.match(/honba\s+(\d+)/i);
   if (honbaMatch && detail && !detail.includes("honba")) {
     detail += ` · honba ${honbaMatch[1]}`;
+  }
+  if (ev.riichiCollected && ev.riichiCollected > 0 && detail && !detail.includes("riichi")) {
+    detail += ` · riichi +${ev.riichiCollected.toLocaleString()}`;
   }
 
   return { title, detail };

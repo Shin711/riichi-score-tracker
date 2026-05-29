@@ -1,10 +1,21 @@
+import type { DrawKind } from "@/lib/scoring/draw";
+
 export type Seat = "E" | "S" | "W" | "N";
+
+export type GameLength = "east" | "hanchan";
+export type RoundWind = "east" | "south";
 
 export type Rules = {
   startingPoints: number;
   returnPoints: number;
   riichiStickValue: number;
   honbaValue: number;
+  /** East-only (tonpuu) vs full hanchan. */
+  gameLength: GameLength;
+  /** Current 場風 — South only applies when gameLength is hanchan. */
+  roundWind: RoundWind;
+  /** Which seat is currently dealer (場家). */
+  dealerSeat: Seat;
 };
 
 export type SessionEvent =
@@ -31,6 +42,23 @@ export type SessionEvent =
       han?: number;
       fu?: number;
       winnerIsDealer?: boolean;
+      /** Riichi sticks on the table collected by this winner (already in deltas when set). */
+      riichiCollected?: number;
+    }
+  | {
+      type: "draw";
+      createdAt: string;
+      dealerTenpai: boolean;
+      drawKind?: DrawKind;
+      tenpaiSeats?: Seat[];
+      nagashiSeat?: Seat;
+      deltas?: Record<Seat, number>;
+      note?: string;
+    }
+  | {
+      type: "round_advance";
+      createdAt: string;
+      roundWind: RoundWind;
     };
 
 export function defaultRules(): Rules {
@@ -39,6 +67,9 @@ export function defaultRules(): Rules {
     returnPoints: 30000,
     riichiStickValue: 1000,
     honbaValue: 300,
+    gameLength: "hanchan",
+    roundWind: "east",
+    dealerSeat: "E",
   };
 }
 
@@ -70,6 +101,49 @@ export function assertZeroSum(deltas: Record<Seat, number>, seats: Seat[] = ["E"
   }
 }
 
+const allSeats: Seat[] = ["E", "S", "W", "N"];
+
+export function inferWinWinner(ev: Extract<SessionEvent, { type: "win" }>): Seat | null {
+  if (ev.winner) return ev.winner;
+  return allSeats.find((s) => (ev.deltas[s] ?? 0) > 0) ?? null;
+}
+
+/**
+ * Riichi bets on the table since the last win (declarations are −value; winner collects on win).
+ * @see https://riichi.wiki/Riichi — bets stay through draws until the next win.
+ */
+export function pendingRiichiPool(events: SessionEvent[]): number {
+  let pool = 0;
+  for (const ev of events) {
+    if (ev.type === "riichi") pool += ev.value;
+    else if (ev.type === "win") pool = 0;
+  }
+  return pool;
+}
+
+/** Riichi sticks on the table per seat since the last win (for UI indicators). */
+export function pendingRiichiBySeat(events: SessionEvent[]): Record<Seat, number> {
+  const bySeat: Record<Seat, number> = { E: 0, S: 0, W: 0, N: 0 };
+  for (const ev of events) {
+    if (ev.type === "riichi") {
+      bySeat[ev.seat] += ev.value;
+    } else if (ev.type === "win") {
+      for (const seat of allSeats) bySeat[seat] = 0;
+    }
+  }
+  return bySeat;
+}
+
+/** Credit pending riichi sticks to the winner (already deducted from declarers on riichi events). */
+export function applyRiichiSticksToWin(
+  deltas: Record<Seat, number>,
+  winner: Seat,
+  pool: number
+): Record<Seat, number> {
+  if (pool <= 0) return deltas;
+  return { ...deltas, [winner]: (deltas[winner] ?? 0) + pool };
+}
+
 export function computeTotals(
   seats: Seat[],
   rules: Rules,
@@ -82,12 +156,27 @@ export function computeTotals(
     N: rules.startingPoints,
   };
 
+  let riichiPool = 0;
+
   for (const ev of events) {
     if (ev.type === "manual_adjustment") {
       for (const seat of seats) totals[seat] += ev.deltaBySeat[seat] ?? 0;
     } else if (ev.type === "riichi") {
       totals[ev.seat] -= ev.value;
+      riichiPool += ev.value;
     } else if (ev.type === "win") {
+      for (const seat of seats) totals[seat] += ev.deltas[seat] ?? 0;
+      const collected = ev.riichiCollected ?? 0;
+      if (collected > 0) {
+        riichiPool = 0;
+      } else {
+        const winner = inferWinWinner(ev);
+        if (winner && riichiPool > 0) {
+          totals[winner] += riichiPool;
+        }
+        riichiPool = 0;
+      }
+    } else if (ev.type === "draw" && ev.deltas) {
       for (const seat of seats) totals[seat] += ev.deltas[seat] ?? 0;
     }
   }

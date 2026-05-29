@@ -6,8 +6,8 @@ export default function ImportPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Import game</h1>
         <p className="mt-1 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
-          Add a finished friendly match from Mahjong Soul or elsewhere. Scores count on the monthly
-          leaderboard alongside in-person sessions.
+          Add a finished friendly match from Mahjong Soul or elsewhere. Human scores count on the
+          monthly leaderboard; mark bot seats as AI so they are stored but not ranked.
         </p>
       </div>
       <ImportGameForm />

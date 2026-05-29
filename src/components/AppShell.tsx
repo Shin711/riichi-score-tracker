@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { CreateSessionButton } from "@/components/CreateSessionButton";
+import { SITE_HEADER, SITE_NAME } from "@/lib/site";
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -60,8 +61,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <>
       <header className="sticky top-0 z-40 border-b border-zinc-200/70 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="shrink-0 font-semibold tracking-tight">
-            Riichi Tracker
+          <Link
+            href="/"
+            className="shrink-0 font-semibold tracking-tight"
+            title={SITE_NAME}
+          >
+            <span className="sm:hidden">{SITE_HEADER}</span>
+            <span className="hidden sm:inline">{SITE_NAME}</span>
           </Link>
           <nav className="hidden items-center gap-4 sm:flex">
             <NavLink href="/players" label="Players" />

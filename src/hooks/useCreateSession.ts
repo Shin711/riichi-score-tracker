@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 
 import { storeEditKey } from "@/lib/editKey";
 import { storeRecentSession } from "@/lib/recentSession";
+import { DEFAULT_SESSION_TITLE } from "@/lib/site";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 export function useCreateSession() {
@@ -36,7 +37,7 @@ export function useCreateSession() {
       const editKey = json.editKey;
       if (!shareId || !editKey) throw new Error("Invalid server response");
 
-      const title = json.session?.title ?? "Riichi session";
+      const title = json.session?.title ?? DEFAULT_SESSION_TITLE;
       storeEditKey(shareId, editKey);
       storeRecentSession(shareId, title);
       router.push(`/s/${shareId}`);

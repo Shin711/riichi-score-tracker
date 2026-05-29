@@ -30,7 +30,7 @@ k7Xm2pQ9vL4nR8wT1yU6sA0bC3dE5fG7
 
 ### Step 2: Add it in Vercel
 
-1. Open [vercel.com](https://vercel.com) → your **riichi-score-tracker** project.
+1. Open [vercel.com](https://vercel.com) → your **flushing-riichi-mahjong-club** project.
 2. Go to **Settings** → **Environment Variables**.
 3. Click **Add New**:
    - **Key:** `CRON_SECRET`

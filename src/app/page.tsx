@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { CreateSessionCard } from "@/components/CreateSessionCard";
 import { RecentSessionCard } from "@/components/RecentSessionCard";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
@@ -16,6 +18,20 @@ export default function Home() {
         <CreateSessionCard />
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 className="text-lg font-semibold tracking-tight">Score calculator</h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            Learning riichi scoring? Work out ron and tsumo payments from han and fu — no game session
+            required.
+          </p>
+          <Link
+            href="/calculator"
+            className="mt-4 inline-flex h-10 items-center rounded-xl border border-zinc-200 px-4 text-sm font-medium dark:border-zinc-700"
+          >
+            Open calculator
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:col-span-2">
           <h2 className="text-lg font-semibold tracking-tight">At the table</h2>
           <ol className="mt-3 space-y-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
             <li>

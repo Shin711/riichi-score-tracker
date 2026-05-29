@@ -71,6 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
           <nav className="hidden items-center gap-4 sm:flex">
             <NavLink href="/players" label="Players" />
+            <NavLink href="/calculator" label="Calculator" />
             <NavLink href="/leaderboard" label="Leaderboard" />
             <NavLink href="/import" label="Import" />
             <NavLink href="/my/sessions" label="My games" />
@@ -90,6 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BottomNavItem href="/" label="Home" />
           <BottomNavItem href="/players" label="Players" />
           <BottomNavItem primary label="New" />
+          <BottomNavItem href="/calculator" label="Calc" />
           <BottomNavItem href="/leaderboard" label="Board" />
           <BottomNavItem href="/my/sessions" label="Games" />
           <BottomNavItem href="/login" label="Account" />

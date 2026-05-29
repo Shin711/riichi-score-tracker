@@ -71,6 +71,8 @@ function LeaderboardTable({
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [gamesWithPlayers, setGamesWithPlayers] = useState(0);
+  const [sessionGames, setSessionGames] = useState(0);
+  const [importedGames, setImportedGames] = useState(0);
   const [periodLabel, setPeriodLabel] = useState("");
   const [archives, setArchives] = useState<MonthlyArchive[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +92,8 @@ export default function LeaderboardPage() {
         const currentJson = (await currentRes.json()) as {
           entries?: LeaderboardEntry[];
           gamesWithPlayers?: number;
+          sessionGames?: number;
+          importedGames?: number;
           period?: { label?: string };
           error?: string;
         };
@@ -104,6 +108,8 @@ export default function LeaderboardPage() {
         if (!cancelled) {
           setEntries(currentJson.entries ?? []);
           setGamesWithPlayers(currentJson.gamesWithPlayers ?? 0);
+          setSessionGames(currentJson.sessionGames ?? 0);
+          setImportedGames(currentJson.importedGames ?? 0);
           setPeriodLabel(currentJson.period?.label ?? "This month");
           setArchives(archivesJson.archives ?? []);
         }
@@ -126,13 +132,20 @@ export default function LeaderboardPage() {
 
   return (
     <main className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Leaderboard</h1>
-        <p className="mt-1 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          Standings reset each calendar month (US Eastern). Finished games count toward the current
-          month only. When a month ends, final rankings are saved permanently and can be downloaded
-          below.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Leaderboard</h1>
+          <p className="mt-1 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            Standings reset each calendar month (US Eastern). Includes in-person sessions (ended on
+            the site) and imported friendly games. Past months can be downloaded below.
+          </p>
+        </div>
+        <Link
+          href="/import"
+          className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+        >
+          Import MJS game
+        </Link>
       </div>
 
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
@@ -141,8 +154,11 @@ export default function LeaderboardPage() {
         <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
           <div className="mt-0.5 text-xs text-zinc-500">
-            {gamesWithPlayers} finished game{gamesWithPlayers === 1 ? "" : "s"} · points = (ending −
-            start) ÷ 1,000 per game
+            {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month
+            {sessionGames > 0 || importedGames > 0
+              ? ` (${sessionGames} in-person${importedGames > 0 ? `, ${importedGames} imported` : ""})`
+              : ""}{" "}
+            · points = (ending − start) ÷ 1,000
           </div>
         </div>
         <div className="hidden border-b border-zinc-200 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3 dark:border-zinc-800">
@@ -157,8 +173,11 @@ export default function LeaderboardPage() {
         ) : activeEntries.length === 0 ? (
           <div className="space-y-3 px-4 py-8 text-sm text-zinc-600 dark:text-zinc-300">
             <p>
-              No finished games this month yet. Assign players, record hands, then tap{" "}
-              <span className="font-medium">End game</span> on the session page.
+              No games this month yet. End an in-person session on the site, or{" "}
+              <Link href="/import" className="font-medium underline">
+                import a Mahjong Soul game
+              </Link>
+              .
             </p>
             <Link href="/players" className="font-medium underline">
               Add players

@@ -1,9 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { ImportedGameRow } from "@/lib/imports/types";
 import {
   computeLeaderboard,
   groupSessionSnapshots,
 } from "@/lib/leaderboard/computeLeaderboard";
+import { mergeImportedGamesIntoLeaderboard } from "@/lib/leaderboard/mergeImports";
 import {
   formatMonthLabel,
   getMonthPartsInTimezone,
@@ -15,7 +17,7 @@ export async function buildLeaderboardForPeriod(
   periodStartIso: string,
   periodEndIso: string
 ) {
-  const [sessionsRes, playersRes, sessionPlayersRes, eventsRes] = await Promise.all([
+  const [sessionsRes, playersRes, sessionPlayersRes, eventsRes, importsRes] = await Promise.all([
     supabase
       .from("sessions")
       .select("id, rules_json, ended_at")
@@ -30,10 +32,19 @@ export async function buildLeaderboardForPeriod(
       .from("events")
       .select("session_id, type, payload_json, created_at")
       .order("created_at", { ascending: true }),
+    supabase
+      .from("imported_games")
+      .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at")
+      .gte("played_at", periodStartIso)
+      .lt("played_at", periodEndIso),
   ]);
 
   const firstError =
-    sessionsRes.error ?? playersRes.error ?? sessionPlayersRes.error ?? eventsRes.error;
+    sessionsRes.error ??
+    playersRes.error ??
+    sessionPlayersRes.error ??
+    eventsRes.error ??
+    importsRes.error;
   if (firstError) throw new Error(firstError.message);
 
   const snapshots = groupSessionSnapshots({
@@ -42,7 +53,7 @@ export async function buildLeaderboardForPeriod(
     events: eventsRes.data ?? [],
   });
 
-  const entries = computeLeaderboard(
+  const sessionEntries = computeLeaderboard(
     snapshots,
     (playersRes.data ?? []).map((p) => ({
       id: p.id,
@@ -50,9 +61,16 @@ export async function buildLeaderboardForPeriod(
     }))
   );
 
+  const imports = (importsRes.data ?? []) as ImportedGameRow[];
+  const entries = mergeImportedGamesIntoLeaderboard(sessionEntries, imports);
+
+  const sessionGames = snapshots.filter((s) => s.assignments.length > 0).length;
+
   return {
     entries,
-    gamesWithPlayers: snapshots.filter((s) => s.assignments.length > 0).length,
+    gamesWithPlayers: sessionGames + imports.length,
+    sessionGames,
+    importedGames: imports.length,
   };
 }
 

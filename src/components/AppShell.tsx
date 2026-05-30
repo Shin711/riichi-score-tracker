@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
 import { CreateSessionButton } from "@/components/CreateSessionButton";
-import { SITE_HEADER, SITE_NAME } from "@/lib/site";
+import { SiteFooter } from "@/components/SiteFooter";
+import { DISCORD_INVITE_URL, SITE_HEADER, SITE_NAME } from "@/lib/site";
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -83,6 +84,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/import" label="Import" />
             <NavLink href="/my/sessions" label="My games" />
             <NavLink href="/login" label="Account" />
+            <a
+              href={DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg px-2.5 py-1.5 text-sm text-stone-600 transition-colors hover:bg-[#5865F2]/10 hover:text-[#5865F2] dark:text-stone-400 dark:hover:text-[#5865F2]"
+            >
+              Discord
+            </a>
             <CreateSessionButton label="New game" className="btn-primary ml-2 h-10" />
           </nav>
           <div className="sm:hidden">
@@ -92,6 +101,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24 sm:py-8 sm:pb-8">{children}</div>
+
+      <SiteFooter />
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-stone-200/90 bg-white/95 backdrop-blur-md sm:hidden dark:border-stone-800/90 dark:bg-stone-950/95">
         <div className="mx-auto flex max-w-5xl items-stretch">

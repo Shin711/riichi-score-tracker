@@ -3,14 +3,28 @@ import Link from "next/link";
 import { CreateSessionCard } from "@/components/CreateSessionCard";
 import { PageHeader } from "@/components/PageHeader";
 import { RecentSessionCard } from "@/components/RecentSessionCard";
-import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
+import { DISCORD_INVITE_URL, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
 const WINDS = ["東", "南", "西", "北"] as const;
 
 export default function Home() {
   return (
     <main className="space-y-6">
-      <PageHeader title={SITE_NAME} description={SITE_DESCRIPTION} badge="Riichi mahjong" />
+      <PageHeader
+        title={SITE_NAME}
+        description={SITE_DESCRIPTION}
+        badge="Riichi mahjong"
+        action={
+          <a
+            href={DISCORD_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary h-10 gap-2 px-4 text-[#5865F2] hover:border-[#5865F2]/40 hover:bg-[#5865F2]/5"
+          >
+            Join Discord
+          </a>
+        }
+      />
 
       <div className="flex justify-center gap-2 py-1" aria-hidden>
         {WINDS.map((wind) => (

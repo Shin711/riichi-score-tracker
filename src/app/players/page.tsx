@@ -79,7 +79,7 @@ export default function PlayersPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Player name"
-            className="h-11 flex-1 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-club-red/30 dark:border-stone-700 dark:bg-stone-950"
+            className="field h-11 flex-1 rounded-xl px-3 text-sm outline-none focus:ring-2 focus:ring-club-red/30"
           />
           <button onClick={() => void onAdd()} className="btn-primary h-11 px-4">
             Add player
@@ -91,20 +91,20 @@ export default function PlayersPage() {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="border-b border-stone-200 px-4 py-3 text-sm font-semibold dark:border-stone-800">
+        <div className="border-b border-club-border px-4 py-3 text-sm font-semibold text-club-ink">
           All players
         </div>
-        <ul className="divide-y divide-stone-200 dark:divide-stone-800">
+        <ul className="divide-club">
           {players.map((p) => (
             <li key={p.id} className="flex items-center justify-between px-4 py-3">
               <div className="min-w-0">
-                <div className="truncate font-medium">{p.display_name}</div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">{p.id}</div>
+                <div className="truncate font-medium text-club-ink">{p.display_name}</div>
+                <div className="text-xs text-subtle">{p.id}</div>
               </div>
             </li>
           ))}
           {players.length === 0 ? (
-            <li className="px-4 py-6 text-sm text-zinc-600 dark:text-zinc-300">
+            <li className="px-4 py-6 text-sm text-muted">
               No players yet.
             </li>
           ) : null}

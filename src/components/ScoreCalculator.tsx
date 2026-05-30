@@ -43,14 +43,14 @@ function ToggleGroup<T extends string>({
           className={`rounded-xl border px-3 py-3 text-left transition-colors ${
             value === opt.value
               ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
-              : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
+              : "border-club-border text-club-ink hover:border-stone-400 dark:hover:border-stone-500"
           }`}
         >
           <div className="text-sm font-semibold">{opt.label}</div>
           {opt.description ? (
             <div
               className={`mt-0.5 text-xs leading-relaxed ${
-                value === opt.value ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500"
+                value === opt.value ? "text-white/90" : "text-subtle"
               }`}
             >
               {opt.description}
@@ -89,10 +89,10 @@ export function ScoreCalculator() {
     <div className="space-y-6">
       <section className="card p-4 sm:p-5">
         <h2 className="text-sm font-semibold">1. How did you win?</h2>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-500">
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">Ron</span> — someone discarded
+        <p className="text-muted mt-1 text-xs leading-relaxed">
+          <span className="font-medium text-club-ink">Ron</span> — someone discarded
           your winning tile.{" "}
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">Tsumo</span> — you drew the
+          <span className="font-medium text-club-ink">Tsumo</span> — you drew the
           winning tile yourself.
         </p>
         <div className="mt-3">
@@ -117,7 +117,7 @@ export function ScoreCalculator() {
 
       <section className="card p-4 sm:p-5">
         <h2 className="text-sm font-semibold">2. Are you the dealer?</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="text-muted mt-1 text-xs">
           The dealer (East seat) pays and receives more. If you are not sure, ask who has the dealer
           marker.
         </p>
@@ -137,7 +137,7 @@ export function ScoreCalculator() {
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-sm font-semibold">3. Hand value (han & fu)</h2>
-            <p className="mt-1 text-xs leading-relaxed text-zinc-500">
+            <p className="text-muted mt-1 text-xs leading-relaxed">
               Count your yaku for <span className="font-medium">han</span>. Use your fu count, or pick a
               common hand below if you are still learning fu.
             </p>
@@ -145,7 +145,7 @@ export function ScoreCalculator() {
           <button
             type="button"
             onClick={() => setShowCustom((v) => !v)}
-            className="shrink-0 text-xs font-medium text-zinc-600 underline dark:text-zinc-400"
+            className="text-muted shrink-0 text-xs font-medium underline"
           >
             {showCustom ? "Hide custom" : "Custom han/fu"}
           </button>
@@ -160,13 +160,13 @@ export function ScoreCalculator() {
               className={`rounded-lg border px-3 py-2 text-left text-xs ${
                 selectedQuick === hand.label
                   ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
-                  : "border-zinc-200 dark:border-zinc-700"
+                  : "border-club-border text-club-ink dark:border-stone-600"
               }`}
             >
               <div className="font-semibold">{hand.label}</div>
               {hand.hint ? (
                 <div
-                  className={`mt-0.5 ${selectedQuick === hand.label ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500"}`}
+                  className={`mt-0.5 ${selectedQuick === hand.label ? "text-white/90" : "text-subtle"}`}
                 >
                   {hand.hint}
                 </div>
@@ -188,7 +188,7 @@ export function ScoreCalculator() {
                   setSelectedQuick("");
                   setHan(Math.max(1, Number(e.target.value) || 1));
                 }}
-                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                className="field mt-1 h-11 w-full px-2 text-sm"
               />
             </label>
             <label className="text-xs">
@@ -204,7 +204,7 @@ export function ScoreCalculator() {
                   setSelectedQuick("");
                   setFu(Number(e.target.value) || 30);
                 }}
-                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950"
+                className="field mt-1 h-11 w-full px-2 text-sm disabled:opacity-50"
               />
             </label>
           </div>
@@ -222,7 +222,7 @@ export function ScoreCalculator() {
 
       <section className="card p-4 sm:p-5">
         <h2 className="text-sm font-semibold">4. Honba sticks (optional)</h2>
-        <p className="mt-1 text-xs text-zinc-500">
+        <p className="text-muted mt-1 text-xs">
           If there were repeat counters on the table from previous dealer wins or draws, add them here
           (usually 300 pts each; 900 total on tsumo).
         </p>
@@ -232,32 +232,30 @@ export function ScoreCalculator() {
           max={20}
           value={honba}
           onChange={(e) => setHonba(Math.max(0, Number(e.target.value) || 0))}
-          className="mt-2 h-11 w-24 rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+          className="field mt-2 h-11 w-24 px-2 text-sm"
           aria-label="Honba sticks on table"
         />
       </section>
 
       {result ? (
-        <section className="rounded-2xl border-2 border-club-jade/40 bg-club-jade-muted/50 p-5 dark:border-teal-900/50 dark:bg-club-jade-muted">
-          <div className="text-xs font-semibold uppercase tracking-wide text-club-jade dark:text-teal-300">
-            You receive
-          </div>
-          <div className="mt-1 font-mono text-4xl font-bold tabular-nums tracking-tight text-teal-950 dark:text-teal-50">
+        <section className="jade-panel">
+          <div className="jade-panel-label">You receive</div>
+          <div className="jade-panel-fg mt-1 font-mono text-4xl font-bold tabular-nums tracking-tight">
             {result.total.toLocaleString()}
-            <span className="ml-2 text-lg font-semibold text-club-jade dark:text-teal-300">pts</span>
+            <span className="jade-panel-label ml-2 text-lg font-semibold normal-case">pts</span>
           </div>
-          <div className="mt-2 text-sm text-teal-900 dark:text-teal-100">
+          <div className="jade-panel-muted mt-2 text-sm">
             {winType === "ron" ? "Ron" : "Tsumo"} · {result.handLabel}
             {winnerIsDealer ? " · dealer win" : ""}
           </div>
 
-          <div className="mt-4 rounded-xl bg-white/70 p-3 dark:bg-zinc-950/40">
-            <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-200">Who pays</div>
+          <div className="card mt-4 p-3">
+            <div className="text-xs font-semibold text-club-ink">Who pays</div>
             <ul className="mt-2 space-y-2">
               {result.payments.map((row) => (
                 <li
                   key={row.label}
-                  className="flex items-center justify-between gap-3 text-sm text-zinc-800 dark:text-zinc-100"
+                  className="flex items-center justify-between gap-3 text-sm text-club-ink"
                 >
                   <span>{row.label}</span>
                   <span className="font-mono font-semibold tabular-nums">
@@ -267,16 +265,16 @@ export function ScoreCalculator() {
               ))}
             </ul>
             {result.honbaNote ? (
-              <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-400">{result.honbaNote}</p>
+              <p className="text-muted mt-2 text-xs">{result.honbaNote}</p>
             ) : null}
           </div>
         </section>
       ) : null}
 
-      <p className="text-xs leading-relaxed text-zinc-500">
+      <p className="text-muted text-xs leading-relaxed">
         Uses standard riichi scoring (EMA-style han/fu tables). Fu is rounded up to the nearest 10.
         This tool helps at the table — for live games, use{" "}
-        <span className="font-medium text-zinc-700 dark:text-zinc-300">New game</span> to track scores
+        <span className="font-medium text-club-ink">New game</span> to track scores
         automatically.
       </p>
     </div>

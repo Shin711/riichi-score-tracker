@@ -95,8 +95,10 @@ If code is already on GitHub but cron was added recently:
 
 1. Vercel → your project → **Settings** → **Cron Jobs** (or **Crons** in the sidebar).
 2. You should see:
-   - **Path:** `/api/cron/archive-leaderboard`
-   - **Schedule:** `0 10 * * *` (daily at 10:00 UTC)
+   - **Path:** `/api/cron/archive-leaderboard` — schedule `0 10 * * *` (daily 10:00 UTC)
+   - **Path:** `/api/cron/maintenance` — schedule `0 11 * * *` (daily 11:00 UTC)
+
+The **maintenance** job deletes empty sessions older than 7 days (no recorded hands) and checks Postgres size. When the database reaches **400 MB**, it logs an error and optionally POSTs to `STORAGE_ALERT_WEBHOOK_URL` (e.g. a Discord webhook), at most once per 24 hours.
 
 If nothing appears, production has not yet deployed a commit that includes `vercel.json`.
 
@@ -109,6 +111,7 @@ If nothing appears, production has not yet deployed a commit that includes `verc
 | During the month | `/leaderboard` shows only games **ended** this month (Eastern). |
 | After midnight Eastern on the 1st | Previous month is a “closed” month. |
 | Daily cron (~5–6 AM Eastern) | App saves previous month to `leaderboard_monthly_archives` if missing. |
+| Daily maintenance cron | Deletes empty sessions >7 days; storage alert at 400 MB. |
 | Any time someone opens leaderboard | Same archive check runs (backup if cron missed a day). |
 | **Past months** on leaderboard page | Download CSV / JSON of saved standings. |
 
@@ -116,8 +119,9 @@ If nothing appears, production has not yet deployed a commit that includes `verc
 
 ## Checklist
 
-- [ ] Ran Supabase migration `004_leaderboard_monthly_archives.sql`
+- [ ] Ran Supabase migrations through `006_maintenance.sql`
 - [ ] `CRON_SECRET` set in Vercel **Production** environment variables
+- [ ] Optional: `STORAGE_ALERT_WEBHOOK_URL` for Discord/Slack when DB ≥ 400 MB
 - [ ] Production deployment **Ready** after `vercel.json` was added
-- [ ] **Settings → Cron Jobs** shows `/api/cron/archive-leaderboard`
+- [ ] **Settings → Cron Jobs** shows `/api/cron/archive-leaderboard` and `/api/cron/maintenance`
 - [ ] `/leaderboard` loads and shows current month label (e.g. “April 2026”)

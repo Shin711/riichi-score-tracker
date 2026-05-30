@@ -1,17 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { authorizeCron } from "@/lib/cron/auth";
 import { ensureMonthlyArchivesUpToDate } from "@/lib/leaderboard/monthly";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 /** Archives completed months. Called by Vercel Cron on the 1st of each month. */
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-    }
-  }
+  const denied = authorizeCron(req);
+  if (denied) return denied;
 
   const supabase = getSupabaseAdmin();
   if (!supabase) {

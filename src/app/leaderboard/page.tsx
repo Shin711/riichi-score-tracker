@@ -24,7 +24,7 @@ function LeaderboardTable({
   const activeEntries = entries.filter((e) => e.gamesPlayed > 0);
 
   if (activeEntries.length === 0) {
-    return <div className="px-4 py-8 text-sm text-zinc-600 dark:text-zinc-300">{emptyMessage}</div>;
+    return <div className="px-4 py-8 text-sm text-muted">{emptyMessage}</div>;
   }
 
   return (
@@ -38,19 +38,19 @@ function LeaderboardTable({
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
                 index === 0
-                  ? "bg-club-gold-muted text-club-gold ring-1 ring-club-gold/30"
+                  ? "rank-badge-1"
                   : index === 1
-                    ? "bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-100"
+                    ? "rank-badge-2"
                     : index === 2
-                      ? "bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200"
-                      : "bg-stone-100 text-stone-600 dark:bg-stone-800/50 dark:text-stone-400"
+                      ? "rank-badge-3"
+                      : "rank-badge-n"
               }`}
             >
               {index + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{entry.displayName}</div>
-              <div className="mt-1 text-xs text-zinc-500 sm:hidden">
+              <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
+              <div className="mt-1 text-xs text-subtle sm:hidden">
                 {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
               </div>
             </div>
@@ -60,7 +60,7 @@ function LeaderboardTable({
               {formatLeaderboardPoints(entry.totalDelta)}
             </div>
           </div>
-          <div className="hidden text-right text-sm tabular-nums text-zinc-500 sm:block">
+          <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
             {entry.gamesPlayed}
           </div>
         </li>
@@ -149,7 +149,7 @@ export default function LeaderboardPage() {
       <div className="card overflow-hidden">
         <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
-          <div className="mt-0.5 text-xs text-zinc-500">
+          <div className="mt-0.5 text-xs text-subtle">
             {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month
             {sessionGames > 0 || importedGames > 0
               ? ` (${sessionGames} in-person${importedGames > 0 ? `, ${importedGames} imported` : ""})`
@@ -157,7 +157,7 @@ export default function LeaderboardPage() {
             · points = (ending − start) ÷ 1,000
           </div>
         </div>
-        <div className="hidden border-b border-zinc-200 px-4 py-3 text-xs font-medium uppercase tracking-wide text-zinc-500 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3 dark:border-zinc-800">
+        <div className="hidden border-b border-stone-200 px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3 dark:border-stone-600">
           <span>Rank</span>
           <span>Name</span>
           <span className="text-right">Points</span>
@@ -165,9 +165,9 @@ export default function LeaderboardPage() {
         </div>
 
         {loading ? (
-          <div className="px-4 py-8 text-sm text-zinc-600 dark:text-zinc-300">Loading standings…</div>
+          <div className="px-4 py-8 text-sm text-muted">Loading standings…</div>
         ) : activeEntries.length === 0 ? (
-          <div className="space-y-3 px-4 py-8 text-sm text-zinc-600 dark:text-zinc-300">
+          <div className="space-y-3 px-4 py-8 text-sm text-muted">
             <p>
               No games this month yet. End an in-person session on the site, or{" "}
               <Link href="/import" className="font-medium underline">
@@ -188,7 +188,7 @@ export default function LeaderboardPage() {
       </div>
 
       {!loading && entries.some((e) => e.gamesPlayed === 0) ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="card p-4">
           <div className="text-sm font-medium">Not on the board yet this month</div>
           <ul className="mt-3 flex flex-wrap gap-2">
             {entries
@@ -206,10 +206,10 @@ export default function LeaderboardPage() {
       ) : null}
 
       {!loading && archives.length > 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="card">
           <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
             <div className="text-sm font-medium">Past months</div>
-            <p className="mt-0.5 text-xs text-zinc-500">
+            <p className="mt-0.5 text-xs text-subtle">
               Final standings saved when each month ended. Download as CSV or JSON.
             </p>
           </div>
@@ -219,7 +219,7 @@ export default function LeaderboardPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="font-medium">{archive.label}</div>
-                    <div className="text-xs text-zinc-500">
+                    <div className="text-xs text-subtle">
                       {archive.gamesCount} game{archive.gamesCount === 1 ? "" : "s"} · archived{" "}
                       {new Date(archive.archivedAt).toLocaleString()}
                     </div>
@@ -241,7 +241,7 @@ export default function LeaderboardPage() {
                 </div>
                 {archive.entries.length > 0 ? (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-xs font-medium text-zinc-600 dark:text-zinc-300">
+                    <summary className="cursor-pointer text-xs font-medium text-muted">
                       View standings
                     </summary>
                     <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">

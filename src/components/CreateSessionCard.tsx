@@ -8,11 +8,11 @@ export function CreateSessionCard() {
   return (
     <div className="card-accent relative overflow-hidden p-6">
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-club-red via-club-gold to-club-jade"
+        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-club-red/40 via-club-gold/30 to-club-jade/40"
         aria-hidden
       />
-      <h2 className="text-xl font-bold tracking-tight">Start a new game</h2>
-      <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
+      <h2 className="text-xl font-bold tracking-tight text-club-ink">Start a new game</h2>
+      <p className="text-muted mt-2 text-sm leading-6">
         One person at the table creates the session on their phone. Everyone else opens the viewer link to
         follow scores live.
       </p>

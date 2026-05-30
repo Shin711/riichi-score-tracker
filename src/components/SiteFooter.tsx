@@ -2,9 +2,9 @@ import { DISCORD_INVITE_URL, SITE_NAME } from "@/lib/site";
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t border-stone-200/80 bg-white/60 py-6 pb-20 backdrop-blur-sm sm:pb-6 dark:border-stone-800/80 dark:bg-stone-950/60">
+    <footer className="shell-bar mt-auto border-t py-6 pb-20 sm:pb-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:text-left">
-        <p className="text-xs text-stone-500 dark:text-stone-400">{SITE_NAME}</p>
+        <p className="text-muted text-xs">{SITE_NAME}</p>
         <a
           href={DISCORD_INVITE_URL}
           target="_blank"

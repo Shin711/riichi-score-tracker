@@ -13,12 +13,10 @@ export function RecentSessionCard() {
   if (!recent) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-club-jade/30 bg-club-jade-muted/80 p-5 shadow-sm dark:border-teal-900/50 dark:bg-club-jade-muted">
-      <div className="text-xs font-semibold uppercase tracking-wide text-club-jade dark:text-teal-300">
-        Continue last game
-      </div>
-      <div className="mt-1 text-lg font-bold tracking-tight">{recent.title}</div>
-      <div className="mt-1 text-xs text-teal-800/70 dark:text-teal-300/70">
+    <div className="jade-panel shadow-sm">
+      <div className="jade-panel-label">Continue last game</div>
+      <div className="jade-panel-fg mt-1 text-lg font-bold tracking-tight">{recent.title}</div>
+      <div className="jade-panel-muted mt-1">
         Last opened {new Date(recent.visitedAt).toLocaleString()}
       </div>
       <Link

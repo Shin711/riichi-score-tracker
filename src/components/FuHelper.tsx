@@ -25,10 +25,10 @@ function Stepper({
   max?: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 px-2 py-2 dark:border-zinc-700">
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-club-border bg-club-surface px-2 py-2">
       <div className="min-w-0">
-        <div className="text-xs font-medium">{label}</div>
-        {hint ? <div className="text-[10px] text-zinc-500">{hint}</div> : null}
+        <div className="text-xs font-medium text-club-ink">{label}</div>
+        {hint ? <div className="text-[10px] text-subtle">{hint}</div> : null}
       </div>
       <div className="flex shrink-0 items-center gap-1">
         <button
@@ -36,7 +36,7 @@ function Stepper({
           aria-label={`Decrease ${label}`}
           disabled={value <= 0}
           onClick={() => onChange(Math.max(0, value - 1))}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 text-sm disabled:opacity-40 dark:border-zinc-600"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-club-border text-sm text-club-ink disabled:opacity-40"
         >
           −
         </button>
@@ -46,7 +46,7 @@ function Stepper({
           aria-label={`Increase ${label}`}
           disabled={value >= max}
           onClick={() => onChange(Math.min(max, value + 1))}
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 text-sm disabled:opacity-40 dark:border-zinc-600"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-club-border text-sm text-club-ink disabled:opacity-40"
         >
           +
         </button>
@@ -92,25 +92,25 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
   const showWait = input.handShape === "normal";
 
   return (
-    <div className="mt-4 rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 p-3 dark:border-zinc-600 dark:bg-zinc-900/50">
+    <div className="mt-4 rounded-xl border border-dashed border-club-border bg-club-surface p-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 text-left"
       >
         <div>
-          <div className="text-xs font-semibold text-zinc-800 dark:text-zinc-100">Fu helper</div>
-          <div className="mt-0.5 text-[10px] text-zinc-500">
+          <div className="text-xs font-semibold text-club-ink">Fu helper</div>
+          <div className="mt-0.5 text-[10px] text-subtle">
             Step-by-step fu count (standard riichi rules)
           </div>
         </div>
-        <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{open ? "Hide" : "Show"}</span>
+        <span className="text-xs font-medium text-muted">{open ? "Hide" : "Show"}</span>
       </button>
 
       {open ? (
         <div className="mt-4 space-y-4">
           <div>
-            <div className="text-xs font-medium text-zinc-700 dark:text-zinc-200">Hand shape</div>
+            <div className="text-xs font-medium text-muted">Hand shape</div>
             <div className="mt-2 flex flex-wrap gap-2">
               {(
                 [
@@ -125,8 +125,8 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
                   onClick={() => setHandShape(value)}
                   className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${
                     input.handShape === value
-                      ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
-                      : "border-zinc-200 dark:border-zinc-700"
+                      ? "border-club-red bg-club-red text-white"
+                      : "border-stone-200 dark:border-stone-600"
                   }`}
                 >
                   {label}
@@ -134,26 +134,26 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
               ))}
             </div>
             {input.handShape === "pinfu" ? (
-              <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">
+              <p className="mt-2 text-[10px] leading-relaxed text-subtle">
                 All sequences + one pair, closed, no fu wait — fixed 20 fu (tsumo) or 30 fu (ron).
               </p>
             ) : null}
             {input.handShape === "chiitoitsu" ? (
-              <p className="mt-2 text-[10px] leading-relaxed text-zinc-500">Fixed 25 fu (not rounded).</p>
+              <p className="mt-2 text-[10px] leading-relaxed text-subtle">Fixed 25 fu (not rounded).</p>
             ) : null}
           </div>
 
           {input.handShape === "normal" ? (
             <div>
-              <div className="text-xs font-medium text-zinc-700 dark:text-zinc-200">Hand open or closed?</div>
+              <div className="text-xs font-medium text-muted">Hand open or closed?</div>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => patch({ isClosed: true })}
                   className={`rounded-lg border px-2 py-2 text-xs font-medium ${
                     input.isClosed
-                      ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
-                      : "border-zinc-200 dark:border-zinc-700"
+                      ? "border-club-red bg-club-red text-white"
+                      : "border-stone-200 dark:border-stone-600"
                   }`}
                 >
                   Closed (concealed)
@@ -163,8 +163,8 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
                   onClick={() => patch({ isClosed: false })}
                   className={`rounded-lg border px-2 py-2 text-xs font-medium ${
                     !input.isClosed
-                      ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
-                      : "border-zinc-200 dark:border-zinc-700"
+                      ? "border-club-red bg-club-red text-white"
+                      : "border-stone-200 dark:border-stone-600"
                   }`}
                 >
                   Open (called chii/pon/kan)
@@ -175,13 +175,13 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
 
           {showMelds ? (
             <div className="space-y-2">
-              <div className="text-xs font-medium text-zinc-700 dark:text-zinc-200">Melds (sets in hand)</div>
-              <p className="text-[10px] text-zinc-500">
+              <div className="text-xs font-medium text-muted">Melds (sets in hand)</div>
+              <p className="text-[10px] text-subtle">
                 Simple = tiles 2–8. Terminal/honor = 1, 9, winds, dragons. Chii (sequences) add 0 fu.
               </p>
               {!input.isClosed ? (
                 <div className="space-y-2">
-                  <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Open (called)</div>
+                  <div className="text-[10px] font-medium uppercase tracking-wide text-subtle">Open (called)</div>
                   <Stepper
                     label="Open pon"
                     hint="2–8"
@@ -211,7 +211,7 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
                 </div>
               ) : null}
               <div className="space-y-2">
-                <div className="text-[10px] font-medium uppercase tracking-wide text-zinc-500">Concealed</div>
+                <div className="text-[10px] font-medium uppercase tracking-wide text-subtle">Concealed</div>
                 <Stepper
                   label="Closed pon"
                   hint="2–8"
@@ -244,7 +244,7 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
 
           {showWait ? (
             <div>
-              <div className="text-xs font-medium text-zinc-700 dark:text-zinc-200">How were you waiting?</div>
+              <div className="text-xs font-medium text-muted">How were you waiting?</div>
               <div className="mt-2 grid gap-1.5">
                 {(
                   [
@@ -261,13 +261,13 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
                     onClick={() => patch({ waitType: value as WaitType })}
                     className={`rounded-lg border px-2 py-2 text-left text-xs ${
                       input.waitType === value
-                        ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950"
-                        : "border-zinc-200 dark:border-zinc-700"
+                        ? "border-club-red bg-club-red text-white"
+                        : "border-stone-200 dark:border-stone-600"
                     }`}
                   >
                     <span className="font-medium">{desc}</span>
                     <span
-                      className={`ml-1 ${input.waitType === value ? "text-zinc-300 dark:text-zinc-600" : "text-zinc-500"}`}
+                      className={`ml-1 ${input.waitType === value ? "text-red-100" : "text-subtle"}`}
                     >
                       · {fuTag}
                     </span>
@@ -278,7 +278,7 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
           ) : null}
 
           {showMelds ? (
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-zinc-700 dark:text-zinc-200">
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-muted">
               <input
                 type="checkbox"
                 checked={input.valuedPair}
@@ -286,19 +286,19 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
                 className="mt-0.5 h-4 w-4 rounded border-zinc-300"
               />
               <span>
-                Pair is seat wind, round wind, or dragon <span className="text-zinc-500">(+2 fu)</span>
+                Pair is seat wind, round wind, or dragon <span className="text-subtle">(+2 fu)</span>
               </span>
             </label>
           ) : null}
 
-          <div className="rounded-lg bg-white p-3 dark:bg-zinc-950">
+          <div className="card p-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-xs font-semibold">Total fu</span>
-              <span className="font-mono text-2xl font-bold tabular-nums">{result.fu}</span>
+              <span className="text-xs font-semibold text-club-ink">Total fu</span>
+              <span className="font-mono text-2xl font-bold tabular-nums text-club-ink">{result.fu}</span>
             </div>
-            <ul className="mt-2 space-y-1 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+            <ul className="divide-club mt-2 space-y-1 pt-2">
               {result.lines.map((line, i) => (
-                <li key={`${line.label}-${i}`} className="flex justify-between gap-2 text-[10px] text-zinc-600 dark:text-zinc-400">
+                <li key={`${line.label}-${i}`} className="flex justify-between gap-2 text-[10px] text-muted">
                   <span>{line.label}</span>
                   {line.fu !== 0 ? (
                     <span className="font-mono tabular-nums">+{line.fu}</span>
@@ -319,7 +319,7 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
               onApply(result.fu);
               setOpen(false);
             }}
-            className="h-10 w-full rounded-lg bg-zinc-950 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+            className="h-10 w-full rounded-lg btn-primary"
           >
             Use {result.fu} fu in calculator
           </button>

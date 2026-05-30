@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
 @theme inline {
   --color-club-red: #c41e3a;
   --color-club-red-dark: #9e1830;
@@ -8,72 +10,236 @@
   --color-club-gold-muted: #fef6e0;
   --color-club-jade: #0f766e;
   --color-club-jade-muted: #ecfdf5;
-  --color-club-cream: #faf8f5;
+  --color-club-jade-fg: #134e4a;
+  --color-club-jade-label: #115e59;
+  --color-club-cream: #f7f5f2;
+  --color-club-surface: #ffffff;
   --color-club-ink: #1c1917;
+  --color-club-muted: #44403c;
+  --color-club-subtle: #44403c;
+  --color-club-border: #d6d3d1;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   @theme inline {
-    --color-club-red-muted: #3f1219;
+    --color-club-red-muted: #4a1d24;
     --color-club-gold-muted: #2a2210;
-    --color-club-jade-muted: #0d2f2c;
-    --color-club-cream: #0c0a09;
+    --color-club-jade-muted: #134e4a;
+    --color-club-jade-fg: #f0fdfa;
+    --color-club-jade-label: #99f6e4;
+    --color-club-cream: #1c1917;
+    --color-club-surface: #292524;
+    --color-club-ink: #fafaf9;
+    --color-club-muted: #e7e5e4;
+    --color-club-subtle: #d6d3d1;
+    --color-club-border: #57534e;
   }
 }
 
 body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   color: var(--color-club-ink);
+  background-color: var(--color-club-cream);
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    color: #fafaf9;
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html {
+      color-scheme: dark;
+    }
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  strong {
+    color: var(--color-club-ink);
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="hidden"]),
+  select,
+  textarea {
+    color: var(--color-club-ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-club-subtle);
+    opacity: 1;
   }
 }
 
-/* Warm page backdrop with subtle tile-grid texture */
+/* Soft warm backdrop */
 .app-shell-bg {
   background-color: var(--color-club-cream);
   background-image:
-    radial-gradient(ellipse 90% 60% at 50% -15%, rgb(196 30 58 / 0.07), transparent 55%),
-    radial-gradient(ellipse 50% 40% at 100% 20%, rgb(184 134 11 / 0.06), transparent 50%),
-    radial-gradient(ellipse 40% 30% at 0% 80%, rgb(15 118 110 / 0.05), transparent 45%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect x='4' y='4' width='16' height='22' rx='2' fill='none' stroke='%23a8a29e' stroke-opacity='0.12' stroke-width='1'/%3E%3Crect x='28' y='22' width='16' height='22' rx='2' fill='none' stroke='%23a8a29e' stroke-opacity='0.08' stroke-width='1'/%3E%3C/svg%3E");
-  background-size: auto, auto, auto, 48px 48px;
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(196 30 58 / 0.025), transparent 60%),
+    radial-gradient(ellipse 45% 35% at 100% 0%, rgb(184 134 11 / 0.02), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Crect x='6' y='6' width='16' height='22' rx='2' fill='none' stroke='%23a8a29e' stroke-opacity='0.045' stroke-width='1'/%3E%3Crect x='32' y='26' width='16' height='22' rx='2' fill='none' stroke='%23a8a29e' stroke-opacity='0.03' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: auto, auto, 56px 56px;
 }
 
 @media (prefers-color-scheme: dark) {
   .app-shell-bg {
-    background-color: #0c0a09;
     background-image:
-      radial-gradient(ellipse 90% 60% at 50% -15%, rgb(196 30 58 / 0.12), transparent 55%),
-      radial-gradient(ellipse 50% 40% at 100% 20%, rgb(184 134 11 / 0.08), transparent 50%),
-      radial-gradient(ellipse 40% 30% at 0% 80%, rgb(15 118 110 / 0.06), transparent 45%),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Crect x='4' y='4' width='16' height='22' rx='2' fill='none' stroke='%2378716c' stroke-opacity='0.15' stroke-width='1'/%3E%3Crect x='28' y='22' width='16' height='22' rx='2' fill='none' stroke='%2378716c' stroke-opacity='0.1' stroke-width='1'/%3E%3C/svg%3E");
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgb(196 30 58 / 0.04), transparent 60%),
+      radial-gradient(ellipse 45% 35% at 100% 0%, rgb(184 134 11 / 0.03), transparent 55%);
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-stone-200/90 bg-white/85 shadow-sm shadow-stone-900/5 backdrop-blur-sm dark:border-stone-800/90 dark:bg-stone-900/85 dark:shadow-none;
+    @apply rounded-2xl border bg-club-surface shadow-sm shadow-stone-900/[0.04] dark:shadow-none;
+    border-color: var(--color-club-border);
   }
 
   .card-accent {
-    @apply rounded-2xl border border-stone-200/90 bg-white/85 shadow-sm shadow-stone-900/5 backdrop-blur-sm ring-1 ring-club-red/15 dark:border-stone-800/90 dark:bg-stone-900/85 dark:shadow-none dark:ring-club-red/25;
+    @apply rounded-2xl border bg-club-surface shadow-sm shadow-stone-900/[0.04] ring-1 ring-club-red/10 dark:shadow-none dark:ring-club-red/15;
+    border-color: var(--color-club-border);
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl bg-club-red px-5 text-sm font-semibold text-white shadow-sm shadow-club-red/25 transition-colors hover:bg-club-red-dark disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-xl bg-club-red px-5 text-sm font-semibold text-white shadow-sm shadow-club-red/15 transition-colors hover:bg-club-red-dark disabled:opacity-50;
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-xl border border-stone-200 bg-white/90 px-4 text-sm font-medium text-stone-800 transition-colors hover:border-stone-300 hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-900/90 dark:text-stone-100 dark:hover:border-stone-600 dark:hover:bg-stone-800;
+    @apply inline-flex items-center justify-center rounded-xl border bg-club-surface px-4 text-sm font-medium text-club-ink transition-colors hover:bg-stone-50 dark:hover:bg-stone-700;
+    border-color: var(--color-club-border);
   }
 
   .nav-link-active {
-    @apply font-semibold text-club-red dark:text-red-400;
+    @apply font-semibold text-club-red dark:text-red-300;
+  }
+
+  .text-ink {
+    color: var(--color-club-ink);
+  }
+
+  .text-muted {
+    color: var(--color-club-muted);
+  }
+
+  .text-subtle {
+    color: var(--color-club-subtle);
+  }
+
+  .field {
+    @apply rounded-lg border bg-club-surface text-club-ink;
+    border-color: var(--color-club-border);
+  }
+
+  .field::placeholder {
+    color: var(--color-club-subtle);
+    opacity: 1;
+  }
+
+  .shell-bar {
+    @apply border-b bg-club-cream/95 backdrop-blur-md;
+    border-color: var(--color-club-border);
+  }
+
+  .divide-club > :not(:last-child) {
+    border-bottom: 1px solid var(--color-club-border);
+  }
+
+  /* Teal accent panels — text tokens flip with the jade background */
+  .jade-panel {
+    @apply rounded-2xl border-2 p-5;
+    border-color: rgb(15 118 110 / 0.35);
+    background-color: var(--color-club-jade-muted);
+  }
+
+  .jade-panel-label {
+    @apply text-xs font-semibold uppercase tracking-wide;
+    color: var(--color-club-jade-label);
+  }
+
+  .jade-panel-fg {
+    color: var(--color-club-jade-fg);
+  }
+
+  .jade-panel-muted {
+    @apply text-xs;
+    color: var(--color-club-jade-label);
+  }
+
+  /* Rank badges always use light fills + dark numerals */
+  .rank-badge-1 {
+    @apply bg-amber-100 text-amber-950 ring-1 ring-amber-600/35;
+  }
+
+  .rank-badge-2 {
+    @apply bg-stone-200 text-stone-900;
+  }
+
+  .rank-badge-3 {
+    @apply bg-orange-100 text-orange-950;
+  }
+
+  .rank-badge-n {
+    @apply bg-stone-100 text-stone-800;
+  }
+
+  .chip-neutral {
+    @apply rounded-md bg-stone-200 px-2 py-0.5 text-[10px] font-medium text-stone-800;
+  }
+
+  .chip-amber {
+    @apply rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-950;
+  }
+
+  .seat-card {
+    @apply rounded-xl border px-2 py-2 sm:px-3;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-surface);
+  }
+
+  .seat-label {
+    @apply text-[10px] font-semibold uppercase tracking-wide;
+    color: var(--color-club-muted);
+  }
+
+  .session-subbar {
+    @apply mt-2 flex flex-wrap items-center gap-2 rounded-lg border px-2.5 py-2 text-xs;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-cream);
+    color: var(--color-club-muted);
+  }
+
+  .btn-riichi {
+    @apply mt-2 h-8 w-full rounded-lg border text-[10px] font-semibold;
+    border-color: rgb(217 119 6 / 0.55);
+    color: #92400e;
+    background-color: #fffbeb;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .btn-riichi {
+      border-color: rgb(251 191 36 / 0.45);
+      color: #fde68a;
+      background-color: rgb(69 26 3 / 0.45);
+    }
+  }
+
+  .btn-riichi-active {
+    @apply mt-2 h-8 w-full rounded-lg border text-[10px] font-semibold;
+    border-color: rgb(217 119 6 / 0.65);
+    color: #78350f;
+    background-color: #fef3c7;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .btn-riichi-active {
+      border-color: rgb(251 191 36 / 0.55);
+      color: #fef3c7;
+      background-color: rgb(69 26 3 / 0.65);
+    }
   }
 }

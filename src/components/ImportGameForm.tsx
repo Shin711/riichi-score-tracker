@@ -180,10 +180,10 @@ export function ImportGameForm() {
     <div className="space-y-6">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-6"
+        className="card p-4 sm:p-6"
       >
         <div className="text-sm font-medium">Import friendly match</div>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="mt-1 text-sm text-muted">
           Enter final scores from Mahjong Soul or any friendly table. Mark bot seats as{" "}
           <span className="font-medium">AI</span> — only human scores count on the leaderboard.
           Points: (final score − starting stack) ÷ 1,000, in the month played (US Eastern).
@@ -196,7 +196,7 @@ export function ImportGameForm() {
               value={mjsPaipuUrl}
               onChange={(e) => setMjsPaipuUrl(e.target.value)}
               placeholder="https://mahjongsoul.game.yo-star.com/?paipu=..."
-              className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
             />
             {mjsPaipuUrl.trim() && !paipuValid ? (
               <span className="mt-1 block text-xs text-red-600 dark:text-red-400">
@@ -212,7 +212,7 @@ export function ImportGameForm() {
                 type="datetime-local"
                 value={playedAt}
                 onChange={(e) => setPlayedAt(e.target.value)}
-                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
               />
             </label>
             <label className="text-xs">
@@ -221,13 +221,13 @@ export function ImportGameForm() {
                 type="number"
                 value={startingPoints}
                 onChange={(e) => setStartingPoints(Number(e.target.value))}
-                className="mt-1 h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
               />
             </label>
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-zinc-600 dark:text-zinc-300">
+            <div className="text-xs font-medium text-muted">
               Final scores (1st → 4th placement order not required)
             </div>
             {seatLabels.map((wind, index) => (
@@ -235,9 +235,9 @@ export function ImportGameForm() {
                 key={wind}
                 className="grid grid-cols-[4.5rem_1fr_6.5rem] items-start gap-2 rounded-xl border border-zinc-200 p-2 dark:border-zinc-800"
               >
-                <span className="pt-2 text-xs font-medium text-zinc-500">{wind}</span>
+                <span className="pt-2 text-xs font-medium text-subtle">{wind}</span>
                 <div className="min-w-0 space-y-1">
-                  <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-300">
+                  <label className="flex items-center gap-2 text-xs text-muted">
                     <input
                       type="checkbox"
                       checked={seats[index].isAi}
@@ -253,7 +253,7 @@ export function ImportGameForm() {
                     AI bot
                   </label>
                   {seats[index].isAi ? (
-                    <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-200 px-2 text-sm text-zinc-500 dark:border-zinc-700">
+                    <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-200 px-2 text-sm text-subtle dark:border-zinc-700">
                       AI ({wind})
                     </div>
                   ) : (
@@ -268,7 +268,7 @@ export function ImportGameForm() {
                             displayName: player?.display_name ?? seats[index].displayName,
                           });
                         }}
-                        className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                        className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:text-stone-100"
                       >
                         <option value="">New name…</option>
                         {players.map((p) => (
@@ -282,7 +282,7 @@ export function ImportGameForm() {
                           value={seats[index].displayName}
                           onChange={(e) => updateSeat(index, { displayName: e.target.value })}
                           placeholder="Player name"
-                          className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                          className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:text-stone-100"
                         />
                       ) : null}
                     </>
@@ -293,7 +293,7 @@ export function ImportGameForm() {
                   value={seats[index].finalScore}
                   onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
                   placeholder="Score"
-                  className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-2 text-sm tabular-nums dark:border-zinc-700 dark:bg-zinc-900"
+                  className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm tabular-nums dark:border-stone-600 dark:text-stone-100"
                 />
               </div>
             ))}
@@ -312,7 +312,7 @@ export function ImportGameForm() {
           <button
             type="submit"
             disabled={submitting}
-            className="h-11 flex-1 rounded-xl bg-zinc-950 text-sm font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-zinc-950"
+            className="h-11 flex-1 rounded-xl btn-primary disabled:opacity-40"
           >
             {submitting ? "Importing…" : "Import game"}
           </button>
@@ -324,7 +324,7 @@ export function ImportGameForm() {
           </Link>
         </div>
 
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-xs text-subtle">
           New names are added to{" "}
           <Link href="/players" className="underline">
             Players
@@ -334,7 +334,7 @@ export function ImportGameForm() {
       </form>
 
       {imports.length > 0 ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="card">
           <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium dark:border-zinc-800">
             Recent imports
           </div>
@@ -346,11 +346,11 @@ export function ImportGameForm() {
                     <div className="font-medium">
                       {new Date(row.played_at).toLocaleString()} · MJS import
                     </div>
-                    <ul className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
+                    <ul className="mt-1 text-xs text-muted">
                       {(row.entries_json ?? []).map((e, entryIndex) => (
                         <li
                           key={e.player_id ?? `${e.display_name}-${entryIndex}`}
-                          className={e.is_ai ? "text-zinc-400 dark:text-zinc-500" : undefined}
+                          className={e.is_ai ? "text-subtle" : undefined}
                         >
                           {e.display_name}
                           {e.is_ai ? " (AI)" : ""}: {e.final_score.toLocaleString()}
@@ -379,7 +379,7 @@ export function ImportGameForm() {
                           type="button"
                           disabled={deletingId === row.id}
                           onClick={() => setConfirmDeleteId(null)}
-                          className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-xs font-medium dark:border-zinc-700 dark:bg-zinc-900"
+                          className="h-9 rounded-lg border border-stone-200 bg-club-surface px-3 text-xs font-medium dark:border-stone-600 dark:text-stone-100"
                         >
                           Cancel
                         </button>

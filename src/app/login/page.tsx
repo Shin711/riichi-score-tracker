@@ -99,20 +99,20 @@ export default function LoginPage() {
     <main className="mx-auto max-w-md space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
+        <p className="mt-1 text-sm text-muted">
           Optional — claim games to your account. Scoring works without signing in.
         </p>
       </div>
 
       {userEmail ? (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="card p-4">
           <div className="text-sm">
             Signed in as <span className="font-medium">{userEmail}</span>
           </div>
           <div className="mt-4 flex gap-3">
             <Link
               href="/my/sessions"
-              className="inline-flex h-10 items-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+              className="inline-flex h-10 items-center btn-primary px-4"
             >
               My games
             </Link>
@@ -126,36 +126,36 @@ export default function LoginPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="card p-4">
             <button
               type="button"
               onClick={() => void onGoogleSignIn()}
               disabled={googleLoading}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-white text-sm font-medium hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              className="btn-secondary h-12 w-full gap-2 disabled:opacity-50"
             >
               <GoogleIcon />
               {googleLoading ? "Redirecting…" : "Continue with Google"}
             </button>
-            <p className="mt-2 text-xs text-zinc-500">
+            <p className="mt-2 text-xs text-subtle">
               Recommended — no email setup required.
             </p>
           </div>
 
-          <details className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+          <details className="card p-4">
             <summary className="cursor-pointer text-sm font-medium">Email magic link (optional)</summary>
             <div className="mt-3">
-              <p className="text-xs text-zinc-500">
-                Needs Resend SMTP in Supabase — see <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">docs/auth-email-setup.md</code>.
+              <p className="text-xs text-subtle">
+                Needs Resend SMTP in Supabase — see <code className="rounded bg-club-surface px-1 text-club-ink ring-1 ring-inset ring-club-border">docs/auth-email-setup.md</code>.
               </p>
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="mt-2 h-11 w-full rounded-xl border border-zinc-200 bg-white px-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+                className="mt-2 h-11 w-full rounded-xl border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
               />
               <button
                 onClick={() => void onSendLink()}
-                className="mt-3 inline-flex h-11 items-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
+                className="mt-3 inline-flex h-11 items-center btn-primary px-4"
               >
                 Send magic link
               </button>

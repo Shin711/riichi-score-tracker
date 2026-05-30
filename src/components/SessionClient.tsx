@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { Rules, Seat, SessionEvent } from "@/lib/scoring/ledger";
 import {
@@ -56,6 +56,66 @@ function friendlySeatError(message: string) {
     return "Each player can only sit in one seat. Pick a different player for this wind.";
   }
   return message;
+}
+
+function TableCompactBar({
+  visible,
+  dealerSeat,
+  seatPlayerName,
+  totals,
+  honba,
+  riichiPool,
+}: {
+  visible: boolean;
+  dealerSeat: Seat;
+  seatPlayerName: Record<Seat, string>;
+  totals: Record<Seat, number>;
+  honba: number;
+  riichiPool: number;
+}) {
+  return (
+    <div
+      aria-hidden={!visible}
+      className={`shell-bar fixed inset-x-0 top-[52px] z-40 hidden border-b shadow-md transition-[transform,opacity] duration-200 sm:block ${
+        visible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0"
+      }`}
+    >
+      <div className="mx-auto max-w-5xl px-4 py-2">
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-muted">
+          <span>
+            Dealer: {seatLabel(dealerSeat)}
+            {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
+          </span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            {honba > 0 ? <span className="chip-amber py-0">Honba {honba}</span> : null}
+            {riichiPool > 0 ? (
+              <span className="chip-amber py-0">Riichi {riichiPool.toLocaleString()}</span>
+            ) : null}
+          </span>
+        </div>
+        <div className="grid grid-cols-4 gap-2">
+          {seats.map((s) => (
+            <div
+              key={s}
+              className={`rounded-lg border px-1.5 py-1 text-center ${
+                s === dealerSeat
+                  ? "border-amber-400/60 bg-amber-50 dark:bg-amber-950/40"
+                  : "border-club-border bg-club-surface"
+              }`}
+            >
+              <div className="truncate text-[9px] font-semibold uppercase text-muted">
+                {seatLabel(s).slice(0, 1)}
+                {seatPlayerName[s] ? ` · ${seatPlayerName[s].split(" ")[0]}` : ""}
+              </div>
+              <div className="font-mono text-sm font-semibold tabular-nums leading-tight text-club-ink">
+                {totals[s].toLocaleString()}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type PlayerOption = { id: string; display_name: string };
@@ -386,6 +446,39 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const riichiPool = useMemo(() => pendingRiichiPool(events), [events]);
   const riichiOnTable = useMemo(() => pendingRiichiBySeat(events), [events]);
 
+  const tableSectionRef = useRef<HTMLElement>(null);
+  const [compactBarVisible, setCompactBarVisible] = useState(false);
+
+  useEffect(() => {
+    const el = tableSectionRef.current;
+    if (!el) return;
+
+    const mq = window.matchMedia("(min-width: 640px)");
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!mq.matches) {
+          setCompactBarVisible(false);
+          return;
+        }
+        setCompactBarVisible(!entry.isIntersecting);
+      },
+      { root: null, rootMargin: "-52px 0px 0px 0px", threshold: 0 }
+    );
+
+    observer.observe(el);
+
+    const onMqChange = () => {
+      if (!mq.matches) setCompactBarVisible(false);
+    };
+    mq.addEventListener("change", onMqChange);
+
+    return () => {
+      observer.disconnect();
+      mq.removeEventListener("change", onMqChange);
+    };
+  }, []);
+
   async function onDeclareRiichi(seat: Seat) {
     setError(null);
     try {
@@ -655,7 +748,19 @@ export function SessionClient({ shareId }: { shareId: string }) {
         </div>
       ) : null}
 
-      <section className="card sticky top-[52px] z-30 -mx-1 p-3 shadow-md">
+      <TableCompactBar
+        visible={compactBarVisible}
+        dealerSeat={dealerSeat}
+        seatPlayerName={seatPlayerName}
+        totals={totals}
+        honba={honba}
+        riichiPool={riichiPool}
+      />
+
+      <section
+        ref={tableSectionRef}
+        className="card sticky top-[52px] z-30 -mx-1 p-3 shadow-md sm:static sm:z-auto sm:shadow-sm"
+      >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-muted">
             Table · dealer: {seatLabel(dealerSeat)}

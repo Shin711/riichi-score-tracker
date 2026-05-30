@@ -106,3 +106,39 @@ export async function PATCH(
   }
   return NextResponse.json({ session: data });
 }
+
+export async function DELETE(
+  req: Request,
+  ctx: { params: Promise<{ shareId: string }> }
+) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase is not configured." }, { status: 500 });
+  }
+
+  const { shareId } = await ctx.params;
+  const editKey = req.headers.get("x-edit-key");
+  if (!editKey) {
+    return NextResponse.json({ error: "Missing x-edit-key header." }, { status: 401 });
+  }
+
+  const sessionResult = await getSessionForEdit(supabase, shareId, editKey, { allowEnded: true });
+  if ("error" in sessionResult) {
+    return NextResponse.json({ error: sessionResult.error }, { status: sessionResult.status });
+  }
+  const session = sessionResult.session;
+
+  if (!session.ended_at) {
+    return NextResponse.json(
+      { error: "Only ended games can be removed. End the game first." },
+      { status: 409 }
+    );
+  }
+
+  const { error } = await supabase.from("sessions").delete().eq("id", session.id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ ok: true });
+}

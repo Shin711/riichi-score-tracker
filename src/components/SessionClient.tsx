@@ -30,7 +30,7 @@ import {
   parseSessionRules,
   roundWindLabel,
 } from "@/lib/scoring/tableState";
-import { storeEditKey } from "@/lib/editKey";
+import { clearEditKey, storeEditKey } from "@/lib/editKey";
 import { clearRecentSession, storeRecentSession } from "@/lib/recentSession";
 import { isSessionEnded } from "@/lib/session/status";
 import { getSupabaseClient } from "@/lib/supabase/client";
@@ -218,6 +218,9 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [recordAction, setRecordAction] = useState<RecordActionState>({ phase: "idle" });
   const [nagashiSeat, setNagashiSeat] = useState<Seat>("E");
   const [abortDealerTenpai, setAbortDealerTenpai] = useState(true);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [sessionRemoved, setSessionRemoved] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/sessions/${shareId}`);
@@ -348,6 +351,28 @@ export function SessionClient({ shareId }: { shareId: string }) {
       storeRecentSession(shareId, title);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to reopen game");
+    }
+  }
+
+  async function onRemoveGame() {
+    if (!editKey || !isEnded || removing) return;
+    setError(null);
+    setRemoving(true);
+    try {
+      const res = await fetch(`/api/sessions/${shareId}`, {
+        method: "DELETE",
+        headers: { "x-edit-key": editKey },
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Failed to remove game");
+      clearRecentSession();
+      clearEditKey(shareId);
+      setSessionRemoved(true);
+      setConfirmRemove(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove game");
+    } finally {
+      setRemoving(false);
     }
   }
 
@@ -763,6 +788,22 @@ export function SessionClient({ shareId }: { shareId: string }) {
     }
   }
 
+  if (sessionRemoved) {
+    return (
+      <main className="space-y-4">
+        <div className="card p-6 text-center">
+          <h1 className="text-xl font-semibold tracking-tight text-club-ink">Game removed</h1>
+          <p className="mt-2 text-sm text-muted">
+            This session and its scores were deleted. It will no longer appear on the leaderboard.
+          </p>
+          <Link href="/" className="btn-primary mt-5 inline-flex h-11 px-6">
+            Back to home
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="space-y-4">
       <div className="flex items-start justify-between gap-3">
@@ -830,6 +871,44 @@ export function SessionClient({ shareId }: { shareId: string }) {
             leaderboard
           </Link>
           .
+          {canEdit ? (
+            <div className="mt-3 border-t border-club-border pt-3">
+              {confirmRemove ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
+                  <p className="text-xs leading-5 text-red-900 dark:text-red-200">
+                    Remove this game permanently? It will leave the leaderboard for that month. This
+                    cannot be undone.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={removing}
+                      onClick={() => setConfirmRemove(false)}
+                      className="btn-secondary h-9 px-3 text-xs"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={removing}
+                      onClick={() => void onRemoveGame()}
+                      className="h-9 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {removing ? "Removing…" : "Yes, remove game"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmRemove(true)}
+                  className="text-xs font-medium text-red-600 underline dark:text-red-400"
+                >
+                  Remove from leaderboard
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

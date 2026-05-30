@@ -9,3 +9,8 @@ export function storeEditKey(shareId: string, editKey: string) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(`${prefix}${shareId}`, editKey);
 }
+
+export function clearEditKey(shareId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(`${prefix}${shareId}`);
+}

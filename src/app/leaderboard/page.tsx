@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { PageHeader } from "@/components/PageHeader";
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import type { MonthlyArchive } from "@/lib/leaderboard/monthly";
 import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
@@ -37,12 +38,12 @@ function LeaderboardTable({
             <span
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
                 index === 0
-                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                  ? "bg-club-gold-muted text-club-gold ring-1 ring-club-gold/30"
                   : index === 1
-                    ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                    ? "bg-stone-200 text-stone-800 dark:bg-stone-700 dark:text-stone-100"
                     : index === 2
                       ? "bg-orange-100 text-orange-900 dark:bg-orange-950 dark:text-orange-200"
-                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400"
+                      : "bg-stone-100 text-stone-600 dark:bg-stone-800/50 dark:text-stone-400"
               }`}
             >
               {index + 1}
@@ -132,25 +133,20 @@ export default function LeaderboardPage() {
 
   return (
     <main className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Leaderboard</h1>
-          <p className="mt-1 max-w-xl text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-            Standings reset each calendar month (US Eastern). Includes in-person sessions (ended on
-            the site) and imported friendly games. Past months can be downloaded below.
-          </p>
-        </div>
-        <Link
-          href="/import"
-          className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white dark:bg-white dark:text-zinc-950"
-        >
-          Import game
-        </Link>
-      </div>
+      <PageHeader
+        badge="Monthly standings"
+        title="Leaderboard"
+        description="Standings reset each calendar month (US Eastern). Includes in-person sessions (ended on the site) and imported friendly games. Past months can be downloaded below."
+        action={
+          <Link href="/import" className="btn-primary h-11 shrink-0 px-4">
+            Import game
+          </Link>
+        }
+      />
 
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
 
-      <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="card overflow-hidden">
         <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
           <div className="mt-0.5 text-xs text-zinc-500">

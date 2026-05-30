@@ -23,7 +23,7 @@ export function CreateSessionButton({
         disabled={loading}
         className={
           className ||
-          `inline-flex h-11 items-center justify-center rounded-xl bg-zinc-950 px-5 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 ${fullWidth ? "w-full" : ""}`
+          `btn-primary h-11 disabled:opacity-50 ${fullWidth ? "w-full" : ""}`
         }
       >
         {loading ? "Starting…" : label}

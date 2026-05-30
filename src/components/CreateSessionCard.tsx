@@ -6,9 +6,13 @@ export function CreateSessionCard() {
   const { createSession, loading, error } = useCreateSession();
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <h1 className="text-2xl font-semibold tracking-tight">Start a new game</h1>
-      <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+    <div className="card-accent relative overflow-hidden p-6">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-club-red via-club-gold to-club-jade"
+        aria-hidden
+      />
+      <h2 className="text-xl font-bold tracking-tight">Start a new game</h2>
+      <p className="mt-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
         One person at the table creates the session on their phone. Everyone else opens the viewer link to
         follow scores live.
       </p>
@@ -17,7 +21,7 @@ export function CreateSessionCard() {
           type="button"
           onClick={() => void createSession()}
           disabled={loading}
-          className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 sm:w-auto sm:px-6"
+          className="btn-primary h-12 w-full sm:w-auto"
         >
           {loading ? "Starting…" : "New game"}
         </button>

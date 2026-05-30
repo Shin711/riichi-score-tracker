@@ -12,3 +12,5 @@ export const SITE_DESCRIPTION =
 export const DEFAULT_SESSION_TITLE = "Club session";
 
 export const SITE_URL = `https://${SITE_SLUG}.vercel.app`;
+
+export const DISCORD_INVITE_URL = "https://discord.gg/ByUTgVDeWq";

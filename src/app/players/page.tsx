@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/PageHeader";
+
 import type { PlayerRow } from "@/lib/db/types";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -66,25 +68,20 @@ export default function PlayersPage() {
 
   return (
     <main className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Players</h1>
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-300">
-          Simple player profiles (names). Later we’ll tie these to accounts.
-        </p>
-      </div>
+      <PageHeader
+        title="Players"
+        description="Simple player profiles (names). Assign them to seats when you start a game."
+      />
 
-      <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="card p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Player name"
-            className="h-11 flex-1 rounded-xl border border-zinc-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:focus:ring-zinc-600"
+            className="h-11 flex-1 rounded-xl border border-stone-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-club-red/30 dark:border-stone-700 dark:bg-stone-950"
           />
-          <button
-            onClick={() => void onAdd()}
-            className="h-11 rounded-xl bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200"
-          >
+          <button onClick={() => void onAdd()} className="btn-primary h-11 px-4">
             Add player
           </button>
         </div>
@@ -93,11 +90,11 @@ export default function PlayersPage() {
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium dark:border-zinc-800">
+      <div className="card overflow-hidden">
+        <div className="border-b border-stone-200 px-4 py-3 text-sm font-semibold dark:border-stone-800">
           All players
         </div>
-        <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <ul className="divide-y divide-stone-200 dark:divide-stone-800">
           {players.map((p) => (
             <li key={p.id} className="flex items-center justify-between px-4 py-3">
               <div className="min-w-0">

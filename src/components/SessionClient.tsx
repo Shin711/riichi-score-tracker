@@ -98,16 +98,14 @@ function TableCompactBar({
             <div
               key={s}
               className={`rounded-lg border px-1.5 py-1 text-center ${
-                s === dealerSeat
-                  ? "border-amber-400/60 bg-amber-50 dark:bg-amber-950/40"
-                  : "border-club-border bg-club-surface"
+                s === dealerSeat ? "compact-score-dealer" : "compact-score-seat"
               }`}
             >
-              <div className="truncate text-[9px] font-semibold uppercase text-muted">
+              <div className="compact-score-label truncate text-[9px] font-semibold uppercase">
                 {seatLabel(s).slice(0, 1)}
                 {seatPlayerName[s] ? ` · ${seatPlayerName[s].split(" ")[0]}` : ""}
               </div>
-              <div className="font-mono text-sm font-semibold tabular-nums leading-tight text-club-ink">
+              <div className="font-mono text-sm font-semibold tabular-nums leading-tight">
                 {totals[s].toLocaleString()}
               </div>
             </div>
@@ -115,6 +113,59 @@ function TableCompactBar({
         </div>
       </div>
     </div>
+  );
+}
+
+type DrawTenpaiPreset = "all_tenpai" | "all_noten" | "dealer_only";
+
+type RecordActionKind = "win" | "draw" | "adjust";
+
+type RecordActionState = {
+  phase: "idle" | "loading" | "success";
+  kind?: RecordActionKind;
+};
+
+function drawTenpaiMatchesPreset(
+  drawTenpai: Record<Seat, boolean>,
+  preset: DrawTenpaiPreset,
+  dealerSeat: Seat
+) {
+  if (preset === "all_tenpai") return seats.every((s) => drawTenpai[s]);
+  if (preset === "all_noten") return seats.every((s) => !drawTenpai[s]);
+  return seats.every((s) => drawTenpai[s] === (s === dealerSeat));
+}
+
+function RecordSubmitButton({
+  kind,
+  label,
+  loadingLabel,
+  successLabel,
+  recordAction,
+  disabled,
+  onClick,
+}: {
+  kind: RecordActionKind;
+  label: string;
+  loadingLabel: string;
+  successLabel: string;
+  recordAction: RecordActionState;
+  disabled?: boolean;
+  onClick: () => void | Promise<void>;
+}) {
+  const isLoading = recordAction.phase === "loading" && recordAction.kind === kind;
+  const isSuccess = recordAction.phase === "success" && recordAction.kind === kind;
+
+  return (
+    <button
+      type="button"
+      disabled={disabled || recordAction.phase === "loading"}
+      onClick={() => void onClick()}
+      className={`mt-3 h-12 w-full rounded-xl btn-primary disabled:opacity-40 ${
+        isLoading ? "record-btn-loading" : ""
+      } ${isSuccess ? "record-btn-success" : ""}`}
+    >
+      {isLoading ? loadingLabel : isSuccess ? successLabel : label}
+    </button>
   );
 }
 
@@ -162,6 +213,9 @@ export function SessionClient({ shareId }: { shareId: string }) {
     W: false,
     N: false,
   });
+  const [drawTenpaiPreset, setDrawTenpaiPreset] = useState<DrawTenpaiPreset | null>(null);
+  const [drawPresetMessage, setDrawPresetMessage] = useState<string | null>(null);
+  const [recordAction, setRecordAction] = useState<RecordActionState>({ phase: "idle" });
   const [nagashiSeat, setNagashiSeat] = useState<Seat>("E");
   const [abortDealerTenpai, setAbortDealerTenpai] = useState(true);
 
@@ -479,6 +533,54 @@ export function SessionClient({ shareId }: { shareId: string }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!drawPresetMessage) return;
+    const timer = window.setTimeout(() => setDrawPresetMessage(null), 2800);
+    return () => window.clearTimeout(timer);
+  }, [drawPresetMessage]);
+
+  function applyDrawTenpaiPreset(preset: DrawTenpaiPreset, message: string) {
+    if (preset === "all_tenpai") {
+      setDrawTenpai({ E: true, S: true, W: true, N: true });
+    } else if (preset === "all_noten") {
+      setDrawTenpai({ E: false, S: false, W: false, N: false });
+    } else {
+      setDrawTenpai({
+        E: dealerSeat === "E",
+        S: dealerSeat === "S",
+        W: dealerSeat === "W",
+        N: dealerSeat === "N",
+      });
+    }
+    setDrawTenpaiPreset(preset);
+    setDrawPresetMessage(message);
+  }
+
+  function updateDrawTenpaiSeat(seat: Seat, tenpai: boolean) {
+    setDrawTenpai((prev) => {
+      const next = { ...prev, [seat]: tenpai };
+      const matched = (["all_tenpai", "all_noten", "dealer_only"] as const).find((preset) =>
+        drawTenpaiMatchesPreset(next, preset, dealerSeat)
+      );
+      setDrawTenpaiPreset(matched ?? null);
+      return next;
+    });
+  }
+
+  async function runRecordAction(kind: RecordActionKind, action: () => Promise<void>) {
+    if (recordAction.phase === "loading") return;
+    setRecordAction({ phase: "loading", kind });
+    setError(null);
+    try {
+      await action();
+      setRecordAction({ phase: "success", kind });
+      window.setTimeout(() => setRecordAction({ phase: "idle" }), 1200);
+    } catch (e) {
+      setRecordAction({ phase: "idle" });
+      setError(e instanceof Error ? e.message : "Failed");
+    }
+  }
+
   async function onDeclareRiichi(seat: Seat) {
     setError(null);
     try {
@@ -526,10 +628,9 @@ export function SessionClient({ shareId }: { shareId: string }) {
     riichiPool,
   ]);
 
-  function onAddWin() {
+  async function onAddWin() {
     if (winType === "ron" && winner === fromSeat) {
-      setError("Winner and discarder cannot be the same seat.");
-      return;
+      throw new Error("Winner and discarder cannot be the same seat.");
     }
 
     let deltas: Record<Seat, number>;
@@ -541,34 +642,29 @@ export function SessionClient({ shareId }: { shareId: string }) {
     };
 
     if (winScoreMode === "hanfu") {
-      try {
-        const scored = scoreFromHanFu({
-          han: winHan,
-          fu: winFu,
-          winType,
-          winner,
-          fromSeat: winType === "ron" ? fromSeat : undefined,
-          winnerIsDealer,
-          dealerSeat,
-        });
-        deltas = applyHonbaToDeltas(scored.deltas, honba, rules.honbaValue, winType);
-        if (riichiPool > 0) {
-          deltas = applyRiichiSticksToWin(deltas, winner, riichiPool);
-        }
-        const noteParts = [scored.note];
-        if (honba > 0) noteParts.push(`honba ${honba}`);
-        if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
-        note = noteParts.join(" · ");
-        payloadExtras = {
-          ...payloadExtras,
-          han: winHan,
-          fu: winFu,
-          winnerIsDealer,
-        };
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Invalid han/fu");
-        return;
+      const scored = scoreFromHanFu({
+        han: winHan,
+        fu: winFu,
+        winType,
+        winner,
+        fromSeat: winType === "ron" ? fromSeat : undefined,
+        winnerIsDealer,
+        dealerSeat,
+      });
+      deltas = applyHonbaToDeltas(scored.deltas, honba, rules.honbaValue, winType);
+      if (riichiPool > 0) {
+        deltas = applyRiichiSticksToWin(deltas, winner, riichiPool);
       }
+      const noteParts = [scored.note];
+      if (honba > 0) noteParts.push(`honba ${honba}`);
+      if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
+      note = noteParts.join(" · ");
+      payloadExtras = {
+        ...payloadExtras,
+        han: winHan,
+        fu: winFu,
+        winnerIsDealer,
+      };
     } else {
       const honbaPay = honba * rules.honbaValue * (winType === "ron" ? 1 : 3);
       const handTotal = winPoints + honbaPay;
@@ -589,9 +685,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       payloadExtras = { ...payloadExtras, riichiCollected: riichiPool };
     }
 
-    void postEvent("win", { deltas, note, ...payloadExtras })
-      .then(() => setError(null))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+    await postEvent("win", { deltas, note, ...payloadExtras });
   }
 
   const drawTenpaiSeats = useMemo(
@@ -633,7 +727,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
     return describeStandardDrawRule(drawTenpaiSeats.length);
   }, [drawKind, drawTenpaiSeats.length, nagashiSeat]);
 
-  function onAddDraw() {
+  async function onAddDraw() {
     const dealerTenpai = drawDealerTenpai;
     const noteParts = [
       drawKindLabel(drawKind),
@@ -641,16 +735,19 @@ export function SessionClient({ shareId }: { shareId: string }) {
       dealerTenpai ? "dealer continues" : "dealer passes",
     ];
 
-    void postEvent("draw", {
+    await postEvent("draw", {
       drawKind,
       dealerTenpai,
       ...(drawKind === "standard" ? { tenpaiSeats: drawTenpaiSeats } : {}),
       ...(drawKind === "nagashi_mangan" ? { nagashiSeat } : {}),
       ...(drawDeltas ? { deltas: drawDeltas } : {}),
       note: noteParts.join(" · "),
-    })
-      .then(() => setError(null))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"));
+    });
+  }
+
+  async function onApplyManualAdjustment() {
+    await postEvent("manual_adjustment", { deltaBySeat: manualDelta });
+    setManualDelta({ E: 0, S: 0, W: 0, N: 0 });
   }
 
   async function onAdvanceToSouth() {
@@ -1031,7 +1128,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
             ) : null}
 
             {hanFuPreview ? (
-              <div className="mt-2 rounded-lg border border-club-border bg-club-cream px-3 py-2 text-xs text-muted">
+              <div className="notice-inset mt-2 px-3">
                 <span className="font-medium">Score preview:</span> {hanFuPreview.note}
               </div>
             ) : winScoreMode === "points" && riichiPool > 0 ? (
@@ -1048,14 +1145,15 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 Winner collects {riichiPool.toLocaleString()} pts in riichi sticks (see table above).
               </p>
             ) : null}
-            <button
-              type="button"
+            <RecordSubmitButton
+              kind="win"
+              label="Record win"
+              loadingLabel="Recording win…"
+              successLabel="Win recorded ✓"
+              recordAction={recordAction}
               disabled={!canRecord}
-              onClick={onAddWin}
-              className="mt-3 h-12 w-full rounded-xl btn-primary disabled:opacity-40"
-            >
-              Record win
-            </button>
+              onClick={() => runRecordAction("win", onAddWin)}
+            />
           </div>
           ) : null}
 
@@ -1088,61 +1186,78 @@ export function SessionClient({ shareId }: { shareId: string }) {
                   <button
                     type="button"
                     onClick={() =>
-                      setDrawTenpai({ E: true, S: true, W: true, N: true })
+                      applyDrawTenpaiPreset(
+                        "all_tenpai",
+                        "All seats set to tenpai — no point payments on this draw."
+                      )
                     }
-                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-stone-600"
+                    className={`chip-preset ${
+                      drawTenpaiPreset === "all_tenpai" ? "chip-preset-active" : ""
+                    }`}
                   >
                     All tenpai
                   </button>
                   <button
                     type="button"
-                    onClick={() => setDrawTenpai({ E: false, S: false, W: false, N: false })}
-                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-stone-600"
+                    onClick={() =>
+                      applyDrawTenpaiPreset(
+                        "all_noten",
+                        "All seats set to noten — no point payments on this draw."
+                      )
+                    }
+                    className={`chip-preset ${
+                      drawTenpaiPreset === "all_noten" ? "chip-preset-active" : ""
+                    }`}
                   >
                     All noten
                   </button>
                   <button
                     type="button"
                     onClick={() =>
-                      setDrawTenpai({
-                        E: dealerSeat === "E",
-                        S: dealerSeat === "S",
-                        W: dealerSeat === "W",
-                        N: dealerSeat === "N",
-                      })
+                      applyDrawTenpaiPreset(
+                        "dealer_only",
+                        `Only ${seatLabel(dealerSeat)} marked tenpai — others pay 1,000 each (3,000 total).`
+                      )
                     }
-                    className="h-8 rounded-lg border border-zinc-200 px-2 text-xs font-medium dark:border-stone-600"
+                    className={`chip-preset ${
+                      drawTenpaiPreset === "dealer_only" ? "chip-preset-active" : ""
+                    }`}
                   >
                     Dealer only
                   </button>
                 </div>
+                {drawPresetMessage ? (
+                  <p className="notice-inset mt-2" role="status">
+                    {drawPresetMessage}
+                  </p>
+                ) : null}
                 <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {seats.map((s) => (
                     <label
                       key={s}
-                      className={`flex cursor-pointer flex-col rounded-lg border px-2 py-2 text-xs ${
+                      className={`draw-seat-card ${
                         drawTenpai[s]
-                          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40"
-                          : "border-zinc-200 dark:border-stone-600"
+                          ? "draw-seat-card--tenpai"
+                          : drawTenpaiPreset === "all_noten"
+                            ? "draw-seat-card--noten"
+                            : ""
                       }`}
                     >
-                      <span className="font-medium text-muted">
+                      <span className="draw-seat-card-label">
                         {seatLabel(s)}
                         {s === dealerSeat ? " · dealer" : ""}
                       </span>
-                      <span className="mt-0.5 text-[10px] text-subtle">
+                      <span className="draw-seat-card-subtle">
                         {seatPlayerName[s] || "—"}
                       </span>
                       <span className="mt-2 flex items-center gap-1.5">
                         <input
                           type="checkbox"
                           checked={drawTenpai[s]}
-                          onChange={(e) =>
-                            setDrawTenpai((prev) => ({ ...prev, [s]: e.target.checked }))
-                          }
+                          onChange={(e) => updateDrawTenpaiSeat(s, e.target.checked)}
                           className="h-4 w-4 rounded border-zinc-300"
                         />
-                        Tenpai
+                        {drawTenpai[s] ? "Tenpai" : "Noten"}
                       </span>
                     </label>
                   ))}
@@ -1175,21 +1290,22 @@ export function SessionClient({ shareId }: { shareId: string }) {
               </label>
             )}
 
-            <div className="mt-2 rounded-lg border border-club-border bg-club-cream px-3 py-2 text-xs text-muted">
+            <div className="notice-inset mt-2 px-3">
               <span className="font-medium">Payments:</span> {drawPaymentPreview}
-              <span className="mt-1 block text-subtle">
+              <span className="notice-inset-subtle mt-1 block">
                 Dealer ({seatLabel(dealerSeat)}):{" "}
                 {drawDealerTenpai ? "stays · honba +1" : "passes · honba +1"}
               </span>
             </div>
-            <button
-              type="button"
+            <RecordSubmitButton
+              kind="draw"
+              label="Record draw"
+              loadingLabel="Recording draw…"
+              successLabel="Draw recorded ✓"
+              recordAction={recordAction}
               disabled={!canRecord}
-              onClick={onAddDraw}
-              className="mt-3 h-11 w-full rounded-xl border border-zinc-200 text-sm font-medium dark:border-stone-600"
-            >
-              Record draw
-            </button>
+              onClick={() => runRecordAction("draw", onAddDraw)}
+            />
           </div>
           ) : null}
 
@@ -1213,23 +1329,24 @@ export function SessionClient({ shareId }: { shareId: string }) {
                       type="number"
                       value={manualDelta[s]}
                       onChange={(e) => setManualDelta((d) => ({ ...d, [s]: Number(e.target.value) }))}
-                      className="mt-0.5 h-9 w-full rounded border border-zinc-200 px-1 text-xs dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                      className={`field mt-0.5 h-9 w-full px-1 text-xs tabular-nums ${
+                        manualDelta[s] !== 0
+                          ? "border-club-red ring-1 ring-club-red/25"
+                          : ""
+                      }`}
                     />
                   </label>
                 ))}
               </div>
-              <button
-                type="button"
+              <RecordSubmitButton
+                kind="adjust"
+                label="Apply score change"
+                loadingLabel="Applying…"
+                successLabel="Applied ✓"
+                recordAction={recordAction}
                 disabled={!canRecord}
-                onClick={() =>
-                  void postEvent("manual_adjustment", { deltaBySeat: manualDelta })
-                    .then(() => setManualDelta({ E: 0, S: 0, W: 0, N: 0 }))
-                    .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-                }
-                className="mt-2 h-9 w-full rounded-lg border border-zinc-200 text-xs font-medium dark:border-stone-600"
-              >
-                Apply score change
-              </button>
+                onClick={() => runRecordAction("adjust", onApplyManualAdjustment)}
+              />
             </div>
           ) : null}
         </div>

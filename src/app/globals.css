@@ -242,4 +242,163 @@ body {
       background-color: rgb(69 26 3 / 0.65);
     }
   }
+
+  .chip-preset {
+    @apply h-8 rounded-lg border px-2 text-xs font-medium transition-colors;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-surface);
+    color: var(--color-club-ink);
+  }
+
+  .chip-preset:hover {
+    border-color: #a8a29e;
+  }
+
+  .chip-preset-active {
+    @apply border-club-red bg-club-red text-white shadow-sm shadow-club-red/15;
+  }
+
+  /* Paired bg + text — avoids light fills with theme-muted text in the wrong mode */
+  .notice-inset {
+    @apply rounded-lg border px-2.5 py-2 text-xs;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-cream);
+    color: var(--color-club-muted);
+  }
+
+  .notice-inset-subtle {
+    color: var(--color-club-subtle);
+  }
+
+  .compact-score-seat {
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-surface);
+    color: var(--color-club-ink);
+  }
+
+  .compact-score-dealer {
+    border-color: rgb(251 191 36 / 0.55);
+    background-color: #fffbeb;
+    color: #78350f;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .compact-score-dealer {
+      border-color: rgb(251 191 36 / 0.45);
+      background-color: rgb(69 26 3 / 0.45);
+      color: #fef3c7;
+    }
+  }
+
+  .compact-score-label {
+    color: var(--color-club-muted);
+  }
+
+  .compact-score-dealer .compact-score-label {
+    color: #92400e;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .compact-score-dealer .compact-score-label {
+      color: #fde68a;
+    }
+  }
+
+  .draw-seat-card {
+    @apply flex cursor-pointer flex-col rounded-lg border px-2 py-2 text-xs transition-colors;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-surface);
+    color: var(--color-club-ink);
+  }
+
+  .draw-seat-card-label {
+    @apply font-medium;
+    color: var(--color-club-muted);
+  }
+
+  .draw-seat-card-subtle {
+    @apply mt-0.5 text-[10px];
+    color: var(--color-club-subtle);
+  }
+
+  .draw-seat-card--tenpai {
+    border-color: rgb(52 211 153 / 0.55);
+    background-color: #ecfdf5;
+    color: #134e4a;
+  }
+
+  .draw-seat-card--tenpai .draw-seat-card-label {
+    color: #047857;
+  }
+
+  .draw-seat-card--tenpai .draw-seat-card-subtle {
+    color: #059669;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .draw-seat-card--tenpai {
+      border-color: rgb(4 120 87 / 0.55);
+      background-color: rgb(6 78 59 / 0.45);
+      color: #d1fae5;
+    }
+
+    .draw-seat-card--tenpai .draw-seat-card-label {
+      color: #6ee7b7;
+    }
+
+    .draw-seat-card--tenpai .draw-seat-card-subtle {
+      color: #34d399;
+    }
+  }
+
+  .draw-seat-card--noten {
+    border-color: #d6d3d1;
+    background-color: #f5f5f4;
+    color: #1c1917;
+  }
+
+  .draw-seat-card--noten .draw-seat-card-label {
+    color: #44403c;
+  }
+
+  .draw-seat-card--noten .draw-seat-card-subtle {
+    color: #57534e;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .draw-seat-card--noten {
+      border-color: #57534e;
+      background-color: rgb(41 37 36 / 0.85);
+      color: #fafaf9;
+    }
+
+    .draw-seat-card--noten .draw-seat-card-label {
+      color: #e7e5e4;
+    }
+
+    .draw-seat-card--noten .draw-seat-card-subtle {
+      color: #d6d3d1;
+    }
+  }
+
+  .record-btn-loading {
+    @apply cursor-wait opacity-90;
+  }
+
+  .record-btn-success {
+    @apply bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-600;
+    animation: record-success-pop 0.45s ease-out;
+  }
+}
+
+@keyframes record-success-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
 }

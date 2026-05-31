@@ -31,7 +31,23 @@ const TENPAI_PAYMENT_BY_COUNT: Record<
   },
 };
 
-export type DrawKind = "standard" | "four_riichi" | "four_kans" | "nagashi_mangan";
+export type DrawKind =
+  | "standard"
+  | "four_riichi"
+  | "four_kans"
+  | "four_winds"
+  | "kyuushu_kyuuhai"
+  | "nagashi_mangan";
+
+/** Mid-hand abortive draws (tochuu ryuukyoku) — not exhaustive wall draws. */
+export function isAbortiveDrawKind(kind: DrawKind | undefined): boolean {
+  return (
+    kind === "four_riichi" ||
+    kind === "four_kans" ||
+    kind === "four_winds" ||
+    kind === "kyuushu_kyuuhai"
+  );
+}
 
 export function drawKindLabel(kind: DrawKind): string {
   switch (kind) {
@@ -39,10 +55,30 @@ export function drawKindLabel(kind: DrawKind): string {
       return "Four riichi (abort)";
     case "four_kans":
       return "Four kans (abort)";
+    case "four_winds":
+      return "Four winds (abort)";
+    case "kyuushu_kyuuhai":
+      return "Kyuushu kyuuhai (abort)";
     case "nagashi_mangan":
       return "Nagashi mangan";
     default:
       return "Standard draw";
+  }
+}
+
+/** Hint text for abortive draw types (EMA / riichi.wiki tochuu ryuukyoku). */
+export function describeAbortiveDrawRule(kind: DrawKind): string {
+  switch (kind) {
+    case "four_riichi":
+      return "All four riichi — hand aborts. No payments · honba +1 · dealer continues. If the 4th riichi wins on discard, record a win instead.";
+    case "four_kans":
+      return "Four kans on the table — hand aborts. No payments · honba +1 · dealer continues.";
+    case "four_winds":
+      return "Four winds (same wind discarded in the opening round) — hand aborts. No payments · honba +1 · dealer continues.";
+    case "kyuushu_kyuuhai":
+      return "Nine terminals/honors after first draw (optional mulligan) — hand aborts. No payments · honba +1 · dealer continues. Not allowed after any call.";
+    default:
+      return "";
   }
 }
 

@@ -109,4 +109,19 @@ const rules = defaultRules();
   ok("new hand starts after draw", handEventsStartIndex(events) === 2);
 }
 
+// Abortive draws always keep dealer (dealerTenpai irrelevant)
+{
+  const base: SessionEvent[] = [
+    { type: "win", createdAt: "1", winner: "S", winType: "ron", fromSeat: "E", deltas: buildRonDeltas("S", "E", 8000) },
+  ];
+  for (const kind of ["four_riichi", "four_kans", "four_winds", "kyuushu_kyuuhai"] as const) {
+    const events: SessionEvent[] = [
+      ...base,
+      { type: "draw", createdAt: "2", dealerTenpai: false, drawKind: kind },
+    ];
+    ok(`${kind} keeps dealer at S`, deriveTableState(rules, events).dealerSeat === "S");
+    ok(`${kind} adds honba`, deriveTableState(rules, events).honba === 1);
+  }
+}
+
 console.log("\nAll scenario checks passed.");

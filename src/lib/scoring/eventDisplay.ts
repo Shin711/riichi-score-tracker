@@ -1,4 +1,4 @@
-import { drawKindLabel } from "@/lib/scoring/draw";
+import { drawKindLabel, isAbortiveDrawKind } from "@/lib/scoring/draw";
 import type { Seat, SessionEvent } from "@/lib/scoring/ledger";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
@@ -62,13 +62,7 @@ export function formatHandHistoryEntry(
   if (ev.type === "draw") {
     const kind = ev.drawKind ?? "standard";
     const title =
-      kind === "nagashi_mangan"
-        ? "Nagashi mangan"
-        : kind === "four_riichi"
-          ? "Four riichi (abort)"
-          : kind === "four_kans"
-            ? "Four kans (abort)"
-            : "Exhaustive draw";
+      kind === "standard" ? "Exhaustive draw" : drawKindLabel(kind);
 
     const paymentParts =
       ev.deltas &&
@@ -76,15 +70,17 @@ export function formatHandHistoryEntry(
         .filter((s) => (ev.deltas![s] ?? 0) !== 0)
         .map((s) => `${playerAtSeat(s, names, label)} ${formatSignedPoints(ev.deltas![s] ?? 0)}`);
 
-    const dealerPart = ev.dealerTenpai
-      ? "Dealer tenpai · dealer continues · honba +1"
-      : "Dealer not tenpai · dealer passes · honba +1";
+    const dealerPart = isAbortiveDrawKind(kind)
+      ? "Dealer continues · honba +1"
+      : ev.dealerTenpai
+        ? "Dealer tenpai · dealer continues · honba +1"
+        : "Dealer not tenpai · dealer passes · honba +1";
 
     const detailParts: string[] = [];
     if (kind !== "standard") detailParts.push(drawKindLabel(kind));
     if (ev.nagashiSeat) detailParts.push(playerAtSeat(ev.nagashiSeat, names, label));
     if (paymentParts && paymentParts.length > 0) detailParts.push(paymentParts.join(" · "));
-    else if (kind === "four_riichi" || kind === "four_kans") {
+    else if (isAbortiveDrawKind(kind)) {
       detailParts.push("No score payments");
     }
     detailParts.push(dealerPart);

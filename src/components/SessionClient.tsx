@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Rules, Seat, SessionEvent } from "@/lib/scoring/ledger";
 import {
   buildRonDeltas,
-  buildTsumoDeltas,
   applyRiichiSticksToWin,
+  assertZeroSum,
   computeTotals,
   pendingRiichiBySeat,
   pendingRiichiPool,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/scoring/ledger";
 import { formatHandHistoryEntry } from "@/lib/scoring/eventDisplay";
 import { mapEventRow } from "@/lib/scoring/events";
-import { applyHonbaToDeltas, scoreFromHanFu } from "@/lib/scoring/hanFu";
+import { applyHonbaToDeltas, buildTsumoDeltasFromWinnerTotal, scoreFromHanFu } from "@/lib/scoring/hanFu";
 import {
   type DrawKind,
   computeExhaustiveDrawDeltas,
@@ -200,7 +200,6 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [winScoreMode, setWinScoreMode] = useState<"points" | "hanfu">("points");
   const [winHan, setWinHan] = useState(2);
   const [winFu, setWinFu] = useState(30);
-  const [honba, setHonba] = useState(0);
   const [drawKind, setDrawKind] = useState<DrawKind>("standard");
   const [drawTenpai, setDrawTenpai] = useState<Record<Seat, boolean>>({
     E: false,
@@ -212,6 +211,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [drawPresetMessage, setDrawPresetMessage] = useState<string | null>(null);
   const [recordAction, setRecordAction] = useState<RecordActionState>({ phase: "idle" });
   const [nagashiSeat, setNagashiSeat] = useState<Seat>("E");
+  const [nagashiDealerTenpai, setNagashiDealerTenpai] = useState(false);
   const [abortDealerTenpai, setAbortDealerTenpai] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
@@ -247,7 +247,6 @@ export function SessionClient({ shareId }: { shareId: string }) {
     const mappedEvents = (json.events ?? []).map((r) => mapEventRow(r));
     setRules(parsedRules);
     setEvents(mappedEvents);
-    setHonba(deriveTableState(json.session?.rules_json, mappedEvents).honba);
 
     const nextSeats: Record<Seat, string> = { E: "", S: "", W: "", N: "" };
     const nextNames: Record<Seat, string> = { E: "", S: "", W: "", N: "" };
@@ -291,6 +290,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const totals = computeTotals(seats, rules, events);
   const tableState = useMemo(() => deriveTableState(rules, events), [rules, events]);
   const dealerSeat = tableState.dealerSeat;
+  const honba = tableState.honba;
   const isEnded = isSessionEnded(endedAt);
   const canEdit = Boolean(editKey);
   const canRecord = canEdit && !isEnded;
@@ -391,7 +391,6 @@ export function SessionClient({ shareId }: { shareId: string }) {
       const mapped = mapEventRow(json.event);
       setEvents((prev) => {
         const next = [...prev, mapped];
-        setHonba(deriveTableState(rules, next).honba);
         return next;
       });
     }
@@ -603,6 +602,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }
 
   async function onDeclareRiichi(seat: Seat) {
+    if (riichiDeclared[seat]) return;
     setError(null);
     try {
       await postEvent("riichi", { seat, value: rules.riichiStickValue });
@@ -687,15 +687,15 @@ export function SessionClient({ shareId }: { shareId: string }) {
         winnerIsDealer,
       };
     } else {
-      const honbaPay = honba * rules.honbaValue * (winType === "ron" ? 1 : 3);
-      const handTotal = winPoints + honbaPay;
       deltas =
         winType === "ron"
-          ? buildRonDeltas(winner, fromSeat, handTotal)
-          : buildTsumoDeltas(winner, handTotal);
+          ? buildRonDeltas(winner, fromSeat, winPoints)
+          : buildTsumoDeltasFromWinnerTotal(winner, winPoints, winnerIsDealer, dealerSeat);
+      deltas = applyHonbaToDeltas(deltas, honba, rules.honbaValue, winType);
       if (riichiPool > 0) {
         deltas = applyRiichiSticksToWin(deltas, winner, riichiPool);
       }
+      const handTotal = deltas[winner] ?? winPoints;
       const noteParts = [`${winType.toUpperCase()} ${handTotal.toLocaleString()}`];
       if (honba > 0) noteParts.push(`honba ${honba}`);
       if (riichiPool > 0) noteParts.push(`riichi +${riichiPool.toLocaleString()}`);
@@ -714,10 +714,10 @@ export function SessionClient({ shareId }: { shareId: string }) {
     [drawTenpai]
   );
   const drawDeltas = useMemo(() => {
-    if (drawKind === "nagashi_mangan") return computeNagashiManganDeltas(nagashiSeat);
+    if (drawKind === "nagashi_mangan") return computeNagashiManganDeltas(nagashiSeat, dealerSeat);
     if (drawKind === "standard") return computeExhaustiveDrawDeltas(drawTenpaiSeats);
     return null;
-  }, [drawKind, drawTenpaiSeats, nagashiSeat]);
+  }, [drawKind, drawTenpaiSeats, nagashiSeat, dealerSeat]);
   const drawPaymentPreview = useMemo(
     () =>
       formatDrawPaymentPreview(drawDeltas, seatPlayerName, (s) => seatWindForDealer(s, dealerSeat), {
@@ -730,14 +730,17 @@ export function SessionClient({ shareId }: { shareId: string }) {
   );
   const drawDealerTenpai =
     drawKind === "nagashi_mangan"
-      ? nagashiSeat === dealerSeat
+      ? nagashiDealerTenpai
       : drawKind === "standard"
         ? drawTenpai[dealerSeat]
         : abortDealerTenpai;
 
   const drawRuleHint = useMemo(() => {
     if (drawKind === "nagashi_mangan") {
-      return `Nagashi mangan: ${seatWindForDealer(nagashiSeat, dealerSeat)} collects 8,000 from each opponent (24,000 total).`;
+      const winnerWind = seatWindForDealer(nagashiSeat, dealerSeat);
+      return nagashiSeat === dealerSeat
+        ? `Nagashi mangan: ${winnerWind} collects 12,000 (4,000 from each opponent).`
+        : `Nagashi mangan: ${winnerWind} collects 8,000 (dealer 4,000 · others 2,000 each). Dealer rotation follows whether dealer was tenpai, not who won nagashi.`;
     }
     if (drawKind === "four_riichi") {
       return "Four riichi declared — hand aborts with no score change. Confirm whether dealer was tenpai.";
@@ -767,6 +770,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }
 
   async function onApplyManualAdjustment() {
+    assertZeroSum(manualDelta);
     await postEvent("manual_adjustment", { deltaBySeat: manualDelta });
     setManualDelta({ E: 0, S: 0, W: 0, N: 0 });
   }
@@ -997,17 +1001,16 @@ export function SessionClient({ shareId }: { shareId: string }) {
         </div>
         {canRecord ? (
           <div className="session-subbar">
-            <label className="flex items-center gap-1.5 font-semibold text-club-ink">
+            <span className="flex items-center gap-1.5 font-semibold text-club-ink">
               Honba
-              <input
-                type="number"
-                min={0}
-                value={honba}
-                onChange={(e) => setHonba(Math.max(0, Number(e.target.value) || 0))}
-                className="field h-8 w-14 px-1.5 text-center font-mono text-sm tabular-nums"
+              <span
+                className="field flex h-8 min-w-14 items-center justify-center px-1.5 font-mono text-sm tabular-nums"
                 aria-label="Honba sticks on table"
-              />
-            </label>
+              >
+                {honba}
+              </span>
+            </span>
+            <span className="text-[10px] text-subtle">From recorded hands</span>
             <span className="hidden h-4 w-px bg-club-border sm:inline" aria-hidden />
             {riichiPool > 0 ? (
               <span className="chip-amber py-1 text-xs">
@@ -1340,20 +1343,31 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 </div>
               </>
             ) : drawKind === "nagashi_mangan" ? (
-              <label className="mt-2 block text-xs">
-                Nagashi winner
-                <select
-                  value={nagashiSeat}
-                  onChange={(e) => setNagashiSeat(e.target.value as Seat)}
-                  className="mt-1 h-10 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
-                >
-                  {seats.map((s) => (
-                    <option key={s} value={s}>
-                      {seatOptionLabel(s, seatPlayerName[s], dealerSeat)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label className="mt-2 block text-xs">
+                  Nagashi winner
+                  <select
+                    value={nagashiSeat}
+                    onChange={(e) => setNagashiSeat(e.target.value as Seat)}
+                    className="mt-1 h-10 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:bg-stone-800 dark:text-stone-100"
+                  >
+                    {seats.map((s) => (
+                      <option key={s} value={s}>
+                        {seatOptionLabel(s, seatPlayerName[s], dealerSeat)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+                  <input
+                    type="checkbox"
+                    checked={nagashiDealerTenpai}
+                    onChange={(e) => setNagashiDealerTenpai(e.target.checked)}
+                    className="h-4 w-4 rounded border-zinc-300"
+                  />
+                  Dealer was tenpai (seat rotation — independent of nagashi winner)
+                </label>
+              </>
             ) : (
               <label className="mt-2 flex items-center gap-2 text-xs text-muted">
                 <input

@@ -28,6 +28,8 @@ export function mapEventRow(row: EventRow): SessionEvent {
     const drawKind =
       payload.drawKind === "four_riichi" ||
       payload.drawKind === "four_kans" ||
+      payload.drawKind === "four_winds" ||
+      payload.drawKind === "kyuushu_kyuuhai" ||
       payload.drawKind === "nagashi_mangan"
         ? payload.drawKind
         : "standard";

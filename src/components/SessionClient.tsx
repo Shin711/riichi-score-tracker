@@ -21,9 +21,11 @@ import {
   type DrawKind,
   computeExhaustiveDrawDeltas,
   computeNagashiManganDeltas,
+  describeAbortiveDrawRule,
   describeStandardDrawRule,
   drawKindLabel,
   formatDrawPaymentPreview,
+  isAbortiveDrawKind,
 } from "@/lib/scoring/draw";
 import {
   deriveTableState,
@@ -212,7 +214,6 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const [recordAction, setRecordAction] = useState<RecordActionState>({ phase: "idle" });
   const [nagashiSeat, setNagashiSeat] = useState<Seat>("E");
   const [nagashiDealerTenpai, setNagashiDealerTenpai] = useState(false);
-  const [abortDealerTenpai, setAbortDealerTenpai] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [sessionRemoved, setSessionRemoved] = useState(false);
@@ -733,7 +734,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       ? nagashiDealerTenpai
       : drawKind === "standard"
         ? drawTenpai[dealerSeat]
-        : abortDealerTenpai;
+        : true;
 
   const drawRuleHint = useMemo(() => {
     if (drawKind === "nagashi_mangan") {
@@ -742,11 +743,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
         ? `Nagashi mangan: ${winnerWind} collects 12,000 (4,000 from each opponent).`
         : `Nagashi mangan: ${winnerWind} collects 8,000 (dealer 4,000 · others 2,000 each). Dealer rotation follows whether dealer was tenpai, not who won nagashi.`;
     }
-    if (drawKind === "four_riichi") {
-      return "Four riichi declared — hand aborts with no score change. Confirm whether dealer was tenpai.";
-    }
-    if (drawKind === "four_kans") {
-      return "Four kans on the table — hand aborts with no score change. Confirm whether dealer was tenpai.";
+    if (isAbortiveDrawKind(drawKind)) {
+      return describeAbortiveDrawRule(drawKind);
     }
     return describeStandardDrawRule(drawTenpaiSeats.length);
   }, [drawKind, drawTenpaiSeats.length, nagashiSeat, dealerSeat]);
@@ -756,7 +754,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
     const noteParts = [
       drawKindLabel(drawKind),
       drawDeltas ? drawPaymentPreview : "No payments",
-      dealerTenpai ? "dealer continues" : "dealer passes",
+      isAbortiveDrawKind(drawKind) || dealerTenpai ? "dealer continues" : "dealer passes",
     ];
 
     await postEvent("draw", {
@@ -1238,7 +1236,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
           {recordTab === "draw" ? (
           <div className="rounded-xl border border-zinc-200 p-3 dark:border-stone-600">
-            <div className="text-xs font-medium text-muted">Exhaustive draw</div>
+            <div className="text-xs font-medium text-muted">Draw / ryuukyoku</div>
             <label className="mt-2 block text-xs">
               Draw type
               <select
@@ -1249,6 +1247,8 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 <option value="standard">Standard (tenpai / noten)</option>
                 <option value="four_riichi">Four riichi — abort</option>
                 <option value="four_kans">Four kans — abort</option>
+                <option value="four_winds">Four winds — abort</option>
+                <option value="kyuushu_kyuuhai">Kyuushu kyuuhai — abort</option>
                 <option value="nagashi_mangan">Nagashi mangan</option>
               </select>
             </label>
@@ -1368,23 +1368,17 @@ export function SessionClient({ shareId }: { shareId: string }) {
                   Dealer was tenpai (seat rotation — independent of nagashi winner)
                 </label>
               </>
-            ) : (
-              <label className="mt-2 flex items-center gap-2 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={abortDealerTenpai}
-                  onChange={(e) => setAbortDealerTenpai(e.target.checked)}
-                  className="h-4 w-4 rounded border-zinc-300"
-                />
-                Dealer was tenpai (usually yes when four riichi)
-              </label>
-            )}
+            ) : null}
 
             <div className="notice-inset mt-2 px-3">
               <span className="font-medium">Payments:</span> {drawPaymentPreview}
               <span className="notice-inset-subtle mt-1 block">
                 Dealer (East):{" "}
-                {drawDealerTenpai ? "stays · honba +1" : "passes · honba +1"}
+                {isAbortiveDrawKind(drawKind)
+                  ? "continues · honba +1"
+                  : drawDealerTenpai
+                    ? "stays · honba +1"
+                    : "passes · honba +1"}
               </span>
             </div>
             <RecordSubmitButton

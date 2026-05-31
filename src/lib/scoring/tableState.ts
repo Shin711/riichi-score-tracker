@@ -1,5 +1,6 @@
 import type { Rules, Seat, SessionEvent } from "@/lib/scoring/ledger";
 import { defaultRules } from "@/lib/scoring/ledger";
+import { isAbortiveDrawKind } from "@/lib/scoring/draw";
 
 export type GameLength = "east" | "hanchan";
 export type RoundWind = "east" | "south";
@@ -81,10 +82,11 @@ export function deriveTableState(rulesJson: unknown, events: SessionEvent[]): De
         honba = 0;
       }
     } else if (ev.type === "draw") {
-      // Exhaustive / abortive draws always add a honba stick; dealer passes only when not tenpai.
-      // @see https://riichi.wiki/Exhaustive_draw — "Regardless of rotation, after an exhaustive draw, the honba count increases by 1."
+      // Honba +1 on every draw. Abortive draws always keep the dealer; exhaustive draws use tenpai renchan.
+      // @see https://riichi.wiki/Abortive_draws · https://riichi.wiki/Exhaustive_draw
       honba += 1;
-      if (!ev.dealerTenpai) {
+      const kind = ev.drawKind ?? "standard";
+      if (!isAbortiveDrawKind(kind) && !ev.dealerTenpai) {
         dealerSeat = nextDealerSeat(dealerSeat);
       }
     } else if (ev.type === "round_advance" && ev.roundWind === "south") {

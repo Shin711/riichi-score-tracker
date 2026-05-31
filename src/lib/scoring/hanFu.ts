@@ -190,6 +190,60 @@ export function scoreFromHanFu(input: HanFuInput): HanFuScore {
   return { deltas, total, basicPoints, limitName, note };
 }
 
+/**
+ * Split a tsumo winner total across losers using EMA rounding (2:1:1 ko, 1:1:1 oya).
+ * Used when entering winner points directly instead of han/fu.
+ */
+export function buildTsumoDeltasFromWinnerTotal(
+  winner: Seat,
+  winnerTotal: number,
+  winnerIsDealer: boolean,
+  dealerSeat: Seat
+): Record<Seat, number> {
+  const deltas: Record<Seat, number> = { E: 0, S: 0, W: 0, N: 0 };
+
+  if (winnerIsDealer) {
+    const each = roundUp100(winnerTotal / 3);
+    let collected = 0;
+    for (const seat of seats) {
+      if (seat === winner) continue;
+      deltas[seat] = -each;
+      collected += each;
+    }
+    deltas[winner] = collected;
+    return deltas;
+  }
+
+  for (let base = 1; base <= 5000; base++) {
+    const dealerPay = roundUp100(base * 2);
+    const otherPay = roundUp100(base);
+    const total = dealerPay + 2 * otherPay;
+    if (total === winnerTotal) {
+      let collected = 0;
+      for (const seat of seats) {
+        if (seat === winner) continue;
+        const pay = seat === dealerSeat ? dealerPay : otherPay;
+        deltas[seat] = -pay;
+        collected += pay;
+      }
+      deltas[winner] = collected;
+      return deltas;
+    }
+  }
+
+  const otherPay = roundUp100(winnerTotal / 4);
+  const dealerPay = roundUp100((winnerTotal - otherPay) / 2);
+  let collected = 0;
+  for (const seat of seats) {
+    if (seat === winner) continue;
+    const pay = seat === dealerSeat ? dealerPay : otherPay;
+    deltas[seat] = -pay;
+    collected += pay;
+  }
+  deltas[winner] = collected;
+  return deltas;
+}
+
 /** Add honba stick payments on top of scored deltas. */
 export function applyHonbaToDeltas(
   deltas: Record<Seat, number>,

@@ -31,9 +31,6 @@ const TENPAI_PAYMENT_BY_COUNT: Record<
   },
 };
 
-/** Nagashi mangan at exhaustive draw: each opponent pays non-dealer mangan (8,000). */
-export const NAGASHI_MANGAN_EACH = 8000;
-
 export type DrawKind = "standard" | "four_riichi" | "four_kans" | "nagashi_mangan";
 
 export function drawKindLabel(kind: DrawKind): string {
@@ -79,13 +76,30 @@ export function computeExhaustiveDrawDeltas(tenpaiSeats: Seat[]): Record<Seat, n
   return deltas;
 }
 
-/** Nagashi mangan: winner collects 8,000 from each of the other three players. */
-export function computeNagashiManganDeltas(winner: Seat): Record<Seat, number> {
+/**
+ * Nagashi mangan at exhaustive draw: mangan tsumo payment (replaces tenpai exchanges).
+ * @see https://riichi.wiki/Nagashi_mangan
+ */
+export function computeNagashiManganDeltas(
+  winner: Seat,
+  dealerSeat: Seat
+): Record<Seat, number> {
   const deltas: Record<Seat, number> = { E: 0, S: 0, W: 0, N: 0 };
-  for (const seat of allSeats) {
-    if (seat !== winner) deltas[seat] = -NAGASHI_MANGAN_EACH;
+  const winnerIsDealer = winner === dealerSeat;
+
+  if (winnerIsDealer) {
+    for (const seat of allSeats) {
+      if (seat !== winner) deltas[seat] = -4000;
+    }
+    deltas[winner] = 12000;
+    return deltas;
   }
-  deltas[winner] = NAGASHI_MANGAN_EACH * 3;
+
+  for (const seat of allSeats) {
+    if (seat === winner) continue;
+    deltas[seat] = seat === dealerSeat ? -4000 : -2000;
+  }
+  deltas[winner] = 8000;
   return deltas;
 }
 

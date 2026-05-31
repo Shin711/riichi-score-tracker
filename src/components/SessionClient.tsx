@@ -11,6 +11,7 @@ import {
   computeTotals,
   pendingRiichiBySeat,
   pendingRiichiPool,
+  riichiDeclaredThisHand,
   defaultRules,
 } from "@/lib/scoring/ledger";
 import { formatHandHistoryEntry } from "@/lib/scoring/eventDisplay";
@@ -29,6 +30,7 @@ import {
   gameLengthLabel,
   parseSessionRules,
   roundWindLabel,
+  seatWindForDealer,
 } from "@/lib/scoring/tableState";
 import { clearEditKey, storeEditKey } from "@/lib/editKey";
 import { clearRecentSession, storeRecentSession } from "@/lib/recentSession";
@@ -39,15 +41,8 @@ import { useEditKey, useOrigin } from "@/hooks/useClientStorage";
 const seats: Seat[] = ["E", "S", "W", "N"];
 const SCORE_PRESETS = [3900, 5200, 7700, 8000, 12000];
 
-function seatLabel(seat: Seat) {
-  if (seat === "E") return "East";
-  if (seat === "S") return "South";
-  if (seat === "W") return "West";
-  return "North";
-}
-
-function seatOptionLabel(seat: Seat, playerName: string) {
-  const wind = seatLabel(seat);
+function seatOptionLabel(seat: Seat, playerName: string, dealerSeat: Seat) {
+  const wind = seatWindForDealer(seat, dealerSeat);
   return playerName ? `${wind} (${playerName})` : wind;
 }
 
@@ -83,7 +78,7 @@ function TableCompactBar({
       <div className="mx-auto max-w-5xl px-4 py-2">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-muted">
           <span>
-            Dealer: {seatLabel(dealerSeat)}
+            Dealer: East
             {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -102,7 +97,7 @@ function TableCompactBar({
               }`}
             >
               <div className="compact-score-label truncate text-[9px] font-semibold uppercase">
-                {seatLabel(s).slice(0, 1)}
+                {seatWindForDealer(s, dealerSeat).slice(0, 1)}
                 {seatPlayerName[s] ? ` · ${seatPlayerName[s].split(" ")[0]}` : ""}
               </div>
               <div className="font-mono text-sm font-semibold tabular-nums leading-tight">
@@ -524,6 +519,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
   const riichiPool = useMemo(() => pendingRiichiPool(events), [events]);
   const riichiOnTable = useMemo(() => pendingRiichiBySeat(events), [events]);
+  const riichiDeclared = useMemo(() => riichiDeclaredThisHand(events), [events]);
 
   const tableSectionRef = useRef<HTMLElement>(null);
   const [compactBarVisible, setCompactBarVisible] = useState(false);
@@ -724,13 +720,13 @@ export function SessionClient({ shareId }: { shareId: string }) {
   }, [drawKind, drawTenpaiSeats, nagashiSeat]);
   const drawPaymentPreview = useMemo(
     () =>
-      formatDrawPaymentPreview(drawDeltas, seatPlayerName, seatLabel, {
+      formatDrawPaymentPreview(drawDeltas, seatPlayerName, (s) => seatWindForDealer(s, dealerSeat), {
         emptyMessage:
           drawKind === "standard"
             ? "All four tenpai or all four noten — no point payments."
             : "No score payments for this abort.",
       }),
-    [drawDeltas, seatPlayerName, drawKind]
+    [drawDeltas, seatPlayerName, drawKind, dealerSeat]
   );
   const drawDealerTenpai =
     drawKind === "nagashi_mangan"
@@ -741,7 +737,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
   const drawRuleHint = useMemo(() => {
     if (drawKind === "nagashi_mangan") {
-      return `Nagashi mangan: ${seatLabel(nagashiSeat)} collects 8,000 from each opponent (24,000 total).`;
+      return `Nagashi mangan: ${seatWindForDealer(nagashiSeat, dealerSeat)} collects 8,000 from each opponent (24,000 total).`;
     }
     if (drawKind === "four_riichi") {
       return "Four riichi declared — hand aborts with no score change. Confirm whether dealer was tenpai.";
@@ -750,7 +746,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       return "Four kans on the table — hand aborts with no score change. Confirm whether dealer was tenpai.";
     }
     return describeStandardDrawRule(drawTenpaiSeats.length);
-  }, [drawKind, drawTenpaiSeats.length, nagashiSeat]);
+  }, [drawKind, drawTenpaiSeats.length, nagashiSeat, dealerSeat]);
 
   async function onAddDraw() {
     const dealerTenpai = drawDealerTenpai;
@@ -939,7 +935,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-muted">
-            Table · dealer: {seatLabel(dealerSeat)}
+            Table · dealer: East
             {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
           </div>
           {canRecord && !allSeatsAssigned ? (
@@ -950,7 +946,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           {seats.map((s) => (
             <div key={s} className="seat-card">
               <div className="flex items-center justify-between gap-1">
-                <div className="seat-label">{seatLabel(s)}</div>
+                <div className="seat-label">{seatWindForDealer(s, dealerSeat)}</div>
                 {s === dealerSeat ? (
                   <span className="chip-amber py-0 text-[9px]">Dealer</span>
                 ) : null}
@@ -960,7 +956,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                   value={seatPlayerId[s]}
                   onChange={(e) => onSeatPlayerChange(s, e.target.value)}
                   className="field mt-1 h-9 w-full truncate px-1.5 text-sm font-medium"
-                  aria-label={`Player at ${seatLabel(s)}`}
+                  aria-label={`Player at ${seatWindForDealer(s, dealerSeat)}`}
                 >
                   <option value="">Choose player…</option>
                   {players.map((p) => {
@@ -984,16 +980,16 @@ export function SessionClient({ shareId }: { shareId: string }) {
               {canRecord && !isEnded ? (
                 <button
                   type="button"
-                  disabled={riichiOnTable[s] > 0}
+                  disabled={riichiDeclared[s]}
                   onClick={() => void onDeclareRiichi(s)}
                   title={
-                    riichiOnTable[s] > 0
+                    riichiDeclared[s]
                       ? "Already declared riichi this hand"
-                      : `Place ${rules.riichiStickValue.toLocaleString()} pt riichi stick (${seatLabel(s)})`
+                      : `Place ${rules.riichiStickValue.toLocaleString()} pt riichi stick (${seatWindForDealer(s, dealerSeat)})`
                   }
-                  className={`disabled:opacity-100 ${riichiOnTable[s] > 0 ? "btn-riichi-active" : "btn-riichi"}`}
+                  className={`disabled:opacity-100 ${riichiDeclared[s] ? "btn-riichi-active" : "btn-riichi"}`}
                 >
-                  {riichiOnTable[s] > 0 ? "Riichi declared" : `Riichi −${rules.riichiStickValue.toLocaleString()}`}
+                  {riichiDeclared[s] ? "Riichi declared" : `Riichi −${rules.riichiStickValue.toLocaleString()}`}
                 </button>
               ) : null}
             </div>
@@ -1020,7 +1016,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                   (
                   {seats
                     .filter((s) => riichiOnTable[s] > 0)
-                    .map((s) => seatLabel(s))
+                    .map((s) => seatWindForDealer(s, dealerSeat))
                     .join(", ")}
                   )
                 </span>
@@ -1122,8 +1118,9 @@ export function SessionClient({ shareId }: { shareId: string }) {
               </div>
             ) : (
               <p className="mt-2 text-xs leading-relaxed text-subtle">
-                Standard riichi scoring from han/fu using the current dealer seat ({seatLabel(dealerSeat)}
-                ). Honba and riichi sticks on the table are added to the winner (ron or tsumo).
+                Standard riichi scoring from han/fu using the current dealer (East wind
+                {seatPlayerName[dealerSeat] ? ` · ${seatPlayerName[dealerSeat]}` : ""}). Honba and
+                riichi sticks on the table are added to the winner (ron or tsumo).
               </p>
             )}
 
@@ -1179,7 +1176,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
               >
                 {seats.map((s) => (
                   <option key={s} value={s}>
-                    Winner: {seatOptionLabel(s, seatPlayerName[s])}
+                    Winner: {seatOptionLabel(s, seatPlayerName[s], dealerSeat)}
                   </option>
                 ))}
               </select>
@@ -1191,7 +1188,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 >
                   {seats.map((s) => (
                     <option key={s} value={s}>
-                      From: {seatOptionLabel(s, seatPlayerName[s])}
+                      From: {seatOptionLabel(s, seatPlayerName[s], dealerSeat)}
                     </option>
                   ))}
                 </select>
@@ -1295,7 +1292,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                     onClick={() =>
                       applyDrawTenpaiPreset(
                         "dealer_only",
-                        `Only ${seatLabel(dealerSeat)} marked tenpai — others pay 1,000 each (3,000 total).`
+                        "Only East marked tenpai — others pay 1,000 each (3,000 total)."
                       )
                     }
                     className={`chip-preset ${
@@ -1323,7 +1320,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                       }`}
                     >
                       <span className="draw-seat-card-label">
-                        {seatLabel(s)}
+                        {seatWindForDealer(s, dealerSeat)}
                         {s === dealerSeat ? " · dealer" : ""}
                       </span>
                       <span className="draw-seat-card-subtle">
@@ -1352,7 +1349,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
                 >
                   {seats.map((s) => (
                     <option key={s} value={s}>
-                      {seatOptionLabel(s, seatPlayerName[s])}
+                      {seatOptionLabel(s, seatPlayerName[s], dealerSeat)}
                     </option>
                   ))}
                 </select>
@@ -1372,7 +1369,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
             <div className="notice-inset mt-2 px-3">
               <span className="font-medium">Payments:</span> {drawPaymentPreview}
               <span className="notice-inset-subtle mt-1 block">
-                Dealer ({seatLabel(dealerSeat)}):{" "}
+                Dealer (East):{" "}
                 {drawDealerTenpai ? "stays · honba +1" : "passes · honba +1"}
               </span>
             </div>
@@ -1402,7 +1399,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
               <div className="mt-2 grid grid-cols-4 gap-1">
                 {seats.map((s) => (
                   <label key={s} className="text-center text-[10px]">
-                    <span className="text-subtle">{seatLabel(s)}</span>
+                    <span className="text-subtle">{seatWindForDealer(s, dealerSeat)}</span>
                     <span className="block text-[9px] text-subtle">+/− pts</span>
                     <input
                       type="number"
@@ -1566,10 +1563,14 @@ export function SessionClient({ shareId }: { shareId: string }) {
           </button>
         </div>
         <ul className="divide-y divide-stone-200 dark:divide-stone-600">
-          {[...events].reverse().map((ev, idx) => {
-            const line = formatHandHistoryEntry(ev, seatPlayerName);
+          {[...events].reverse().map((ev, revIdx) => {
+            const eventIndex = events.length - 1 - revIdx;
+            const dealerAtEvent = deriveTableState(rules, events.slice(0, eventIndex)).dealerSeat;
+            const line = formatHandHistoryEntry(ev, seatPlayerName, (s) =>
+              seatWindForDealer(s, dealerAtEvent)
+            );
             return (
-              <li key={idx} className="px-4 py-3 text-sm">
+              <li key={eventIndex} className="px-4 py-3 text-sm">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <div className="font-medium">{line.title}</div>
                   <div className="text-xs text-subtle">{new Date(ev.createdAt).toLocaleString()}</div>

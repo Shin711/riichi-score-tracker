@@ -17,9 +17,9 @@ function seatLabel(seat: Seat) {
   return "North";
 }
 
-function playerAtSeat(seat: Seat, names: SeatNames): string {
+function playerAtSeat(seat: Seat, names: SeatNames, label: (seat: Seat) => string): string {
   const name = names[seat]?.trim();
-  return name ? `${seatLabel(seat)} (${name})` : seatLabel(seat);
+  return name ? `${label(seat)} (${name})` : label(seat);
 }
 
 function formatSignedPoints(value: number) {
@@ -52,7 +52,13 @@ function parseWinTypeFromNote(note?: string): "ron" | "tsumo" | undefined {
   return undefined;
 }
 
-export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): HandHistoryLine {
+export function formatHandHistoryEntry(
+  ev: SessionEvent,
+  names: SeatNames,
+  seatWindLabel?: (seat: Seat) => string
+): HandHistoryLine {
+  const label = seatWindLabel ?? seatLabel;
+
   if (ev.type === "draw") {
     const kind = ev.drawKind ?? "standard";
     const title =
@@ -68,7 +74,7 @@ export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): Hand
       ev.deltas &&
       seats
         .filter((s) => (ev.deltas![s] ?? 0) !== 0)
-        .map((s) => `${playerAtSeat(s, names)} ${formatSignedPoints(ev.deltas![s] ?? 0)}`);
+        .map((s) => `${playerAtSeat(s, names, label)} ${formatSignedPoints(ev.deltas![s] ?? 0)}`);
 
     const dealerPart = ev.dealerTenpai
       ? "Dealer tenpai · dealer continues · honba +1"
@@ -76,7 +82,7 @@ export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): Hand
 
     const detailParts: string[] = [];
     if (kind !== "standard") detailParts.push(drawKindLabel(kind));
-    if (ev.nagashiSeat) detailParts.push(playerAtSeat(ev.nagashiSeat, names));
+    if (ev.nagashiSeat) detailParts.push(playerAtSeat(ev.nagashiSeat, names, label));
     if (paymentParts && paymentParts.length > 0) detailParts.push(paymentParts.join(" · "));
     else if (kind === "four_riichi" || kind === "four_kans") {
       detailParts.push("No score payments");
@@ -99,14 +105,14 @@ export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): Hand
   if (ev.type === "riichi") {
     return {
       title: "Riichi",
-      detail: `${playerAtSeat(ev.seat, names)} · ${formatSignedPoints(-ev.value)} stick`,
+      detail: `${playerAtSeat(ev.seat, names, label)} · ${formatSignedPoints(-ev.value)} stick`,
     };
   }
 
   if (ev.type === "manual_adjustment") {
     const changes = seats
       .filter((s) => (ev.deltaBySeat[s] ?? 0) !== 0)
-      .map((s) => `${playerAtSeat(s, names)} ${formatSignedPoints(ev.deltaBySeat[s] ?? 0)}`);
+      .map((s) => `${playerAtSeat(s, names, label)} ${formatSignedPoints(ev.deltaBySeat[s] ?? 0)}`);
     return {
       title: "Manual score change",
       detail: changes.length > 0 ? changes.join(" · ") : (ev.note ?? null),
@@ -131,9 +137,9 @@ export function formatHandHistoryEntry(ev: SessionEvent, names: SeatNames): Hand
 
   if (winner) {
     if (winType === "ron" && fromSeat) {
-      detail = `${playerAtSeat(winner, names)} from ${playerAtSeat(fromSeat, names)}`;
+      detail = `${playerAtSeat(winner, names, label)} from ${playerAtSeat(fromSeat, names, label)}`;
     } else {
-      detail = playerAtSeat(winner, names);
+      detail = playerAtSeat(winner, names, label);
     }
     if (hanFuParts.length > 0) {
       detail += ` · ${hanFuParts.join(" ")}`;

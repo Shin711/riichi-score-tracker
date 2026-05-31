@@ -110,7 +110,8 @@ export function inferWinWinner(ev: Extract<SessionEvent, { type: "win" }>): Seat
 
 /**
  * Riichi bets on the table since the last win (declarations are −value; winner collects on win).
- * @see https://riichi.wiki/Riichi — bets stay through draws until the next win.
+ * Sticks carry over exhaustive draws until the next win.
+ * @see https://riichi.wiki/Riichi
  */
 export function pendingRiichiPool(events: SessionEvent[]): number {
   let pool = 0;
@@ -121,7 +122,7 @@ export function pendingRiichiPool(events: SessionEvent[]): number {
   return pool;
 }
 
-/** Riichi sticks on the table per seat since the last win (for UI indicators). */
+/** Riichi sticks on the table per seat since the last win (for pool attribution in UI). */
 export function pendingRiichiBySeat(events: SessionEvent[]): Record<Seat, number> {
   const bySeat: Record<Seat, number> = { E: 0, S: 0, W: 0, N: 0 };
   for (const ev of events) {
@@ -132,6 +133,32 @@ export function pendingRiichiBySeat(events: SessionEvent[]): Record<Seat, number
     }
   }
   return bySeat;
+}
+
+/** Events after the last hand-ending win or draw — start of the current hand. */
+export function handEventsStartIndex(events: SessionEvent[]): number {
+  let start = 0;
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].type === "win" || events[i].type === "draw") {
+      start = i + 1;
+    }
+  }
+  return start;
+}
+
+/**
+ * Whether each seat declared riichi in the current unfinished hand.
+ * Resets after win or exhaustive/abortive draw so a new hand can declare again
+ * while sticks from prior hands remain on the table until collected on win.
+ */
+export function riichiDeclaredThisHand(events: SessionEvent[]): Record<Seat, boolean> {
+  const start = handEventsStartIndex(events);
+  const declared: Record<Seat, boolean> = { E: false, S: false, W: false, N: false };
+  for (let i = start; i < events.length; i++) {
+    const ev = events[i];
+    if (ev.type === "riichi") declared[ev.seat] = true;
+  }
+  return declared;
 }
 
 /** Credit pending riichi sticks to the winner (already deducted from declarers on riichi events). */

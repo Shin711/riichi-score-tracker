@@ -6,9 +6,28 @@ export type RoundWind = "east" | "south";
 
 const seatOrder: Seat[] = ["E", "S", "W", "N"];
 
+const seatWindLabels = ["East", "South", "West", "North"] as const;
+
 export function nextDealerSeat(current: Seat): Seat {
   const index = seatOrder.indexOf(current);
   return seatOrder[(index + 1) % seatOrder.length];
+}
+
+/**
+ * Seat wind (自风) relative to the current dealer — dealer is always East.
+ * Fixed chair positions (E/S/W/N in data) rotate winds as the dealer passes.
+ */
+export function seatWindForDealer(seat: Seat, dealerSeat: Seat): string {
+  const dealerIndex = seatOrder.indexOf(dealerSeat);
+  const seatIndex = seatOrder.indexOf(seat);
+  const offset = (seatIndex - dealerIndex + seatOrder.length) % seatOrder.length;
+  return seatWindLabels[offset];
+}
+
+/** Seats in counter-clockwise wind order starting from the dealer (East wind). */
+export function seatsInWindOrder(dealerSeat: Seat): Seat[] {
+  const start = seatOrder.indexOf(dealerSeat);
+  return seatOrder.map((_, i) => seatOrder[(start + i) % seatOrder.length]);
 }
 
 export function parseSessionRules(rulesJson: unknown): Rules {

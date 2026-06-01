@@ -15,7 +15,7 @@ type QuickHand = {
 };
 
 const QUICK_HANDS: QuickHand[] = [
-  { label: "2 han 30 fu", han: 2, fu: 30, group: "common", hint: "e.g. riichi + pinfu (ron)" },
+  { label: "2 han 30 fu", han: 2, fu: 30, group: "common", hint: "e.g. riichi + tanyao" },
   { label: "2 han 40 fu", han: 2, fu: 40, group: "common", hint: "e.g. riichi + yakuhai (fu-heavy hand)" },
   { label: "3 han 30 fu", han: 3, fu: 30, group: "common", hint: "e.g. riichi + tanyao + dora 1" },
   { label: "3 han 40 fu", han: 3, fu: 40, group: "common" },
@@ -163,6 +163,13 @@ export function ScoreCalculator() {
           <span className="font-medium">Ron/Tsumo</span> and <span className="font-medium">Dealer</span>, then
           open <span className="font-medium">Fu helper</span> if your fu is uncertain.
         </div>
+        <p className="mt-2 text-[11px] text-subtle">
+          Common yaku to recognize first: <span className="font-medium text-club-ink">riichi</span>,{" "}
+          <span className="font-medium text-club-ink">tanyao</span>,{" "}
+          <span className="font-medium text-club-ink">pinfu</span>,{" "}
+          <span className="font-medium text-club-ink">yakuhai</span>, and{" "}
+          <span className="font-medium text-club-ink">menzen tsumo</span>.
+        </p>
 
         <div className="mt-3 space-y-3">
           <div>

@@ -100,9 +100,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-5xl items-stretch">
           <BottomNavItem href="/" label="Home" />
           <BottomNavItem href="/players" label="Players" />
-          <BottomNavItem primary label="New" />
           <BottomNavItem href="/calculator" label="Calc" />
           <BottomNavItem href="/leaderboard" label="Board" />
+          <BottomNavItem href="/import" label="Import" />
           <BottomNavItem href="/my/sessions" label="Games" />
           <BottomNavItem href="/login" label="Account" />
         </div>

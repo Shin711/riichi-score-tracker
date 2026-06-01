@@ -933,7 +933,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
       <section
         ref={tableSectionRef}
-        className="card sticky top-[52px] z-30 -mx-1 p-3 shadow-md sm:static sm:z-auto sm:shadow-sm"
+        className="card -mx-1 p-3 shadow-md sm:static sm:z-auto sm:shadow-sm"
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-muted">

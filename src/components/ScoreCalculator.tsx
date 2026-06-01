@@ -10,18 +10,21 @@ type QuickHand = {
   label: string;
   han: number;
   fu: number;
+  group: "common" | "limit";
   hint?: string;
 };
 
 const QUICK_HANDS: QuickHand[] = [
-  { label: "2 han 30 fu", han: 2, fu: 30, hint: "e.g. riichi + tanyao" },
-  { label: "2 han 40 fu", han: 2, fu: 40, hint: "e.g. riichi + pinfu" },
-  { label: "3 han 30 fu", han: 3, fu: 30, hint: "e.g. riichi + sanshoku" },
-  { label: "3 han 40 fu", han: 3, fu: 40 },
-  { label: "4 han 30 fu", han: 4, fu: 30 },
-  { label: "Mangan", han: 5, fu: 30, hint: "5 han or 4 han 40+ fu" },
-  { label: "Haneman", han: 6, fu: 30 },
-  { label: "Baiman", han: 8, fu: 30 },
+  { label: "2 han 30 fu", han: 2, fu: 30, group: "common", hint: "e.g. riichi + pinfu (ron)" },
+  { label: "2 han 40 fu", han: 2, fu: 40, group: "common", hint: "e.g. riichi + yakuhai (fu-heavy hand)" },
+  { label: "3 han 30 fu", han: 3, fu: 30, group: "common", hint: "e.g. riichi + tanyao + dora 1" },
+  { label: "3 han 40 fu", han: 3, fu: 40, group: "common" },
+  { label: "4 han 30 fu", han: 4, fu: 30, group: "common" },
+  { label: "Mangan", han: 5, fu: 30, group: "limit", hint: "5 han or 4 han 40+ fu" },
+  { label: "Haneman", han: 6, fu: 30, group: "limit" },
+  { label: "Baiman", han: 8, fu: 30, group: "limit" },
+  { label: "Sanbaiman", han: 11, fu: 30, group: "limit" },
+  { label: "Yakuman", han: 13, fu: 30, group: "limit", hint: "Single yakuman (incl. kazoe yakuman)" },
 ];
 
 function ToggleGroup<T extends string>({
@@ -141,6 +144,10 @@ export function ScoreCalculator() {
               Count your yaku for <span className="font-medium">han</span>. Use your fu count, or pick a
               common hand below if you are still learning fu.
             </p>
+            <p className="mt-1 text-[11px] text-subtle">
+              Tip: for <span className="font-medium text-club-ink">1 han</span> hands, fu matters most — use
+              Fu helper for a more reliable result.
+            </p>
           </div>
           <button
             type="button"
@@ -151,28 +158,66 @@ export function ScoreCalculator() {
           </button>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          {QUICK_HANDS.map((hand) => (
-            <button
-              key={hand.label}
-              type="button"
-              onClick={() => applyQuick(hand)}
-              className={`rounded-lg border px-3 py-2 text-left text-xs ${
-                selectedQuick === hand.label
-                  ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
-                  : "border-club-border text-club-ink dark:border-stone-600"
-              }`}
-            >
-              <div className="font-semibold">{hand.label}</div>
-              {hand.hint ? (
-                <div
-                  className={`mt-0.5 ${selectedQuick === hand.label ? "text-white/90" : "text-subtle"}`}
+        <div className="notice-inset mt-3">
+          <span className="font-medium">Beginner path:</span> Choose{" "}
+          <span className="font-medium">Ron/Tsumo</span> and <span className="font-medium">Dealer</span>, then
+          open <span className="font-medium">Fu helper</span> if your fu is uncertain.
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted">Common hands</div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_HANDS.filter((h) => h.group === "common").map((hand) => (
+                <button
+                  key={hand.label}
+                  type="button"
+                  onClick={() => applyQuick(hand)}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs ${
+                    selectedQuick === hand.label
+                      ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
+                      : "border-club-border text-club-ink dark:border-stone-600"
+                  }`}
                 >
-                  {hand.hint}
-                </div>
-              ) : null}
-            </button>
-          ))}
+                  <div className="font-semibold">{hand.label}</div>
+                  {hand.hint ? (
+                    <div
+                      className={`mt-0.5 ${selectedQuick === hand.label ? "text-white/90" : "text-subtle"}`}
+                    >
+                      {hand.hint}
+                    </div>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-[11px] font-medium text-muted">Limit hands</div>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_HANDS.filter((h) => h.group === "limit").map((hand) => (
+                <button
+                  key={hand.label}
+                  type="button"
+                  onClick={() => applyQuick(hand)}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs ${
+                    selectedQuick === hand.label
+                      ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
+                      : "border-club-border text-club-ink dark:border-stone-600"
+                  }`}
+                >
+                  <div className="font-semibold">{hand.label}</div>
+                  {hand.hint ? (
+                    <div
+                      className={`mt-0.5 ${selectedQuick === hand.label ? "text-white/90" : "text-subtle"}`}
+                    >
+                      {hand.hint}
+                    </div>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {showCustom ? (

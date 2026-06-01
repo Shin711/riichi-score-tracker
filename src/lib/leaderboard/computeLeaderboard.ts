@@ -47,7 +47,9 @@ export function parseRules(rulesJson: unknown): Rules {
     gameLength:
       r.gameLength === "east" || r.gameLength === "hanchan" ? r.gameLength : defaults.gameLength,
     roundWind:
-      r.roundWind === "east" || r.roundWind === "south" ? r.roundWind : defaults.roundWind,
+      r.roundWind === "east" || r.roundWind === "south" || r.roundWind === "west"
+        ? r.roundWind
+        : defaults.roundWind,
     dealerSeat:
       r.dealerSeat === "E" || r.dealerSeat === "S" || r.dealerSeat === "W" || r.dealerSeat === "N"
         ? r.dealerSeat

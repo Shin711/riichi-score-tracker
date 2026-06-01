@@ -200,7 +200,8 @@ export default function PlayersPage() {
                 confirmDeleteId === p.id ? (
                   <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
                     <p className="text-xs leading-5 text-red-900 dark:text-red-200">
-                      Remove <span className="font-medium">{p.display_name}</span> from the roster?
+                      Remove{" "}
+                      <span className="font-medium">{p.display_name}</span> from the roster?
                       Their player links are removed; sessions, imports, and other players&apos;
                       scores are kept. This cannot be undone.
                     </p>

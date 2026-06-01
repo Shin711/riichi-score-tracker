@@ -31,7 +31,7 @@ import {
   deriveTableState,
   gameLengthLabel,
   parseSessionRules,
-  roundWindLabel,
+  roundHandLabel,
   seatWindForDealer,
 } from "@/lib/scoring/tableState";
 import { clearEditKey, storeEditKey } from "@/lib/editKey";
@@ -57,6 +57,7 @@ function friendlySeatError(message: string) {
 
 function TableCompactBar({
   visible,
+  roundLabel,
   dealerSeat,
   seatPlayerName,
   totals,
@@ -64,6 +65,7 @@ function TableCompactBar({
   riichiPool,
 }: {
   visible: boolean;
+  roundLabel: string;
   dealerSeat: Seat;
   seatPlayerName: Record<Seat, string>;
   totals: Record<Seat, number>;
@@ -80,7 +82,7 @@ function TableCompactBar({
       <div className="mx-auto max-w-5xl px-4 py-2">
         <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[10px] text-muted">
           <span>
-            Dealer: East
+            {roundLabel} · Dealer: East
             {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
           </span>
           <span className="flex flex-wrap items-center gap-1.5">
@@ -293,12 +295,15 @@ export function SessionClient({ shareId }: { shareId: string }) {
   const dealerSeat = tableState.dealerSeat;
   const honba = tableState.honba;
   const isEnded = isSessionEnded(endedAt);
+  const shouldEndByRule = tableState.ruleEnded && !isEnded;
   const canEdit = Boolean(editKey);
-  const canRecord = canEdit && !isEnded;
+  const canRecord = canEdit && !isEnded && !tableState.ruleEnded;
+  const canUndo = canEdit && !isEnded;
   const allSeatsAssigned = seats.every((s) => Boolean(seatPlayerId[s]));
   const shareUrl = origin ? `${origin}/s/${shareId}` : `/s/${shareId}`;
   const editUrl = canEdit ? `${shareUrl}?editKey=${encodeURIComponent(editKey ?? "")}` : null;
-
+  const autoRuleEndInFlightRef = useRef(false);
+  const prevRuleEndedRef = useRef(tableState.ruleEnded);
   async function patchSession(body: Record<string, unknown>) {
     if (!editKey) {
       setError("Editing is not enabled on this device (missing edit key).");
@@ -321,6 +326,38 @@ export function SessionClient({ shareId }: { shareId: string }) {
     }
     return json.session;
   }
+
+  useEffect(() => {
+    const justReachedRuleEnd = tableState.ruleEnded && !prevRuleEndedRef.current;
+    prevRuleEndedRef.current = tableState.ruleEnded;
+    if (!justReachedRuleEnd || isEnded || !canEdit || autoRuleEndInFlightRef.current || !editKey) return;
+    autoRuleEndInFlightRef.current = true;
+    setError(null);
+    void fetch(`/api/sessions/${shareId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-edit-key": editKey },
+      body: JSON.stringify({ end: true }),
+    })
+      .then(async (res) => {
+        const json = (await res.json()) as {
+          session?: { title: string | null; rules_json: Rules; ended_at: string | null };
+          error?: string;
+        };
+        if (!res.ok) throw new Error(json.error ?? "Failed to end game by rule");
+        if (json.session) {
+          setTitle(json.session.title ?? "Session");
+          setRules(parseSessionRules(json.session.rules_json));
+          setEndedAt(json.session.ended_at ?? null);
+        }
+        clearRecentSession();
+      })
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Failed to end game by rule");
+      })
+      .finally(() => {
+        autoRuleEndInFlightRef.current = false;
+      });
+  }, [tableState.ruleEnded, isEnded, canEdit, editKey, shareId]);
 
   async function onEndGame() {
     if (!canEdit || isEnded) return;
@@ -819,7 +856,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
               {gameLengthLabel(tableState.gameLength)}
             </span>
             <span className="chip-neutral">
-              {roundWindLabel(tableState.roundWind)}
+              {roundHandLabel(tableState.roundWind, tableState.handNumber)}
             </span>
             {honba > 0 ? (
               <span className="chip-amber">
@@ -915,6 +952,11 @@ export function SessionClient({ shareId }: { shareId: string }) {
           View-only. Ask the scorekeeper to share the editor link, or paste the edit key under{" "}
           <span className="font-medium">Share with table</span> below.
         </div>
+      ) : shouldEndByRule ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+          Rule end reached at South 4: dealer passed and someone is at or above{" "}
+          {rules.returnPoints.toLocaleString()} points. This game is ending.
+        </div>
       ) : canEdit && isEnded ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
           You have the edit key but this game is ended. Tap <span className="font-medium">Reopen</span> to
@@ -924,6 +966,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
 
       <TableCompactBar
         visible={compactBarVisible}
+        roundLabel={roundHandLabel(tableState.roundWind, tableState.handNumber)}
         dealerSeat={dealerSeat}
         seatPlayerName={seatPlayerName}
         totals={totals}
@@ -937,7 +980,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-muted">
-            Table · dealer: East
+            Table · {roundHandLabel(tableState.roundWind, tableState.handNumber)} · dealer: East
             {seatPlayerName[dealerSeat] ? ` (${seatPlayerName[dealerSeat]})` : ""}
           </div>
           {canRecord && !allSeatsAssigned ? (
@@ -1559,7 +1602,7 @@ export function SessionClient({ shareId }: { shareId: string }) {
           <div className="text-sm font-medium">Hand history</div>
           <button
             type="button"
-            disabled={!canRecord || events.length === 0}
+            disabled={!canUndo || events.length === 0}
             onClick={() =>
               void onUndoLastEvent().catch((e) =>
                 setError(e instanceof Error ? e.message : "Failed to undo")

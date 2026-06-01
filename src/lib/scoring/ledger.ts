@@ -3,7 +3,7 @@ import type { DrawKind } from "@/lib/scoring/draw";
 export type Seat = "E" | "S" | "W" | "N";
 
 export type GameLength = "east" | "hanchan";
-export type RoundWind = "east" | "south";
+export type RoundWind = "east" | "south" | "west";
 
 export type Rules = {
   startingPoints: number;

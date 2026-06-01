@@ -60,6 +60,12 @@ type FuHelperProps = {
   onApply: (fu: number) => void;
 };
 
+const ONE_HAN_QUICK_FU: Array<{ fu: number; label: string; hint: string }> = [
+  { fu: 30, label: "1 han · 30 fu", hint: "Riichi nomi / pinfu ron shape" },
+  { fu: 40, label: "1 han · 40 fu", hint: "Riichi nomi, closed ron (common)" },
+  { fu: 50, label: "1 han · 50 fu", hint: "Riichi nomi, fu-heavy shape" },
+];
+
 export function FuHelper({ winType, onApply }: FuHelperProps) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState<FuHelperInput>(() => defaultFuHelperInput(winType));
@@ -109,6 +115,29 @@ export function FuHelper({ winType, onApply }: FuHelperProps) {
 
       {open ? (
         <div className="mt-4 space-y-4">
+          <div>
+            <div className="text-xs font-medium text-muted">1-han quick start</div>
+            <p className="mt-1 text-[10px] leading-relaxed text-subtle">
+              If your hand has only 1 han, pick a common fu shape here, then fine-tune below if needed.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ONE_HAN_QUICK_FU.map((preset) => (
+                <button
+                  key={preset.fu}
+                  type="button"
+                  onClick={() => {
+                    onApply(preset.fu);
+                    setOpen(false);
+                  }}
+                  className="rounded-lg border border-club-border px-3 py-2 text-left text-xs hover:border-stone-400 dark:border-stone-600 dark:hover:border-stone-500"
+                >
+                  <div className="font-medium text-club-ink">{preset.label}</div>
+                  <div className="text-subtle">{preset.hint}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <div className="text-xs font-medium text-muted">Hand shape</div>
             <div className="mt-2 flex flex-wrap gap-2">

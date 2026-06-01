@@ -39,6 +39,71 @@ const rules = defaultRules();
   ok("dealer noten draw passes dealer to W", state.dealerSeat === "W" && state.honba === 2);
 }
 
+// East 4 -> South 1 auto transition when dealer rotates in hanchan
+{
+  const events: SessionEvent[] = [
+    { type: "draw", createdAt: "1", dealerTenpai: false, drawKind: "standard" }, // E->S
+    { type: "draw", createdAt: "2", dealerTenpai: false, drawKind: "standard" }, // S->W
+    { type: "draw", createdAt: "3", dealerTenpai: false, drawKind: "standard" }, // W->N
+    { type: "draw", createdAt: "4", dealerTenpai: false, drawKind: "standard" }, // N->E + South
+  ];
+  const state = deriveTableState(rules, events);
+  ok("after 4 dealer passes in East, transition to South round", state.roundWind === "south");
+  ok("South 1 starts at dealer seat E", state.dealerSeat === "E" && state.handNumber === 1);
+}
+
+// South 4 dealer pass with no 30k+ should continue to West 1.
+{
+  const events: SessionEvent[] = [
+    { type: "draw", createdAt: "1", dealerTenpai: false, drawKind: "standard" }, // E2
+    { type: "draw", createdAt: "2", dealerTenpai: false, drawKind: "standard" }, // E3
+    { type: "draw", createdAt: "3", dealerTenpai: false, drawKind: "standard" }, // E4
+    { type: "draw", createdAt: "4", dealerTenpai: false, drawKind: "standard" }, // S1
+    { type: "draw", createdAt: "5", dealerTenpai: false, drawKind: "standard" }, // S2
+    { type: "draw", createdAt: "6", dealerTenpai: false, drawKind: "standard" }, // S3
+    { type: "draw", createdAt: "7", dealerTenpai: false, drawKind: "standard" }, // S4
+    { type: "draw", createdAt: "8", dealerTenpai: false, drawKind: "standard" }, // still S4
+  ];
+  const state = deriveTableState(rules, events);
+  ok("after South 4 pass without 30k+, continue to West 1", state.roundWind === "west" && state.handNumber === 1);
+}
+
+// South 4 dealer pass with 30k+ should end by rule (no West continuation).
+{
+  const events: SessionEvent[] = [
+    { type: "manual_adjustment", createdAt: "1", deltaBySeat: { E: 6000, S: -2000, W: -2000, N: -2000 } }, // E=31k
+    { type: "draw", createdAt: "2", dealerTenpai: false, drawKind: "standard" }, // E2
+    { type: "draw", createdAt: "3", dealerTenpai: false, drawKind: "standard" }, // E3
+    { type: "draw", createdAt: "4", dealerTenpai: false, drawKind: "standard" }, // E4
+    { type: "draw", createdAt: "5", dealerTenpai: false, drawKind: "standard" }, // S1
+    { type: "draw", createdAt: "6", dealerTenpai: false, drawKind: "standard" }, // S2
+    { type: "draw", createdAt: "7", dealerTenpai: false, drawKind: "standard" }, // S3
+    { type: "draw", createdAt: "8", dealerTenpai: false, drawKind: "standard" }, // S4
+    { type: "draw", createdAt: "9", dealerTenpai: false, drawKind: "standard" }, // end at S4
+  ];
+  const state = deriveTableState(rules, events);
+  ok("South 4 dealer pass with 30k+ stays South 4", state.roundWind === "south" && state.handNumber === 4);
+  ok("South 4 dealer pass with 30k+ flags rule end", state.ruleEnded === true);
+}
+
+// In West continuation, game ends when someone is >= return points and dealer passes.
+{
+  const events: SessionEvent[] = [
+    { type: "draw", createdAt: "1", dealerTenpai: false, drawKind: "standard" }, // E2
+    { type: "draw", createdAt: "2", dealerTenpai: false, drawKind: "standard" }, // E3
+    { type: "draw", createdAt: "3", dealerTenpai: false, drawKind: "standard" }, // E4
+    { type: "draw", createdAt: "4", dealerTenpai: false, drawKind: "standard" }, // S1
+    { type: "draw", createdAt: "5", dealerTenpai: false, drawKind: "standard" }, // S2
+    { type: "draw", createdAt: "6", dealerTenpai: false, drawKind: "standard" }, // S3
+    { type: "draw", createdAt: "7", dealerTenpai: false, drawKind: "standard" }, // S4
+    { type: "draw", createdAt: "8", dealerTenpai: false, drawKind: "standard" }, // W1
+    { type: "manual_adjustment", createdAt: "9", deltaBySeat: { E: 6000, S: -2000, W: -2000, N: -2000 } }, // E=31k
+    { type: "draw", createdAt: "10", dealerTenpai: false, drawKind: "standard" }, // dealer pass in West -> end
+  ];
+  const state = deriveTableState(rules, events);
+  ok("West dealer pass with 30k+ flags rule end", state.roundWind === "west" && state.ruleEnded === true);
+}
+
 // Draw payments
 {
   const d1 = computeExhaustiveDrawDeltas(["E"]);

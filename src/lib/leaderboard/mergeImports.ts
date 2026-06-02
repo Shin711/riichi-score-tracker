@@ -1,5 +1,6 @@
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import { gameScoreDelta, LEADERBOARD_POINTS_DIVISOR } from "@/lib/leaderboard/points";
+import { compareLeaderboardEntries } from "@/lib/leaderboard/qualification";
 import { isHumanImportEntry } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 
@@ -41,10 +42,5 @@ export function mergeImportedGamesIntoLeaderboard(
       ...entry,
       points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
     }))
-    .sort(
-      (a, b) =>
-        b.points - a.points ||
-        b.gamesPlayed - a.gamesPlayed ||
-        a.displayName.localeCompare(b.displayName)
-    );
+    .sort(compareLeaderboardEntries);
 }

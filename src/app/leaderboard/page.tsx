@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import type { MonthlyArchive } from "@/lib/leaderboard/monthly";
 import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
+import {
+  gamesUntilLeaderboardRank,
+  LEADERBOARD_MIN_GAMES_FOR_RANK,
+  splitLeaderboardEntries,
+} from "@/lib/leaderboard/qualification";
 
 function pointsClassName(points: number) {
   if (points > 0) return "text-emerald-700 dark:text-emerald-400";
@@ -21,15 +26,13 @@ function LeaderboardTable({
   entries: LeaderboardEntry[];
   emptyMessage: string;
 }) {
-  const activeEntries = entries.filter((e) => e.gamesPlayed > 0);
-
-  if (activeEntries.length === 0) {
+  if (entries.length === 0) {
     return <div className="px-4 py-8 text-sm text-muted">{emptyMessage}</div>;
   }
 
   return (
     <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-      {activeEntries.map((entry, index) => (
+      {entries.map((entry, index) => (
         <li
           key={entry.playerId}
           className="px-4 py-4 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
@@ -69,8 +72,74 @@ function LeaderboardTable({
   );
 }
 
+function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
+  if (entries.length === 0) return null;
+
+  return (
+    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      {entries.map((entry) => {
+        const needed = gamesUntilLeaderboardRank(entry.gamesPlayed);
+        return (
+          <li
+            key={entry.playerId}
+            className="px-4 py-4 sm:grid sm:grid-cols-[1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
+          >
+            <div className="flex items-center gap-3 sm:contents">
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
+                <div className="mt-1 text-xs text-subtle">
+                  {needed} more game{needed === 1 ? "" : "s"} to rank · {entry.gamesPlayed} played
+                </div>
+              </div>
+              <div
+                className={`ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
+              >
+                {formatLeaderboardPoints(entry.totalDelta)}
+              </div>
+            </div>
+            <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
+              {entry.gamesPlayed}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function LeaderboardSections({
+  entries,
+  minGamesForRank,
+  rankedEmptyMessage,
+}: {
+  entries: LeaderboardEntry[];
+  minGamesForRank: number;
+  rankedEmptyMessage: string;
+}) {
+  const { ranked, unranked } = useMemo(() => splitLeaderboardEntries(entries), [entries]);
+
+  return (
+    <>
+      <LeaderboardTable entries={ranked} emptyMessage={rankedEmptyMessage} />
+      {unranked.length > 0 ? (
+        <div className="border-t border-zinc-200 dark:border-zinc-800">
+          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+            <div className="text-sm font-medium">Not ranked yet</div>
+            <p className="mt-0.5 text-xs text-subtle">
+              {minGamesForRank}+ games needed to appear on the board. Points still count toward
+              your total once you qualify.
+            </p>
+          </div>
+          <UnrankedLeaderboardList entries={unranked} />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [minGamesForRank, setMinGamesForRank] = useState(LEADERBOARD_MIN_GAMES_FOR_RANK);
   const [gamesWithPlayers, setGamesWithPlayers] = useState(0);
   const [sessionGames, setSessionGames] = useState(0);
   const [importedGames, setImportedGames] = useState(0);
@@ -92,6 +161,7 @@ export default function LeaderboardPage() {
         ]);
         const currentJson = (await currentRes.json()) as {
           entries?: LeaderboardEntry[];
+          minGamesForRank?: number;
           gamesWithPlayers?: number;
           sessionGames?: number;
           importedGames?: number;
@@ -108,6 +178,9 @@ export default function LeaderboardPage() {
 
         if (!cancelled) {
           setEntries(currentJson.entries ?? []);
+          setMinGamesForRank(
+            currentJson.minGamesForRank ?? LEADERBOARD_MIN_GAMES_FOR_RANK
+          );
           setGamesWithPlayers(currentJson.gamesWithPlayers ?? 0);
           setSessionGames(currentJson.sessionGames ?? 0);
           setImportedGames(currentJson.importedGames ?? 0);
@@ -129,7 +202,11 @@ export default function LeaderboardPage() {
     };
   }, []);
 
-  const activeEntries = entries.filter((e) => e.gamesPlayed > 0);
+  const { ranked, unranked, inactive } = useMemo(
+    () => splitLeaderboardEntries(entries),
+    [entries]
+  );
+  const hasAnyActivity = ranked.length > 0 || unranked.length > 0;
 
   return (
     <main className="space-y-6">
@@ -154,7 +231,7 @@ export default function LeaderboardPage() {
             {sessionGames > 0 || importedGames > 0
               ? ` (${sessionGames} in-person${importedGames > 0 ? `, ${importedGames} imported` : ""})`
               : ""}{" "}
-            · points = (ending − start) ÷ 1,000
+            · points = (ending − start) ÷ 1,000 · ranked after {minGamesForRank}+ games
           </div>
         </div>
         <div className="hidden border-b border-stone-200 px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3 dark:border-stone-600">
@@ -166,7 +243,7 @@ export default function LeaderboardPage() {
 
         {loading ? (
           <div className="px-4 py-8 text-sm text-muted">Loading standings…</div>
-        ) : activeEntries.length === 0 ? (
+        ) : !hasAnyActivity ? (
           <div className="space-y-3 px-4 py-8 text-sm text-muted">
             <p>
               No games this month yet. End an in-person session on the site, or{" "}
@@ -180,27 +257,27 @@ export default function LeaderboardPage() {
             </Link>
           </div>
         ) : (
-          <LeaderboardTable
+          <LeaderboardSections
             entries={entries}
-            emptyMessage="No finished games this month yet."
+            minGamesForRank={minGamesForRank}
+            rankedEmptyMessage={`No players with ${minGamesForRank}+ games yet this month.`}
           />
         )}
       </div>
 
-      {!loading && entries.some((e) => e.gamesPlayed === 0) ? (
+      {!loading && inactive.length > 0 ? (
         <div className="card p-4">
           <div className="text-sm font-medium">Not on the board yet this month</div>
+          <p className="mt-0.5 text-xs text-subtle">No finished games recorded yet.</p>
           <ul className="mt-3 flex flex-wrap gap-2">
-            {entries
-              .filter((e) => e.gamesPlayed === 0)
-              .map((e) => (
-                <li
-                  key={e.playerId}
-                  className="rounded-full border border-zinc-200 px-3 py-1 text-sm dark:border-zinc-700"
-                >
-                  {e.displayName}
-                </li>
-              ))}
+            {inactive.map((e) => (
+              <li
+                key={e.playerId}
+                className="rounded-full border border-zinc-200 px-3 py-1 text-sm dark:border-zinc-700"
+              >
+                {e.displayName}
+              </li>
+            ))}
           </ul>
         </div>
       ) : null}
@@ -245,9 +322,10 @@ export default function LeaderboardPage() {
                       View standings
                     </summary>
                     <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-                      <LeaderboardTable
+                      <LeaderboardSections
                         entries={archive.entries}
-                        emptyMessage="No ranked players that month."
+                        minGamesForRank={minGamesForRank}
+                        rankedEmptyMessage="No ranked players that month."
                       />
                     </div>
                   </details>

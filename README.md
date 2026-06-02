@@ -51,7 +51,7 @@ After renaming an existing deployment, update **Google OAuth** authorized origin
 ## Usage
 
 - **Players**: add names on `/players`. Admins (see `ADMIN_USER_IDS` / `ADMIN_EMAILS` in env) can remove a player profile; sessions, imports, and other players' leaderboard scores are kept.
-- **Leaderboard**: `/leaderboard` ranks players for the **current calendar month (US Eastern)**. When a month ends, standings are archived and downloadable under **Past months**. Setup: [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md).
+- **Leaderboard**: `/leaderboard` ranks players for the **current calendar month (US Eastern)**. Players need **3+ finished games** in the month to appear on the ranked board; fewer games still show points in an “not ranked yet” section. When a month ends, standings are archived and downloadable under **Past months**. Setup: [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md).
 - **Import game**: `/import` — add a finished friendly / Mahjong Soul match (final scores + optional paipu link). Mark AI/bot seats on mixed human–bot games; bot scores are saved but only humans count on the leaderboard.
 - **End game**: on a session you edit, tap **End game** when play is over — locks score entry and counts the game on the leaderboard. Use **Reopen** if you ended by mistake.
 - **New session**: click **Create session** on the home page. The edit key is stored in this browser’s `localStorage`. Anonymous creation is rate-limited (10/hour, 30/day per network).

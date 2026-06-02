@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
+import {
+  LEADERBOARD_MIN_GAMES_FOR_RANK,
+  splitLeaderboardEntries,
+} from "@/lib/leaderboard/qualification";
 import { buildLeaderboardForPeriod } from "@/lib/leaderboard/server";
 import {
   formatMonthLabel,
@@ -9,7 +13,7 @@ import {
   getMonthPeriodBounds,
 } from "@/lib/leaderboard/timezone";
 
-export type MonthlyArchiveEntry = LeaderboardEntry & { rank: number };
+export type MonthlyArchiveEntry = LeaderboardEntry & { rank: number | null };
 
 export type MonthlyArchive = {
   id: string;
@@ -42,8 +46,11 @@ export function* iterateMonthsUntilExclusive(
 }
 
 function withRanks(entries: LeaderboardEntry[]): MonthlyArchiveEntry[] {
-  const active = entries.filter((e) => e.gamesPlayed > 0);
-  return active.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  const { ranked, unranked } = splitLeaderboardEntries(entries);
+  return [
+    ...ranked.map((entry, index) => ({ ...entry, rank: index + 1 })),
+    ...unranked.map((entry) => ({ ...entry, rank: null })),
+  ];
 }
 
 export async function archiveLeaderboardMonth(
@@ -137,16 +144,34 @@ export function mapArchiveRow(row: {
   };
 }
 
+function csvName(displayName: string) {
+  return displayName.includes(",")
+    ? `"${displayName.replace(/"/g, '""')}"`
+    : displayName;
+}
+
 export function archiveToCsv(archive: MonthlyArchive) {
+  const { ranked, unranked } = splitLeaderboardEntries(archive.entries);
   const lines = ["Rank,Name,Points,Games"];
-  for (const entry of archive.entries) {
-    const name = entry.displayName.includes(",")
-      ? `"${entry.displayName.replace(/"/g, '""')}"`
-      : entry.displayName;
+
+  for (const [index, entry] of ranked.entries()) {
     lines.push(
-      `${entry.rank},${name},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
+      `${index + 1},${csvName(entry.displayName)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
     );
   }
+
+  if (unranked.length > 0) {
+    lines.push("");
+    lines.push(`Unranked (under ${LEADERBOARD_MIN_GAMES_FOR_RANK} games)`);
+    lines.push("Name,Points,Games,Games needed");
+    for (const entry of unranked) {
+      const needed = LEADERBOARD_MIN_GAMES_FOR_RANK - entry.gamesPlayed;
+      lines.push(
+        `${csvName(entry.displayName)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
+      );
+    }
+  }
+
   return lines.join("\n");
 }
 

@@ -7,6 +7,7 @@ import {
   type Seat,
 } from "@/lib/scoring/ledger";
 
+import { compareLeaderboardEntries } from "@/lib/leaderboard/qualification";
 import { gameScoreDelta, LEADERBOARD_POINTS_DIVISOR } from "@/lib/leaderboard/points";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
@@ -112,12 +113,7 @@ export function computeLeaderboard(
       ...entry,
       points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
     }))
-    .sort(
-      (a, b) =>
-        b.points - a.points ||
-        b.gamesPlayed - a.gamesPlayed ||
-        a.displayName.localeCompare(b.displayName)
-    );
+    .sort(compareLeaderboardEntries);
 }
 
 export function groupSessionSnapshots(input: {

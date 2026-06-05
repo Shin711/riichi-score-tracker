@@ -9,7 +9,7 @@ import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/point
 import { formatMonthLabel, getMonthPartsInTimezone } from "@/lib/leaderboard/timezone";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
-const seatLabels = ["East", "South", "West", "North"] as const;
+const IMPORT_SEAT_COUNT = 4;
 const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 type PlayerOption = { id: string; display_name: string };
@@ -22,7 +22,12 @@ type SeatForm = {
 };
 
 function defaultSeats(): SeatForm[] {
-  return seatLabels.map(() => ({ playerId: "", displayName: "", finalScore: "", isAi: false }));
+  return Array.from({ length: IMPORT_SEAT_COUNT }, () => ({
+    playerId: "",
+    displayName: "",
+    finalScore: "",
+    isAi: false,
+  }));
 }
 
 function toDatetimeLocalValue(date: Date) {
@@ -41,6 +46,13 @@ function rankedImportEntries(entries: ImportedGameEntry[]): RankedImportEntry[] 
 function leaderboardMonthLabel(playedAt: string) {
   const { year, month } = getMonthPartsInTimezone(new Date(playedAt));
   return formatMonthLabel(year, month);
+}
+
+function ordinalPlacement(place: number) {
+  if (place === 1) return "1st";
+  if (place === 2) return "2nd";
+  if (place === 3) return "3rd";
+  return "4th";
 }
 
 function formatImportPlayedAt(playedAt: string) {
@@ -293,16 +305,35 @@ export function ImportGameForm() {
 
   const paipuValid = !mjsPaipuUrl.trim() || isValidMjsPaipuUrl(mjsPaipuUrl);
 
-  const scoreSumWarning = useMemo(() => {
-    const scores = seats.map((s) => Number(s.finalScore));
-    if (scores.some((n) => !Number.isFinite(n))) return null;
+  const scoreSummary = useMemo(() => {
     const expected = startingPoints * 4;
-    const sum = scores.reduce((a, b) => a + b, 0);
-    if (sum !== expected) {
-      return `Scores sum to ${sum.toLocaleString()}, but four × ${startingPoints.toLocaleString()} = ${expected.toLocaleString()}. Double-check for typos.`;
-    }
-    return null;
+    const entered = seats.filter((s) => s.finalScore.trim() !== "");
+    const allEntered = entered.length === seats.length;
+    const allValid = entered.every((s) => Number.isFinite(Number(s.finalScore)));
+    const sum = entered.reduce((a, s) => a + (Number(s.finalScore) || 0), 0);
+    return {
+      expected,
+      sum,
+      anyEntered: entered.length > 0,
+      complete: allEntered && allValid,
+      balanced: allEntered && allValid && sum === expected,
+    };
   }, [seats, startingPoints]);
+
+  const placementBySeat = useMemo(() => {
+    const map = new Map<number, number>();
+    const valid = seats
+      .map((s, i) => ({
+        i,
+        score: Number(s.finalScore),
+        ok: s.finalScore.trim() !== "" && Number.isFinite(Number(s.finalScore)),
+      }))
+      .filter((s) => s.ok);
+    if (valid.length !== seats.length) return map;
+    valid.sort((a, b) => b.score - a.score);
+    valid.forEach((s, idx) => map.set(s.i, idx + 1));
+    return map;
+  }, [seats]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -413,12 +444,23 @@ export function ImportGameForm() {
       >
         <div className="text-sm font-medium">Import friendly match</div>
         <p className="mt-1 text-sm text-muted">
-          Enter final scores from Mahjong Soul or any friendly table. Mark bot seats as{" "}
-          <span className="font-medium">AI</span> — only human scores count on the leaderboard.
-          Points: (final score − starting stack) ÷ 1,000, in the month played (US Eastern).
+          Enter the four final scores from Mahjong Soul or any friendly table.
         </p>
+        <ul className="mt-2 space-y-1 text-xs text-subtle">
+          <li>
+            Mark bot seats as <span className="font-medium">AI</span> — only human scores count on
+            the leaderboard.
+          </li>
+          <li>
+            Leaderboard points = (final score − starting stack) ÷ 1,000, counted in the month
+            played (US Eastern).
+          </li>
+        </ul>
 
         <div className="mt-4 space-y-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
+            Game details
+          </div>
           <label className="block text-xs">
             Mahjong Soul log link (optional)
             <input
@@ -452,19 +494,35 @@ export function ImportGameForm() {
                 onChange={(e) => setStartingPoints(Number(e.target.value))}
                 className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
               />
+              <span className="mt-1 block text-[11px] text-subtle">
+                Usually 25,000 · {(startingPoints * 4).toLocaleString()} on the table
+              </span>
             </label>
           </div>
 
           <div className="space-y-2">
-            <div className="text-xs font-medium text-muted">
-              Final scores (1st → 4th placement order not required)
+            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
+              Player scores
             </div>
-            {seatLabels.map((wind, index) => (
+            <div className="text-xs text-muted">
+              Enter all four — placement order does not matter.
+            </div>
+            {Array.from({ length: IMPORT_SEAT_COUNT }, (_, index) => {
+              const seatLabel = `Player ${index + 1}`;
+              const placement = placementBySeat.get(index);
+              return (
               <div
-                key={wind}
+                key={seatLabel}
                 className="grid grid-cols-[4.5rem_1fr_6.5rem] items-start gap-2 rounded-xl border border-zinc-200 p-2 dark:border-zinc-800"
               >
-                <span className="pt-2 text-xs font-medium text-subtle">{wind}</span>
+                <div className="pt-2">
+                  <div className="text-xs font-medium text-subtle">{seatLabel}</div>
+                  {placement ? (
+                    <span className="mt-1 inline-block rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-stone-700 dark:bg-stone-700 dark:text-stone-200">
+                      {ordinalPlacement(placement)}
+                    </span>
+                  ) : null}
+                </div>
                 <div className="min-w-0 space-y-1">
                   <label className="flex items-center gap-2 text-xs text-muted">
                     <input
@@ -483,7 +541,7 @@ export function ImportGameForm() {
                   </label>
                   {seats[index].isAi ? (
                     <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-200 px-2 text-sm text-subtle dark:border-zinc-700">
-                      AI ({wind})
+                      AI ({seatLabel})
                     </div>
                   ) : (
                     <>
@@ -525,9 +583,30 @@ export function ImportGameForm() {
                   className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm tabular-nums dark:border-stone-600 dark:text-stone-100"
                 />
               </div>
-            ))}
-            {scoreSumWarning ? (
-              <p className="text-xs text-amber-700 dark:text-amber-300">{scoreSumWarning}</p>
+            );
+            })}
+            {scoreSummary.anyEntered ? (
+              <div
+                className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
+                  scoreSummary.balanced
+                    ? "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
+                    : scoreSummary.complete
+                      ? "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
+                      : "border-stone-200 text-subtle dark:border-stone-700"
+                }`}
+              >
+                <span>{scoreSummary.complete ? "Total" : "Total so far"}</span>
+                <span className="font-mono tabular-nums">
+                  {scoreSummary.sum.toLocaleString()} / {scoreSummary.expected.toLocaleString()}
+                  {scoreSummary.balanced ? " ✓" : ""}
+                </span>
+              </div>
+            ) : null}
+            {scoreSummary.complete && !scoreSummary.balanced ? (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Scores don&apos;t add up to {scoreSummary.expected.toLocaleString()}. Double-check
+                for typos.
+              </p>
             ) : null}
           </div>
         </div>

@@ -15,8 +15,9 @@ export function leaderboardPoints(totalDelta: number): number {
 export function formatLeaderboardPoints(totalDelta: number): string {
   const points = leaderboardPoints(totalDelta);
   if (Object.is(points, -0) || points === 0) return "0";
-  return points.toLocaleString(undefined, {
+  const formatted = points.toLocaleString(undefined, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   });
+  return points > 0 ? `+${formatted}` : formatted;
 }

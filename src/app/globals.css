@@ -389,6 +389,18 @@ body {
     @apply bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-600;
     animation: record-success-pop 0.45s ease-out;
   }
+
+  .import-history-entry {
+    @apply overflow-hidden rounded-xl border;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-surface);
+  }
+
+  .import-history-entry-header {
+    @apply flex items-start justify-between gap-3 border-b px-3 py-2.5;
+    border-color: var(--color-club-border);
+    background-color: var(--color-club-cream);
+  }
 }
 
 @keyframes record-success-pop {

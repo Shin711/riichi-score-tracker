@@ -79,7 +79,7 @@ export async function POST(req: Request) {
   const seats = body.seats ?? [];
 
   if (seats.length !== 4) {
-    return NextResponse.json({ error: "Provide exactly four seats (East, South, West, North)." }, { status: 400 });
+    return NextResponse.json({ error: "Provide exactly four player scores." }, { status: 400 });
   }
 
   const playedAt = body.playedAt ? new Date(body.playedAt) : new Date();
@@ -118,7 +118,6 @@ export async function POST(req: Request) {
   }
 
   try {
-    const seatLabels = ["East", "South", "West", "North"] as const;
     const entries = await resolveImportPlayers(
       supabase,
       seats.map((s, index) => ({
@@ -126,7 +125,7 @@ export async function POST(req: Request) {
         displayName: s.displayName ?? "",
         finalScore: Number(s.finalScore),
         isAi: s.isAi === true,
-        windLabel: seatLabels[index],
+        windLabel: `Player ${index + 1}`,
       }))
     );
 

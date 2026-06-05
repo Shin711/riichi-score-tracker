@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { ImportedGameRow } from "@/lib/imports/types";
+import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
+import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
+import { formatMonthLabel, getMonthPartsInTimezone } from "@/lib/leaderboard/timezone";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const seatLabels = ["East", "South", "West", "North"] as const;
+const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 type PlayerOption = { id: string; display_name: string };
 
@@ -27,6 +30,191 @@ function toDatetimeLocalValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+type RankedImportEntry = ImportedGameEntry & { placement: number };
+
+function rankedImportEntries(entries: ImportedGameEntry[]): RankedImportEntry[] {
+  return [...entries]
+    .sort((a, b) => b.final_score - a.final_score)
+    .map((entry, index) => ({ ...entry, placement: index + 1 }));
+}
+
+function leaderboardMonthLabel(playedAt: string) {
+  const { year, month } = getMonthPartsInTimezone(new Date(playedAt));
+  return formatMonthLabel(year, month);
+}
+
+function formatImportPlayedAt(playedAt: string) {
+  return new Date(playedAt).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function importPointsClassName(delta: number) {
+  if (delta > 0) return "text-emerald-700 dark:text-emerald-400";
+  if (delta < 0) return "text-red-600 dark:text-red-400";
+  return "text-subtle";
+}
+
+function ImportHistoryCard({
+  row,
+  confirmDeleteId,
+  deletingId,
+  onConfirmDelete,
+  onCancelDelete,
+  onRequestDelete,
+}: {
+  row: ImportedGameRow;
+  confirmDeleteId: string | null;
+  deletingId: string | null;
+  onConfirmDelete: (id: string) => void;
+  onCancelDelete: () => void;
+  onRequestDelete: (id: string) => void;
+}) {
+  const ranked = rankedImportEntries(row.entries_json ?? []);
+  const monthLabel = leaderboardMonthLabel(row.played_at);
+  const playedLabel = formatImportPlayedAt(row.played_at);
+
+  return (
+    <li className="import-history-entry">
+      <div className="import-history-entry-header">
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-club-ink">{playedLabel}</div>
+          <div className="text-xs text-subtle">Counts toward {monthLabel}</div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {row.mjs_paipu_url ? (
+            <a
+              href={row.mjs_paipu_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs font-medium underline"
+            >
+              Log
+            </a>
+          ) : null}
+          {confirmDeleteId !== row.id ? (
+            <button
+              type="button"
+              onClick={() => onRequestDelete(row.id)}
+              className="text-xs text-red-600 underline dark:text-red-400"
+            >
+              Remove
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="overflow-x-auto px-3 py-1">
+        <table className="w-full min-w-[17rem] max-w-md text-xs">
+          <thead>
+            <tr className="border-b text-left text-[10px] font-medium uppercase tracking-wide text-subtle underline [border-color:var(--color-club-border)]">
+              <th className="w-8 py-2 pr-3">#</th>
+              <th className="py-2 pr-3">Player</th>
+              <th className="w-[5.5rem] py-2 pr-3 text-right">Score</th>
+              <th className="w-[3.5rem] py-2 text-right">LB pts</th>
+            </tr>
+          </thead>
+          <tbody className="divide-club">
+            {ranked.map((entry, entryIndex) => {
+              const delta = gameScoreDelta(entry.final_score, row.starting_points);
+              return (
+                <tr
+                  key={entry.player_id ?? `${entry.display_name}-${entryIndex}`}
+                  className={entry.is_ai ? "text-subtle" : undefined}
+                >
+                  <td className="py-2 pr-3 tabular-nums text-subtle">{entry.placement}</td>
+                  <td className="max-w-[10rem] truncate py-2 pr-3 sm:max-w-none">
+                    <span className="font-medium text-club-ink">{entry.display_name}</span>
+                    {entry.is_ai ? <span className="text-subtle"> · AI</span> : null}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
+                    {entry.final_score.toLocaleString()}
+                  </td>
+                  <td
+                    className={`py-2 text-right font-mono font-semibold tabular-nums ${
+                      entry.is_ai ? "text-subtle" : importPointsClassName(delta)
+                    }`}
+                  >
+                    {entry.is_ai ? "—" : formatLeaderboardPoints(delta)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {confirmDeleteId === row.id ? (
+        <div className="border-t border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
+          <p className="text-xs leading-5 text-red-900 dark:text-red-200">
+            Remove this import? It will leave the {monthLabel} leaderboard. This cannot be undone.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={deletingId === row.id}
+              onClick={onCancelDelete}
+              className="h-9 rounded-lg border border-stone-200 bg-club-surface px-3 text-xs font-medium dark:border-stone-600 dark:text-stone-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deletingId === row.id}
+              onClick={() => onConfirmDelete(row.id)}
+              className="h-9 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {deletingId === row.id ? "Removing…" : "Yes, remove"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+function ImportHistoryPagination({
+  historyPage,
+  historyTotalPages,
+  historyLoading,
+  onPageChange,
+}: {
+  historyPage: number;
+  historyTotalPages: number;
+  historyLoading: boolean;
+  onPageChange: (page: number) => void;
+}) {
+  if (historyTotalPages <= 1) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-2">
+      <button
+        type="button"
+        disabled={historyLoading || historyPage <= 1}
+        onClick={() => onPageChange(Math.max(1, historyPage - 1))}
+        className="inline-flex h-8 items-center rounded-lg border border-zinc-200 px-3 text-xs font-medium disabled:opacity-40 dark:border-zinc-700"
+      >
+        Previous
+      </button>
+      <span className="text-xs tabular-nums text-subtle">
+        Page {historyPage} of {historyTotalPages}
+      </span>
+      <button
+        type="button"
+        disabled={historyLoading || historyPage >= historyTotalPages}
+        onClick={() => onPageChange(Math.min(historyTotalPages, historyPage + 1))}
+        className="inline-flex h-8 items-center rounded-lg border border-zinc-200 px-3 text-xs font-medium disabled:opacity-40 dark:border-zinc-700"
+      >
+        Next
+      </button>
+    </div>
+  );
+}
+
 export function ImportGameForm() {
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [players, setPlayers] = useState<PlayerOption[]>([]);
@@ -35,40 +223,73 @@ export function ImportGameForm() {
   const [startingPoints, setStartingPoints] = useState(25000);
   const [mjsPaipuUrl, setMjsPaipuUrl] = useState("");
   const [imports, setImports] = useState<ImportedGameRow[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(0);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadImports = useCallback(async () => {
-    const res = await fetch("/api/imports/games");
-    const json = (await res.json()) as { imports?: ImportedGameRow[]; error?: string };
-    if (res.ok) setImports(json.imports ?? []);
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      if (supabase) {
-        const { data, error: err } = await supabase
-          .from("players")
-          .select("id, display_name")
-          .order("display_name");
-        if (!cancelled && !err) setPlayers((data ?? []) as PlayerOption[]);
-      }
-
-      const res = await fetch("/api/imports/games");
-      const json = (await res.json()) as { imports?: ImportedGameRow[] };
-      if (!cancelled && res.ok) setImports(json.imports ?? []);
+    async function loadPlayers() {
+      if (!supabase) return;
+      const { data, error: err } = await supabase
+        .from("players")
+        .select("id, display_name")
+        .order("display_name");
+      if (!cancelled && !err) setPlayers((data ?? []) as PlayerOption[]);
     }
 
-    void load();
+    void loadPlayers();
     return () => {
       cancelled = true;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadHistory() {
+      setHistoryLoading(true);
+      const params = new URLSearchParams({
+        page: String(historyPage),
+        pageSize: String(IMPORT_HISTORY_PAGE_SIZE),
+      });
+      const res = await fetch(`/api/imports/games?${params}`);
+      const json = (await res.json()) as {
+        imports?: ImportedGameRow[];
+        total?: number;
+        totalPages?: number;
+      };
+
+      if (cancelled || !res.ok) {
+        if (!cancelled) setHistoryLoading(false);
+        return;
+      }
+
+      const totalPages = json.totalPages ?? 0;
+      if (totalPages > 0 && historyPage > totalPages) {
+        setHistoryPage(totalPages);
+        return;
+      }
+
+      setImports(json.imports ?? []);
+      setHistoryTotal(json.total ?? 0);
+      setHistoryTotalPages(totalPages);
+      setHistoryLoading(false);
+    }
+
+    void loadHistory();
+    return () => {
+      cancelled = true;
+    };
+  }, [historyPage, historyRefresh]);
 
   const paipuValid = !mjsPaipuUrl.trim() || isValidMjsPaipuUrl(mjsPaipuUrl);
 
@@ -146,7 +367,7 @@ export function ImportGameForm() {
       setSeats(defaultSeats());
       setMjsPaipuUrl("");
       setPlayedAt(toDatetimeLocalValue(new Date()));
-      await loadImports();
+      setHistoryPage(1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -166,11 +387,19 @@ export function ImportGameForm() {
       }
       setConfirmDeleteId(null);
       setStatus(null);
-      await loadImports();
+      if (imports.length === 1 && historyPage > 1) {
+        setHistoryPage(historyPage - 1);
+      } else {
+        setHistoryRefresh((n) => n + 1);
+      }
     } finally {
       setDeletingId(null);
     }
   }
+
+  const historyRangeStart =
+    historyTotal === 0 ? 0 : (historyPage - 1) * IMPORT_HISTORY_PAGE_SIZE + 1;
+  const historyRangeEnd = Math.min(historyPage * IMPORT_HISTORY_PAGE_SIZE, historyTotal);
 
   function updateSeat(index: number, patch: Partial<SeatForm>) {
     setSeats((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
@@ -333,79 +562,58 @@ export function ImportGameForm() {
         </p>
       </form>
 
-      {imports.length > 0 ? (
+      {historyTotal > 0 || historyLoading ? (
         <div className="card">
-          <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium dark:border-zinc-800">
-            Recent imports
-          </div>
-          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-            {imports.map((row) => (
-              <li key={row.id} className="px-4 py-3 text-sm">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="font-medium">
-                      {new Date(row.played_at).toLocaleString()} · MJS import
-                    </div>
-                    <ul className="mt-1 text-xs text-muted">
-                      {(row.entries_json ?? []).map((e, entryIndex) => (
-                        <li
-                          key={e.player_id ?? `${e.display_name}-${entryIndex}`}
-                          className={e.is_ai ? "text-subtle" : undefined}
-                        >
-                          {e.display_name}
-                          {e.is_ai ? " (AI)" : ""}: {e.final_score.toLocaleString()}
-                        </li>
-                      ))}
-                    </ul>
-                    {row.mjs_paipu_url ? (
-                      <a
-                        href={row.mjs_paipu_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-2 inline-block text-xs font-medium underline"
-                      >
-                        Open Mahjong Soul log
-                      </a>
-                    ) : null}
+          <div className="flex flex-col gap-2 border-b border-zinc-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
+            <div>
+              <div className="text-sm font-medium">Import history</div>
+              {historyTotal > 0 ? (
+                <>
+                  <div className="mt-0.5 text-xs text-subtle">
+                    Showing {historyRangeStart}–{historyRangeEnd} of {historyTotal}
                   </div>
-                  {confirmDeleteId === row.id ? (
-                    <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
-                      <p className="text-xs leading-5 text-red-900 dark:text-red-200">
-                        Remove this import? It will leave the leaderboard for that month. This cannot
-                        be undone.
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          disabled={deletingId === row.id}
-                          onClick={() => setConfirmDeleteId(null)}
-                          className="h-9 rounded-lg border border-stone-200 bg-club-surface px-3 text-xs font-medium dark:border-stone-600 dark:text-stone-100"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          disabled={deletingId === row.id}
-                          onClick={() => void confirmDelete(row.id)}
-                          className="h-9 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
-                        >
-                          {deletingId === row.id ? "Removing…" : "Yes, remove"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setConfirmDeleteId(row.id)}
-                      className="shrink-0 text-xs text-red-600 underline dark:text-red-400"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <div className="mt-0.5 text-xs text-subtle">
+                    LB pts = (score − start) ÷ 1,000
+                  </div>
+                </>
+              ) : null}
+            </div>
+            <ImportHistoryPagination
+              historyPage={historyPage}
+              historyTotalPages={historyTotalPages}
+              historyLoading={historyLoading}
+              onPageChange={setHistoryPage}
+            />
+          </div>
+          {historyLoading ? (
+            <div className="px-4 py-6 text-sm text-muted">Loading import history…</div>
+          ) : (
+            <>
+              <ul className="space-y-3 p-4">
+                {imports.map((row) => (
+                  <ImportHistoryCard
+                    key={row.id}
+                    row={row}
+                    confirmDeleteId={confirmDeleteId}
+                    deletingId={deletingId}
+                    onRequestDelete={setConfirmDeleteId}
+                    onCancelDelete={() => setConfirmDeleteId(null)}
+                    onConfirmDelete={(id) => void confirmDelete(id)}
+                  />
+                ))}
+              </ul>
+              {historyTotalPages > 1 ? (
+                <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
+                  <ImportHistoryPagination
+                    historyPage={historyPage}
+                    historyTotalPages={historyTotalPages}
+                    historyLoading={historyLoading}
+                    onPageChange={setHistoryPage}
+                  />
                 </div>
-              </li>
-            ))}
-          </ul>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>

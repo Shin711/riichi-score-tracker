@@ -18,23 +18,55 @@ type ImportBody = {
   }>;
 };
 
-export async function GET() {
+const DEFAULT_IMPORT_PAGE_SIZE = 10;
+const MAX_IMPORT_PAGE_SIZE = 50;
+
+function parseImportListParams(url: URL) {
+  const page = Math.max(1, Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1);
+  const requestedPageSize = Number.parseInt(
+    url.searchParams.get("pageSize") ?? String(DEFAULT_IMPORT_PAGE_SIZE),
+    10
+  );
+  const pageSize = Math.min(
+    MAX_IMPORT_PAGE_SIZE,
+    Math.max(1, requestedPageSize || DEFAULT_IMPORT_PAGE_SIZE)
+  );
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  return { page, pageSize, from, to };
+}
+
+export async function GET(req: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ error: "Supabase is not configured." }, { status: 500 });
   }
 
-  const { data, error } = await supabase
+  const { page, pageSize, from, to } = parseImportListParams(new URL(req.url));
+
+  const { data, error, count } = await supabase
     .from("imported_games")
-    .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at")
+    .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at", {
+      count: "exact",
+    })
     .order("played_at", { ascending: false })
-    .limit(30);
+    .range(from, to);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  return NextResponse.json({ imports: (data ?? []) as ImportedGameRow[] });
+  const total = count ?? 0;
+  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
+
+  return NextResponse.json({
+    imports: (data ?? []) as ImportedGameRow[],
+    page,
+    pageSize,
+    total,
+    totalPages,
+  });
 }
 
 export async function POST(req: Request) {

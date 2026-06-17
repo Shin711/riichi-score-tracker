@@ -37,11 +37,7 @@ export default function Home() {
         ))}
       </div>
 
-      <RecentSessionCard />
-
       <div className="grid gap-6 md:grid-cols-2">
-        <CreateSessionCard />
-
         <div className="card p-6">
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-club-gold-muted text-sm font-bold text-club-gold">
@@ -50,39 +46,34 @@ export default function Home() {
             <h2 className="text-lg font-bold tracking-tight text-club-ink">Score calculator</h2>
           </div>
           <p className="text-muted mt-2 text-sm leading-6">
-            Learning riichi scoring? Work out ron and tsumo payments from han and fu — no game session
-            required.
+            At the table? Tap ron or tsumo and pick a common hand to see who pays — no session or han/fu
+            math required.
           </p>
-          <Link href="/calculator" className="btn-secondary mt-4 h-10 px-4">
+          <Link href="/calculator" className="btn-primary mt-4 h-10 px-4">
             Open calculator
           </Link>
         </div>
 
-        <div className="card p-6 md:col-span-2">
-          <h2 className="text-lg font-bold tracking-tight text-club-ink">At the table</h2>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-2">
-            {[
-              ["Add player names", "Players"],
-              ["Start a session", "New game"],
-              ["Share the viewer link", "Live scores"],
-              ["Record each hand", "Undo if needed"],
-            ].map(([step, hint], i) => (
-              <li
-                key={step}
-                className="flex gap-3 rounded-xl border border-club-border bg-club-surface px-3 py-3 dark:bg-stone-800/25"
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-club-red text-xs font-bold text-white">
-                  {i + 1}
-                </span>
-                <div className="text-sm">
-                  <span className="font-medium text-club-ink">{step}</span>
-                  <span className="mt-0.5 block text-xs text-subtle">{hint}</span>
-                </div>
-              </li>
-            ))}
-          </ol>
+        <div className="card p-6">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-club-red-muted text-sm font-bold text-club-red">
+              入
+            </span>
+            <h2 className="text-lg font-bold tracking-tight text-club-ink">Import game</h2>
+          </div>
+          <p className="text-muted mt-2 text-sm leading-6">
+            Finished playing? Enter final scores from Mahjong Soul or your notes to update the monthly
+            leaderboard.
+          </p>
+          <Link href="/import" className="btn-primary mt-4 h-10 px-4">
+            Import scores
+          </Link>
         </div>
       </div>
+
+      <RecentSessionCard />
+
+      <CreateSessionCard />
     </main>
   );
 }

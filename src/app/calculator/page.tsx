@@ -3,16 +3,16 @@ import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = {
   title: "Score calculator",
-  description: "Calculate riichi mahjong hand payments for beginners — ron, tsumo, han and fu.",
+  description: "Quick riichi payment lookup at the table — tap your hand and see who owes what.",
 };
 
 export default function CalculatorPage() {
   return (
     <main className="space-y-5">
       <PageHeader
-        badge="Beginner friendly"
+        badge="At the table"
         title="Score calculator"
-        description="Answer a few questions and see how many points you should collect. No account or game session needed."
+        description="Pick ron or tsumo, tap a common hand, and see payments instantly. No game session needed."
       />
       <ScoreCalculator />
     </main>

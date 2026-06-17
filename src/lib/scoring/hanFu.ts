@@ -30,6 +30,8 @@ function roundUp100(value: number) {
 }
 
 export function roundFu(fu: number) {
+  // Chiitoitsu (seven pairs) is fixed at 25 fu and is never rounded.
+  if (fu === 25) return 25;
   return Math.max(20, Math.ceil(fu / 10) * 10);
 }
 
@@ -253,9 +255,10 @@ export function applyHonbaToDeltas(
 ): Record<Seat, number> {
   if (honba <= 0) return deltas;
   const next = { ...deltas };
-  const pay = honba * honbaValue;
 
   if (winType === "ron") {
+    // The deal-in player pays the full honba value per stick.
+    const pay = honba * honbaValue;
     const winner = seats.find((s) => next[s] > 0);
     const loser = seats.find((s) => next[s] < 0);
     if (winner && loser) {
@@ -265,13 +268,15 @@ export function applyHonbaToDeltas(
     return next;
   }
 
+  // On tsumo the honba value is split evenly across the three payers (100 each per stick).
+  const payEach = honba * (honbaValue / 3);
   const winner = seats.find((s) => next[s] > 0);
   if (!winner) return next;
   let extra = 0;
   for (const seat of seats) {
     if (seat !== winner && next[seat] < 0) {
-      next[seat] -= pay;
-      extra += pay;
+      next[seat] -= payEach;
+      extra += payEach;
     }
   }
   next[winner] += extra;

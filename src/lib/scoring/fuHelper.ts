@@ -55,21 +55,6 @@ function meldFu(input: FuHelperInput): { total: number; lines: FuBreakdownLine[]
   return { total, lines };
 }
 
-function waitLabel(wait: WaitType): string {
-  switch (wait) {
-    case "ryanmen":
-      return "Two-sided wait (ryanmen)";
-    case "shanpon":
-      return "Two-pair wait (shanpon)";
-    case "tanki":
-      return "Pair wait (tanki)";
-    case "kanchan":
-      return "Closed wait (kanchan)";
-    case "penchan":
-      return "Edge wait (penchan)";
-  }
-}
-
 /**
  * Standard riichi fu (EMA-style).
  * @see https://riichi.wiki/Fu
@@ -127,7 +112,7 @@ export function calculateFu(input: FuHelperInput): FuHelperResult {
     input.waitType === "tanki" || input.waitType === "kanchan" || input.waitType === "penchan" ? 2 : 0;
   if (waitFu > 0) {
     fu += waitFu;
-    lines.push({ label: `${waitLabel(input.waitType)} (+2)`, fu: waitFu });
+    lines.push({ label: "Edge / middle / pair wait (+2)", fu: waitFu });
   }
 
   if (input.winType === "tsumo") {

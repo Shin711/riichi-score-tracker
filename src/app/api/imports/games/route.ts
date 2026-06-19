@@ -129,8 +129,8 @@ export async function POST(req: Request) {
       }))
     );
 
-    if (humanImportEntries({ entries_json: entries }).length === 0) {
-      return NextResponse.json({ error: "At least one human seat is required." }, { status: 400 });
+    if (humanImportEntries({ entries_json: entries }).length < 2) {
+      return NextResponse.json({ error: "At least two human seats are required." }, { status: 400 });
     }
 
     const { data, error } = await supabase

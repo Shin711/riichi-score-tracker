@@ -140,6 +140,10 @@ body {
     opacity: 1;
   }
 
+  .field-datetime {
+    @apply block w-full max-w-full min-w-0 box-border;
+  }
+
   .shell-bar {
     @apply border-b bg-club-cream/95 backdrop-blur-md;
     border-color: var(--color-club-border);

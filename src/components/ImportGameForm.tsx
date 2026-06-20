@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
@@ -85,6 +85,108 @@ function formatScoreDifference(delta: number) {
   if (delta === 0) return "0";
   const sign = delta > 0 ? "+" : "-";
   return `${sign}${Math.abs(delta).toLocaleString()}`;
+}
+
+function seatPlayerName(seat: SeatForm, players: PlayerOption[]) {
+  if (seat.playerId) {
+    return players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName;
+  }
+  return seat.displayName;
+}
+
+function resolveSeatPlayerName(
+  value: string,
+  players: PlayerOption[]
+): Pick<SeatForm, "playerId" | "displayName"> {
+  const trimmed = value.trim();
+  const match = players.find((p) => p.display_name.toLowerCase() === trimmed.toLowerCase());
+  if (match) {
+    return { playerId: match.id, displayName: match.display_name };
+  }
+  return { playerId: "", displayName: value };
+}
+
+function ImportPlayerNameInput({
+  players,
+  playerId,
+  displayName,
+  onChange,
+}: {
+  players: PlayerOption[];
+  playerId: string;
+  displayName: string;
+  onChange: (patch: Pick<SeatForm, "playerId" | "displayName">) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const blurTimer = useRef<number | null>(null);
+  const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
+
+  const suggestions = useMemo(() => {
+    const query = value.trim().toLowerCase();
+    const matches = query
+      ? players.filter((p) => p.display_name.toLowerCase().includes(query))
+      : players;
+    return (matches.length > 0 ? matches : players).slice(0, 12);
+  }, [players, value]);
+
+  function handleFocus() {
+    if (blurTimer.current !== null) {
+      window.clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
+    setOpen(true);
+  }
+
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const current = e.target.value;
+    blurTimer.current = window.setTimeout(() => {
+      setOpen(false);
+      onChange(resolveSeatPlayerName(current, players));
+    }, 150);
+  }
+
+  function selectPlayer(player: PlayerOption) {
+    onChange({ playerId: player.id, displayName: player.display_name });
+    setOpen(false);
+  }
+
+  return (
+    <div className={`relative min-w-0 ${open ? "z-20" : ""}`}>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(resolveSeatPlayerName(e.target.value, players));
+          setOpen(true);
+        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        placeholder="Player name"
+        autoComplete="off"
+        className="field h-11 w-full px-3 text-sm"
+      />
+      {open && players.length > 0 ? (
+        <ul
+          role="listbox"
+          className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-club-border bg-club-surface py-1 shadow-lg"
+        >
+          {suggestions.map((player) => (
+            <li key={player.id} role="option" aria-selected={player.id === playerId}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectPlayer(player)}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                  player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
+                }`}
+              >
+                {player.display_name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 function ImportHistoryCard({
@@ -467,10 +569,10 @@ export function ImportGameForm() {
     <div className="space-y-6">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card divide-y divide-club-border"
+        className="card min-w-0 divide-y divide-club-border"
       >
         {/* Player scores */}
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Player scores</h2>
             <span className="text-xs text-muted">placement order doesn&apos;t matter</span>
@@ -521,42 +623,19 @@ export function ImportGameForm() {
                 </div>
 
                 {/* Name + score */}
-                <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_9rem]">
-                  <div>
+                <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                  <div className="min-w-0">
                     {isAi ? (
                       <div className="flex h-11 items-center rounded-lg border border-dashed border-club-border px-3 text-sm text-subtle">
                         AI seat — not ranked
                       </div>
                     ) : (
-                      <>
-                        <select
-                          value={seats[index].playerId}
-                          onChange={(e) => {
-                            const playerId = e.target.value;
-                            const player = players.find((p) => p.id === playerId);
-                            updateSeat(index, {
-                              playerId,
-                              displayName: player?.display_name ?? seats[index].displayName,
-                            });
-                          }}
-                          className="field h-11 w-full px-3 text-sm"
-                        >
-                          <option value="">Type a new name…</option>
-                          {players.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.display_name}
-                            </option>
-                          ))}
-                        </select>
-                        {!seats[index].playerId ? (
-                          <input
-                            value={seats[index].displayName}
-                            onChange={(e) => updateSeat(index, { displayName: e.target.value })}
-                            placeholder="Player name"
-                            className="field mt-1.5 h-11 w-full px-3 text-sm"
-                          />
-                        ) : null}
-                      </>
+                      <ImportPlayerNameInput
+                        players={players}
+                        playerId={seats[index].playerId}
+                        displayName={seats[index].displayName}
+                        onChange={(patch) => updateSeat(index, patch)}
+                      />
                     )}
                   </div>
                   <input
@@ -613,20 +692,20 @@ export function ImportGameForm() {
         </div>
 
         {/* Game details */}
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3 p-4 sm:p-5">
           <h2 className="text-sm font-semibold">Game details</h2>
 
-          <label className="block text-xs font-medium text-muted">
+          <label className="block min-w-0 text-xs font-medium text-muted">
             When the game ended
             <input
               type="datetime-local"
               value={playedAt}
               onChange={(e) => setPlayedAt(e.target.value)}
-              className="field mt-1.5 h-11 w-full px-3 text-sm"
+              className="field field-datetime mt-1.5 h-11 px-3 text-base"
             />
           </label>
 
-          <label className="block text-xs font-medium text-muted">
+          <label className="block min-w-0 text-xs font-medium text-muted">
             Mahjong Soul log link{" "}
             <span className="font-normal text-subtle">(optional)</span>
             <input
@@ -678,13 +757,13 @@ export function ImportGameForm() {
             <button
               type="submit"
               disabled={submitting}
-              className="h-11 flex-1 rounded-xl btn-primary disabled:opacity-40"
+              className="btn-primary h-12 w-full rounded-xl text-base font-semibold disabled:opacity-40 sm:h-11 sm:flex-1"
             >
               {submitting ? "Importing…" : "Import game"}
             </button>
             <Link
               href="/leaderboard"
-              className="btn-secondary inline-flex h-11 items-center justify-center px-4"
+              className="btn-secondary inline-flex h-11 w-full items-center justify-center px-4 sm:w-auto"
             >
               View leaderboard
             </Link>

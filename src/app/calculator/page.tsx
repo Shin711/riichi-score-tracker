@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function CalculatorPage() {
   return (
-    <main className="space-y-5">
+    <main className="space-y-7">
       <PageHeader
         badge="At the table"
         title="Score calculator"

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { BrandMark } from "@/components/BrandMark";
-import { CreateSessionButton } from "@/components/CreateSessionButton";
+import { PageTransition } from "@/components/PageTransition";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SITE_HEADER, SITE_NAME } from "@/lib/site";
 
@@ -15,10 +15,10 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+      className={`rounded-full px-3.5 py-1.5 text-sm transition-all duration-200 ${
         active
-          ? "nav-link-active bg-club-red-muted dark:bg-club-red-muted"
-          : "text-club-muted hover:bg-club-surface hover:text-club-ink dark:hover:bg-stone-700"
+          ? "nav-link-active bg-club-red-muted/85 shadow-sm dark:bg-club-red-muted"
+          : "text-club-muted hover:-translate-y-px hover:bg-club-red-muted/70 hover:text-club-ink dark:hover:bg-club-red-muted/80"
       }`}
     >
       {label}
@@ -26,40 +26,19 @@ function NavLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-function BottomNavItem({
-  href,
-  label,
-  primary,
-}: {
-  href?: string;
-  label: string;
-  primary?: boolean;
-}) {
+function BottomNavItem({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
-  const active = href ? pathname === href || (href !== "/" && pathname.startsWith(href)) : false;
-
-  if (primary) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center px-1">
-        <CreateSessionButton
-          label="+"
-          className="flex h-12 w-12 items-center justify-center rounded-full bg-club-red text-xl font-semibold text-white shadow-lg shadow-club-red/30 hover:bg-club-red-dark"
-        />
-        <span className="mt-1 text-[10px] font-medium text-muted">New</span>
-      </div>
-    );
-  }
+  const active = pathname === href || (href !== "/" && pathname.startsWith(href));
 
   return (
     <Link
-      href={href!}
-      className={`relative flex flex-1 flex-col items-center justify-center px-1 py-2 text-[10px] font-medium ${
-        active ? "text-club-red dark:text-red-300" : "text-muted"
+      href={href}
+      className={`relative mx-0.5 my-1 flex flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-medium transition-all duration-300 ease-fluid ${
+        active
+          ? "bg-club-surface text-club-red shadow-sm ring-1 ring-club-border dark:text-red-300"
+          : "text-muted"
       }`}
     >
-      {active ? (
-        <span className="absolute top-1 h-1 w-1 rounded-full bg-club-red dark:bg-red-400" aria-hidden />
-      ) : null}
       <span className="text-xs">{label}</span>
     </Link>
   );
@@ -68,9 +47,14 @@ function BottomNavItem({
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell-bg flex min-h-full flex-col">
+      <div className="ambient-orb ambient-orb-red" aria-hidden />
+      <div className="ambient-orb ambient-orb-jade" aria-hidden />
       <header className="shell-bar sticky top-0 z-40 border-b">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3">
-          <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3.5">
+          <Link
+            href="/"
+            className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight transition-opacity duration-300 hover:opacity-90"
+          >
             <BrandMark className="h-9 w-9 text-base" />
             <span className="text-club-ink">
               <span className="sm:hidden">{SITE_HEADER}</span>
@@ -84,15 +68,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLink href="/import" label="Import" />
             <NavLink href="/my/sessions" label="My games" />
             <NavLink href="/login" label="Account" />
-            <CreateSessionButton label="New game" className="btn-primary ml-2 h-10" />
+            <Link href="/import" className="btn-primary ml-2 h-10 px-5">
+              Import scores
+            </Link>
           </nav>
           <div className="sm:hidden">
-            <CreateSessionButton label="New game" className="btn-primary h-10 px-4 text-xs" />
+            <Link href="/import" className="btn-primary h-10 px-4 text-xs">
+              Import
+            </Link>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-24 sm:py-8 sm:pb-8">{children}</div>
+      <div className="relative mx-auto w-full max-w-5xl flex-1 px-4 py-7 pb-24 sm:py-9 sm:pb-9">
+        <PageTransition>{children}</PageTransition>
+      </div>
 
       <SiteFooter />
 

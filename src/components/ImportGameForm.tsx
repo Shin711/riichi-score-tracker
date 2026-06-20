@@ -111,15 +111,22 @@ function ImportPlayerNameInput({
   playerId,
   displayName,
   onChange,
+  onOpenChange,
 }: {
   players: PlayerOption[];
   playerId: string;
   displayName: string;
   onChange: (patch: Pick<SeatForm, "playerId" | "displayName">) => void;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
   const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
+
+  function setDropdownOpen(next: boolean) {
+    setOpen(next);
+    onOpenChange?.(next);
+  }
 
   const suggestions = useMemo(() => {
     const query = value.trim().toLowerCase();
@@ -134,40 +141,40 @@ function ImportPlayerNameInput({
       window.clearTimeout(blurTimer.current);
       blurTimer.current = null;
     }
-    setOpen(true);
+    setDropdownOpen(true);
   }
 
   function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
     const current = e.target.value;
     blurTimer.current = window.setTimeout(() => {
-      setOpen(false);
+      setDropdownOpen(false);
       onChange(resolveSeatPlayerName(current, players));
     }, 150);
   }
 
   function selectPlayer(player: PlayerOption) {
     onChange({ playerId: player.id, displayName: player.display_name });
-    setOpen(false);
+    setDropdownOpen(false);
   }
 
   return (
-    <div className={`relative min-w-0 ${open ? "z-20" : ""}`}>
+    <div className="relative min-w-0">
       <input
         value={value}
         onChange={(e) => {
           onChange(resolveSeatPlayerName(e.target.value, players));
-          setOpen(true);
+          setDropdownOpen(true);
         }}
         onFocus={handleFocus}
         onBlur={handleBlur}
         placeholder="Player name"
         autoComplete="off"
-        className="field h-11 w-full px-3 text-sm"
+        className="field field-combobox h-11 w-full px-3 text-sm"
       />
       {open && players.length > 0 ? (
         <ul
           role="listbox"
-          className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-club-border bg-club-surface py-1 shadow-lg"
+          className="combobox-dropdown absolute top-full left-0 z-[100] mt-1.5 max-h-52 w-full overflow-y-auto rounded-xl border border-club-border py-1 shadow-xl"
         >
           {suggestions.map((player) => (
             <li key={player.id} role="option" aria-selected={player.id === playerId}>
@@ -496,9 +503,16 @@ export function ImportGameForm() {
 
     setSubmitting(true);
     try {
+      const { data: sessionData } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } };
+      const token = sessionData.session?.access_token;
+      const headers: HeadersInit = { "Content-Type": "application/json" };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
       const res = await fetch("/api/imports/games", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           playedAt: new Date(playedAt).toISOString(),
           startingPoints,
@@ -564,15 +578,16 @@ export function ImportGameForm() {
   }
 
   const [showStartingPoints, setShowStartingPoints] = useState(false);
+  const [openNameSeatIndex, setOpenNameSeatIndex] = useState<number | null>(null);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card min-w-0 divide-y divide-club-border"
+        className="card min-w-0 divide-y divide-club-border overflow-visible"
       >
         {/* Player scores */}
-        <div className="min-w-0 space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3.5 overflow-visible p-4 sm:p-6">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Player scores</h2>
             <span className="text-xs text-muted">placement order doesn&apos;t matter</span>
@@ -582,13 +597,18 @@ export function ImportGameForm() {
             const seatLabel = `Player ${index + 1}`;
             const placement = placementBySeat.get(index);
             const isAi = seats[index].isAi;
+            const isNameOpen = openNameSeatIndex === index;
             return (
               <div
                 key={seatLabel}
-                className={`rounded-xl border p-3 transition-colors ${
+                className={`rounded-xl border p-3 transition-all duration-300 ease-fluid ${
+                  isNameOpen ? "relative z-50" : ""
+                } ${
                   isAi
                     ? "border-club-border bg-club-surface/50 opacity-70"
-                    : "border-club-border bg-club-surface"
+                    : isNameOpen
+                      ? "border-club-border bg-club-surface shadow-md"
+                      : "border-club-border bg-club-surface hover:-translate-y-0.5 hover:shadow-md"
                 }`}
               >
                 {/* Row header: seat label + placement + AI toggle */}
@@ -635,6 +655,12 @@ export function ImportGameForm() {
                         playerId={seats[index].playerId}
                         displayName={seats[index].displayName}
                         onChange={(patch) => updateSeat(index, patch)}
+                        onOpenChange={(open) =>
+                          setOpenNameSeatIndex((current) => {
+                            if (open) return index;
+                            return current === index ? null : current;
+                          })
+                        }
                       />
                     )}
                   </div>
@@ -692,7 +718,7 @@ export function ImportGameForm() {
         </div>
 
         {/* Game details */}
-        <div className="min-w-0 space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3.5 p-4 sm:p-6">
           <h2 className="text-sm font-semibold">Game details</h2>
 
           <label className="block min-w-0 text-xs font-medium text-muted">
@@ -745,7 +771,7 @@ export function ImportGameForm() {
         </div>
 
         {/* Submit */}
-        <div className="p-4 sm:p-5">
+        <div className="p-4 sm:p-6">
           {error ? <div className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</div> : null}
           {status ? (
             <div className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">

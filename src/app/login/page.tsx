@@ -100,7 +100,8 @@ export default function LoginPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Account</h1>
         <p className="mt-1 text-sm text-muted">
-          Optional — claim games to your account. Scoring works without signing in.
+          Optional — save imported games and live sessions to your account. Import and scoring work without
+          signing in.
         </p>
       </div>
 

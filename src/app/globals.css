@@ -376,42 +376,54 @@ body {
     opacity: 1;
   }
 
-  /* Native date/time controls on iOS Safari ignore width unless appearance is
-     reset, so they overflow their grid cell. Force them to shrink. */
-  .field-datetime,
-  .field-date,
-  .field-time {
+  .field-datetime {
     @apply block w-full min-w-0 max-w-full box-border;
-    -webkit-appearance: none;
-    appearance: none;
     width: 100%;
     -webkit-min-logical-width: 0;
   }
 
-  input[type="datetime-local"].field-datetime,
-  input[type="date"].field-date,
-  input[type="time"].field-time {
+  input[type="datetime-local"].field-datetime {
     display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
+  }
+
+  input[type="datetime-local"].field-datetime::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
+  /* Bare native date/time controls used inside a bordered wrapper on mobile.
+     The wrapper owns the border/padding and clips overflow, so even when iOS
+     WebKit refuses to shrink the control below its intrinsic width it can never
+     break out of the card. */
+  .datetime-bare {
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    max-width: 100%;
+    background: transparent;
     -webkit-min-logical-width: 0;
   }
 
-  .field-datetime::-webkit-date-and-time-value,
-  .field-date::-webkit-date-and-time-value,
-  .field-time::-webkit-date-and-time-value {
+  .datetime-bare::-webkit-date-and-time-value {
     text-align: left;
     margin: 0;
     min-width: 0;
   }
 
-  .field-datetime::-webkit-datetime-edit,
-  .field-date::-webkit-datetime-edit,
-  .field-time::-webkit-datetime-edit {
+  .datetime-bare::-webkit-datetime-edit {
     padding: 0;
     min-width: 0;
-    overflow: hidden;
+  }
+
+  .datetime-bare::-webkit-calendar-picker-indicator {
+    margin-left: auto;
+    flex-shrink: 0;
   }
 
   .shell-bar {

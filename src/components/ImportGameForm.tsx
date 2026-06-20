@@ -57,19 +57,25 @@ function ImportPlayedAtInput({
 
   return (
     <>
-      <div className="mt-1.5 grid min-w-0 grid-cols-[1.3fr_1fr] gap-2 sm:hidden">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => onChange(mergeDatetimeLocal(e.target.value, time || "00:00"))}
-          className="field field-date h-11 w-full min-w-0 px-3 text-sm"
-        />
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => onChange(mergeDatetimeLocal(date || fallbackDate, e.target.value))}
-          className="field field-time h-11 w-full min-w-0 px-3 text-sm"
-        />
+      <div className="mt-1.5 space-y-2 sm:hidden">
+        <div className="field flex h-11 w-full min-w-0 max-w-full items-center overflow-hidden px-3">
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => onChange(mergeDatetimeLocal(e.target.value, time || "00:00"))}
+            className="datetime-bare w-full min-w-0 bg-transparent text-base text-club-ink"
+            aria-label="Date the game ended"
+          />
+        </div>
+        <div className="field flex h-11 w-full min-w-0 max-w-full items-center overflow-hidden px-3">
+          <input
+            type="time"
+            value={time}
+            onChange={(e) => onChange(mergeDatetimeLocal(date || fallbackDate, e.target.value))}
+            className="datetime-bare w-full min-w-0 bg-transparent text-base text-club-ink"
+            aria-label="Time the game ended"
+          />
+        </div>
       </div>
       <input
         type="datetime-local"

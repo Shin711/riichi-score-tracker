@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/PageHeader";
 
 export default function ImportPage() {
   return (
-    <main className="space-y-7">
+    <main className="min-w-0 max-w-full space-y-7 overflow-x-hidden">
       <PageHeader
         badge="Leaderboard"
         title="Import game"

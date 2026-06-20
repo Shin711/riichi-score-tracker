@@ -35,6 +35,52 @@ function toDatetimeLocalValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function splitDatetimeLocal(value: string) {
+  const [date = "", time = ""] = value.split("T");
+  return { date, time: time.slice(0, 5) };
+}
+
+function mergeDatetimeLocal(date: string, time: string) {
+  if (!date) return "";
+  return `${date}T${time || "00:00"}`;
+}
+
+function ImportPlayedAtInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const { date, time } = splitDatetimeLocal(value);
+  const fallbackDate = splitDatetimeLocal(toDatetimeLocalValue(new Date())).date;
+
+  return (
+    <>
+      <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-2 sm:hidden">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => onChange(mergeDatetimeLocal(e.target.value, time || "00:00"))}
+          className="field field-date h-11 min-w-0 w-full px-2 text-base"
+        />
+        <input
+          type="time"
+          value={time}
+          onChange={(e) => onChange(mergeDatetimeLocal(date || fallbackDate, e.target.value))}
+          className="field field-time h-11 min-w-0 w-full px-2 text-base"
+        />
+      </div>
+      <input
+        type="datetime-local"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="field field-datetime mt-1.5 hidden h-11 w-full min-w-0 max-w-full px-3 text-base sm:block"
+      />
+    </>
+  );
+}
+
 type RankedImportEntry = ImportedGameEntry & { placement: number };
 
 function rankedImportEntries(entries: ImportedGameEntry[]): RankedImportEntry[] {
@@ -581,7 +627,7 @@ export function ImportGameForm() {
   const [openNameSeatIndex, setOpenNameSeatIndex] = useState<number | null>(null);
 
   return (
-    <div className="space-y-7">
+    <div className="min-w-0 max-w-full space-y-7 overflow-x-hidden">
       <form
         onSubmit={(e) => void onSubmit(e)}
         className="card min-w-0 max-w-full divide-y divide-club-border overflow-x-clip"
@@ -723,24 +769,19 @@ export function ImportGameForm() {
 
           <label className="block min-w-0 max-w-full text-xs font-medium text-muted">
             When the game ended
-            <div className="mt-1.5 w-full min-w-0 max-w-full overflow-hidden">
-              <input
-                type="datetime-local"
-                value={playedAt}
-                onChange={(e) => setPlayedAt(e.target.value)}
-                className="field field-datetime h-11 w-full min-w-0 max-w-full px-3 text-base"
-              />
-            </div>
+            <ImportPlayedAtInput value={playedAt} onChange={setPlayedAt} />
           </label>
 
-          <label className="block min-w-0 text-xs font-medium text-muted">
-            Mahjong Soul log link{" "}
-            <span className="font-normal text-subtle">(optional)</span>
+          <label className="block min-w-0 max-w-full text-xs font-medium text-muted">
+            <span className="break-words">
+              Mahjong Soul log link{" "}
+              <span className="font-normal text-subtle">(optional)</span>
+            </span>
             <input
               value={mjsPaipuUrl}
               onChange={(e) => setMjsPaipuUrl(e.target.value)}
               placeholder="https://mahjongsoul.game.yo-star.com/?paipu=…"
-              className="field mt-1.5 h-11 w-full px-3 text-sm"
+              className="field mt-1.5 h-11 w-full min-w-0 max-w-full px-3 text-sm"
             />
             {mjsPaipuUrl.trim() && !paipuValid ? (
               <span className="mt-1 block font-normal text-red-600 dark:text-red-400">

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
@@ -104,6 +104,89 @@ function resolveSeatPlayerName(
     return { playerId: match.id, displayName: match.display_name };
   }
   return { playerId: "", displayName: value };
+}
+
+function ImportPlayerNameInput({
+  players,
+  playerId,
+  displayName,
+  onChange,
+}: {
+  players: PlayerOption[];
+  playerId: string;
+  displayName: string;
+  onChange: (patch: Pick<SeatForm, "playerId" | "displayName">) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const blurTimer = useRef<number | null>(null);
+  const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
+
+  const suggestions = useMemo(() => {
+    const query = value.trim().toLowerCase();
+    const matches = query
+      ? players.filter((p) => p.display_name.toLowerCase().includes(query))
+      : players;
+    return (matches.length > 0 ? matches : players).slice(0, 12);
+  }, [players, value]);
+
+  function handleFocus() {
+    if (blurTimer.current !== null) {
+      window.clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
+    setOpen(true);
+  }
+
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const current = e.target.value;
+    blurTimer.current = window.setTimeout(() => {
+      setOpen(false);
+      onChange(resolveSeatPlayerName(current, players));
+    }, 150);
+  }
+
+  function selectPlayer(player: PlayerOption) {
+    onChange({ playerId: player.id, displayName: player.display_name });
+    setOpen(false);
+  }
+
+  return (
+    <div className={`relative min-w-0 ${open ? "z-20" : ""}`}>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(resolveSeatPlayerName(e.target.value, players));
+          setOpen(true);
+        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        placeholder="Player name"
+        autoComplete="off"
+        className="field h-11 w-full px-3 text-sm"
+      />
+      {open && players.length > 0 ? (
+        <ul
+          role="listbox"
+          className="absolute z-30 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-club-border bg-club-surface py-1 shadow-lg"
+        >
+          {suggestions.map((player) => (
+            <li key={player.id} role="option" aria-selected={player.id === playerId}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectPlayer(player)}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                  player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
+                }`}
+              >
+                {player.display_name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 function ImportHistoryCard({
@@ -486,7 +569,7 @@ export function ImportGameForm() {
     <div className="space-y-6">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card min-w-0 overflow-hidden divide-y divide-club-border"
+        className="card min-w-0 divide-y divide-club-border"
       >
         {/* Player scores */}
         <div className="min-w-0 space-y-3 p-4 sm:p-5">
@@ -547,26 +630,12 @@ export function ImportGameForm() {
                         AI seat — not ranked
                       </div>
                     ) : (
-                      <>
-                        <input
-                          list={`import-players-${index}`}
-                          value={seatPlayerName(seats[index], players)}
-                          onChange={(e) =>
-                            updateSeat(index, resolveSeatPlayerName(e.target.value, players))
-                          }
-                          onBlur={(e) =>
-                            updateSeat(index, resolveSeatPlayerName(e.target.value, players))
-                          }
-                          placeholder="Player name"
-                          autoComplete="off"
-                          className="field h-11 w-full px-3 text-sm"
-                        />
-                        <datalist id={`import-players-${index}`}>
-                          {players.map((p) => (
-                            <option key={p.id} value={p.display_name} />
-                          ))}
-                        </datalist>
-                      </>
+                      <ImportPlayerNameInput
+                        players={players}
+                        playerId={seats[index].playerId}
+                        displayName={seats[index].displayName}
+                        onChange={(patch) => updateSeat(index, patch)}
+                      />
                     )}
                   </div>
                   <input

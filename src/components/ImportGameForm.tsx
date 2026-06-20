@@ -584,7 +584,7 @@ export function ImportGameForm() {
     <div className="space-y-7">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card min-w-0 divide-y divide-club-border overflow-visible"
+        className="card min-w-0 max-w-full divide-y divide-club-border overflow-x-clip"
       >
         {/* Player scores */}
         <div className="min-w-0 space-y-3.5 overflow-visible p-4 sm:p-6">
@@ -718,17 +718,19 @@ export function ImportGameForm() {
         </div>
 
         {/* Game details */}
-        <div className="min-w-0 space-y-3.5 p-4 sm:p-6">
+        <div className="min-w-0 max-w-full space-y-3.5 p-4 sm:p-6">
           <h2 className="text-sm font-semibold">Game details</h2>
 
-          <label className="block min-w-0 text-xs font-medium text-muted">
+          <label className="block min-w-0 max-w-full text-xs font-medium text-muted">
             When the game ended
-            <input
-              type="datetime-local"
-              value={playedAt}
-              onChange={(e) => setPlayedAt(e.target.value)}
-              className="field field-datetime mt-1.5 h-11 px-3 text-base"
-            />
+            <div className="mt-1.5 w-full min-w-0 max-w-full overflow-hidden">
+              <input
+                type="datetime-local"
+                value={playedAt}
+                onChange={(e) => setPlayedAt(e.target.value)}
+                className="field field-datetime h-11 w-full min-w-0 max-w-full px-3 text-base"
+              />
+            </div>
           </label>
 
           <label className="block min-w-0 text-xs font-medium text-muted">

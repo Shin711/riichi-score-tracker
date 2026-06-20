@@ -9,23 +9,25 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, badge, action }: PageHeaderProps) {
   return (
-    <div className="card relative overflow-hidden p-5 sm:p-6">
+    <div className="hero-card p-6 sm:p-8">
       <div
-        className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-club-red/[0.04] dark:bg-club-red/[0.06]"
+        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-club-red/[0.12] blur-3xl dark:bg-club-red/[0.18]"
         aria-hidden
       />
-      <div className="relative flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
+      <div
+        className="pointer-events-none absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-club-jade/[0.1] blur-3xl dark:bg-club-jade/[0.15]"
+        aria-hidden
+      />
+      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-3">
           {badge ? (
-            <span className="mb-2 inline-block rounded-full bg-club-red-muted px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-club-red dark:text-red-200">
+            <span className="inline-flex items-center rounded-full border border-club-border bg-club-surface/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-club-red backdrop-blur-sm dark:text-red-200">
               {badge}
             </span>
           ) : null}
-          <h1 className="text-2xl font-bold tracking-tight text-club-ink sm:text-3xl">
-            {title}
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight text-club-ink sm:text-4xl">{title}</h1>
           {description ? (
-            <p className="text-muted mt-1.5 max-w-xl text-sm leading-6">{description}</p>
+            <p className="text-muted max-w-2xl text-sm leading-7 sm:text-base">{description}</p>
           ) : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

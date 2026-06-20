@@ -32,10 +32,10 @@ function PillRow<T extends string>({
           key={opt.value}
           type="button"
           onClick={() => onChange(opt.value)}
-          className={`flex min-h-12 items-center justify-center rounded-xl border px-3 text-sm font-medium transition-colors ${
+          className={`flex min-h-12 items-center justify-center rounded-xl border px-3 text-sm font-medium transition-all duration-300 ease-fluid ${
             value === opt.value
-              ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
-              : "border-club-border text-club-ink hover:border-stone-400 dark:hover:border-stone-500"
+              ? "scale-[1.02] border-club-red bg-club-red text-white shadow-md shadow-club-red/25"
+              : "border-club-border text-club-ink hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-sm dark:hover:border-stone-500"
           }`}
         >
           {opt.label}
@@ -79,9 +79,9 @@ export function ScoreCalculator() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {result ? (
-        <section className="jade-panel sticky top-16 z-30 p-4 shadow-md sm:p-5">
+        <section className="jade-panel sticky top-16 z-30 p-4 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="jade-panel-label">You receive</span>
             <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-medium text-white/90 dark:bg-white/10">
@@ -97,12 +97,15 @@ export function ScoreCalculator() {
               </span>
             ) : null}
           </div>
-          <div className="jade-panel-fg mt-1.5 font-mono text-4xl font-bold tabular-nums tracking-tight sm:text-5xl">
+          <div
+            key={result.total}
+            className="score-display score-pop jade-panel-fg mt-1.5 text-4xl sm:text-5xl"
+          >
             {result.total.toLocaleString()}
             <span className="jade-panel-label ml-2 text-lg font-semibold normal-case">pts</span>
           </div>
 
-          <div className="card mt-4 p-3">
+          <div className="card mt-4 p-3.5">
             <div className="text-xs font-semibold uppercase tracking-wide text-subtle">Who pays</div>
             <ul className="mt-2 space-y-1.5">
               {result.payments.map((row) => (
@@ -122,7 +125,7 @@ export function ScoreCalculator() {
         </section>
       ) : null}
 
-      <section className="card space-y-4 p-4 sm:p-5">
+      <section className="card space-y-5 p-4 sm:p-6">
         <div>
           <h2 className="text-sm font-semibold">Win type</h2>
           <div className="mt-2">
@@ -180,10 +183,10 @@ export function ScoreCalculator() {
                   key={scenario.id}
                   type="button"
                   onClick={() => pickScenario(scenario.id)}
-                  className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                  className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left transition-all duration-300 ease-fluid ${
                     active
-                      ? "border-club-red bg-club-red text-white shadow-sm shadow-club-red/20"
-                      : "border-club-border text-club-ink hover:border-stone-400 dark:hover:border-stone-500"
+                      ? "scale-[1.01] border-club-red bg-club-red text-white shadow-md shadow-club-red/30"
+                      : "border-club-border text-club-ink hover:-translate-y-0.5 hover:border-stone-400 hover:shadow-md dark:hover:border-stone-500"
                   }`}
                 >
                   <div className="min-w-0">
@@ -249,7 +252,7 @@ export function ScoreCalculator() {
       </section>
 
       {winType === "ron" && !winnerIsDealer ? (
-        <details className="card group p-4 sm:p-5">
+        <details className="card group p-4 sm:p-6">
           <summary className="cursor-pointer text-sm font-semibold text-club-ink marker:text-muted">
             I know the exact ron total (e.g. from Mahjong Soul)
           </summary>
@@ -279,7 +282,7 @@ export function ScoreCalculator() {
         </details>
       ) : null}
 
-      <details className="card group p-4 sm:p-5">
+      <details className="card group p-4 sm:p-6">
         <summary className="cursor-pointer text-sm font-semibold text-club-ink marker:text-muted">
           Advanced — custom han & fu
         </summary>

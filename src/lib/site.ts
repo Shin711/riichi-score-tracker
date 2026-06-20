@@ -7,7 +7,7 @@ export const SITE_NAME = "Flushing Riichi Mahjong Club";
 export const SITE_HEADER = "Flushing Riichi";
 
 export const SITE_DESCRIPTION =
-  "Scores and monthly leaderboard for Flushing Riichi Mahjong Club — in-person tables and Mahjong Soul imports.";
+  "Import finished games, track the monthly leaderboard, and use the in-table score calculator for Flushing Riichi Mahjong Club.";
 
 export const DEFAULT_SESSION_TITLE = "Club session";
 

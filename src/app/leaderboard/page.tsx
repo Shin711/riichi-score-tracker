@@ -31,11 +31,11 @@ function LeaderboardTable({
   }
 
   return (
-    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+    <ul className="divide-y divide-club-border">
       {entries.map((entry, index) => (
         <li
           key={entry.playerId}
-          className="px-4 py-4 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
+          className="px-4 py-4 transition-colors duration-300 ease-fluid hover:bg-club-surface/50 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
         >
           <div className="flex items-center gap-3 sm:contents">
             <span
@@ -76,7 +76,7 @@ function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
   if (entries.length === 0) return null;
 
   return (
-    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+    <ul className="divide-y divide-club-border">
       {entries.map((entry) => {
         const needed = gamesUntilLeaderboardRank(entry.gamesPlayed);
         return (
@@ -122,8 +122,8 @@ function LeaderboardSections({
     <>
       <LeaderboardTable entries={ranked} emptyMessage={rankedEmptyMessage} />
       {unranked.length > 0 ? (
-        <div className="border-t border-zinc-200 dark:border-zinc-800">
-          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <div className="border-t border-club-border">
+          <div className="border-b border-club-border px-4 py-3">
             <div className="text-sm font-medium">Not ranked yet</div>
             <p className="mt-0.5 text-xs text-subtle">
               {minGamesForRank}+ games needed to appear on the board. Points still count toward
@@ -209,7 +209,7 @@ export default function LeaderboardPage() {
   const hasAnyActivity = ranked.length > 0 || unranked.length > 0;
 
   return (
-    <main className="space-y-6">
+    <main className="space-y-7">
       <PageHeader
         badge="Monthly standings"
         title="Leaderboard"
@@ -224,7 +224,7 @@ export default function LeaderboardPage() {
       {error ? <div className="text-sm text-red-600 dark:text-red-400">{error}</div> : null}
 
       <div className="card overflow-hidden">
-        <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+        <div className="border-b border-club-border px-4 py-3.5">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
           <div className="mt-0.5 text-xs text-subtle">
             {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month
@@ -234,7 +234,7 @@ export default function LeaderboardPage() {
             · points = (ending − start) ÷ 1,000 · ranked after {minGamesForRank}+ games
           </div>
         </div>
-        <div className="hidden border-b border-stone-200 px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3 dark:border-stone-600">
+        <div className="hidden border-b border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
           <span>Rank</span>
           <span>Name</span>
           <span className="text-right">Points</span>
@@ -273,7 +273,7 @@ export default function LeaderboardPage() {
             {inactive.map((e) => (
               <li
                 key={e.playerId}
-                className="rounded-full border border-zinc-200 px-3 py-1 text-sm dark:border-zinc-700"
+                className="rounded-full border border-club-border bg-club-surface px-3 py-1 text-sm"
               >
                 {e.displayName}
               </li>
@@ -284,13 +284,13 @@ export default function LeaderboardPage() {
 
       {!loading && archives.length > 0 ? (
         <div className="card">
-          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <div className="border-b border-club-border px-4 py-3.5">
             <div className="text-sm font-medium">Past months</div>
             <p className="mt-0.5 text-xs text-subtle">
               Final standings saved when each month ended. Download as CSV or JSON.
             </p>
           </div>
-          <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+          <ul className="divide-y divide-club-border">
             {archives.map((archive) => (
               <li key={archive.id} className="px-4 py-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -304,13 +304,13 @@ export default function LeaderboardPage() {
                   <div className="flex flex-wrap gap-2">
                     <a
                       href={`/api/leaderboard/archives/download?year=${archive.year}&month=${archive.month}&format=csv`}
-                      className="inline-flex h-9 items-center rounded-lg border border-zinc-200 px-3 text-xs font-medium dark:border-zinc-700"
+                      className="inline-flex h-9 items-center rounded-lg border border-club-border bg-club-surface px-3 text-xs font-medium transition-colors hover:bg-stone-50 dark:hover:bg-stone-700"
                     >
                       Download CSV
                     </a>
                     <a
                       href={`/api/leaderboard/archives/download?year=${archive.year}&month=${archive.month}&format=json`}
-                      className="inline-flex h-9 items-center rounded-lg border border-zinc-200 px-3 text-xs font-medium dark:border-zinc-700"
+                      className="inline-flex h-9 items-center rounded-lg border border-club-border bg-club-surface px-3 text-xs font-medium transition-colors hover:bg-stone-50 dark:hover:bg-stone-700"
                     >
                       Download JSON
                     </a>
@@ -318,10 +318,10 @@ export default function LeaderboardPage() {
                 </div>
                 {archive.entries.length > 0 ? (
                   <details className="mt-3">
-                    <summary className="cursor-pointer text-xs font-medium text-muted">
+                    <summary className="cursor-pointer text-xs font-medium text-muted hover:text-club-ink">
                       View standings
                     </summary>
-                    <div className="mt-2 overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <div className="mt-2 overflow-hidden rounded-xl border border-club-border bg-club-surface">
                       <LeaderboardSections
                         entries={archive.entries}
                         minGamesForRank={minGamesForRank}

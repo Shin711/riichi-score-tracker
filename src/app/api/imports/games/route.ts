@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
 import { humanImportEntries } from "@/lib/imports/types";
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await supabase
     .from("imported_games")
-    .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at", {
+    .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id", {
       count: "exact",
     })
     .order("played_at", { ascending: false })
@@ -118,6 +119,8 @@ export async function POST(req: Request) {
   }
 
   try {
+    const importedByUserId = await getUserIdFromRequest(req, supabase);
+
     const entries = await resolveImportPlayers(
       supabase,
       seats.map((s, index) => ({
@@ -141,8 +144,9 @@ export async function POST(req: Request) {
         entries_json: entries,
         mjs_paipu_url: mjsPaipuUrl,
         mjs_record_uuid: mjsRecordUuid,
+        imported_by_user_id: importedByUserId,
       })
-      .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at")
+      .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id")
       .single();
 
     if (error) {

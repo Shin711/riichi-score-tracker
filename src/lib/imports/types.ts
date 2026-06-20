@@ -13,6 +13,7 @@ export type ImportedGameRow = {
   mjs_paipu_url: string | null;
   mjs_record_uuid: string | null;
   created_at: string;
+  imported_by_user_id?: string | null;
 };
 
 /** True for human seats that count on the leaderboard (legacy rows without is_ai count as human). */

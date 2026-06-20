@@ -57,18 +57,18 @@ function ImportPlayedAtInput({
 
   return (
     <>
-      <div className="mt-1.5 grid min-w-0 grid-cols-2 gap-2 sm:hidden">
+      <div className="mt-1.5 grid min-w-0 grid-cols-[1.3fr_1fr] gap-2 sm:hidden">
         <input
           type="date"
           value={date}
           onChange={(e) => onChange(mergeDatetimeLocal(e.target.value, time || "00:00"))}
-          className="field field-date h-11 min-w-0 w-full px-2 text-base"
+          className="field field-date h-11 w-full min-w-0 px-3 text-sm"
         />
         <input
           type="time"
           value={time}
           onChange={(e) => onChange(mergeDatetimeLocal(date || fallbackDate, e.target.value))}
-          className="field field-time h-11 min-w-0 w-full px-2 text-base"
+          className="field field-time h-11 w-full min-w-0 px-3 text-sm"
         />
       </div>
       <input

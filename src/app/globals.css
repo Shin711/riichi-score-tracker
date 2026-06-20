@@ -393,37 +393,18 @@ body {
     text-align: left;
   }
 
-  /* Bare native date/time controls used inside a bordered wrapper on mobile.
-     The wrapper owns the border/padding and clips overflow, so even when iOS
-     WebKit refuses to shrink the control below its intrinsic width it can never
-     break out of the card. */
-  .datetime-bare {
+  /* Invisible native picker layered over a plain text field. Absolute inset-0
+     forces its box to the parent's size, so iOS WebKit's intrinsic control
+     width can never push surrounding layout. */
+  .datetime-overlay {
     -webkit-appearance: none;
     appearance: none;
     border: 0;
-    outline: none;
-    padding: 0;
     margin: 0;
     min-width: 0;
     max-width: 100%;
     background: transparent;
     -webkit-min-logical-width: 0;
-  }
-
-  .datetime-bare::-webkit-date-and-time-value {
-    text-align: left;
-    margin: 0;
-    min-width: 0;
-  }
-
-  .datetime-bare::-webkit-datetime-edit {
-    padding: 0;
-    min-width: 0;
-  }
-
-  .datetime-bare::-webkit-calendar-picker-indicator {
-    margin-left: auto;
-    flex-shrink: 0;
   }
 
   .shell-bar {

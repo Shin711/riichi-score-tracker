@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
@@ -168,7 +169,9 @@ function ImportPlayerNameInput({
   inputClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
   const blurTimer = useRef<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
 
   function setDropdownOpen(next: boolean) {
@@ -201,13 +204,70 @@ function ImportPlayerNameInput({
   }
 
   function selectPlayer(player: PlayerOption) {
+    if (blurTimer.current !== null) {
+      window.clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
     onChange({ playerId: player.id, displayName: player.display_name });
     setDropdownOpen(false);
   }
 
+  useLayoutEffect(() => {
+    if (!open || !inputRef.current) return;
+
+    function updatePosition() {
+      const input = inputRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      setDropdownStyle({
+        position: "fixed",
+        top: rect.bottom + 6,
+        left: rect.left,
+        width: rect.width,
+        zIndex: 9999,
+        visibility: "visible",
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [open, value]);
+
+  const dropdown =
+    open && players.length > 0 ? (
+      <ul
+        role="listbox"
+        style={dropdownStyle}
+        className="combobox-dropdown max-h-52 overflow-y-auto rounded-xl border border-club-border py-1 shadow-xl"
+      >
+        {suggestions.map((player) => (
+          <li key={player.id} role="option" aria-selected={player.id === playerId}>
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.preventDefault();
+                selectPlayer(player);
+              }}
+              className={`block w-full px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
+              }`}
+            >
+              {player.display_name}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : null;
+
   return (
     <div className="relative min-w-0">
       <input
+        ref={inputRef}
         value={value}
         onChange={(e) => {
           onChange(resolveSeatPlayerName(e.target.value, players));
@@ -219,27 +279,7 @@ function ImportPlayerNameInput({
         autoComplete="off"
         className={inputClassName}
       />
-      {open && players.length > 0 ? (
-        <ul
-          role="listbox"
-          className="combobox-dropdown absolute top-full left-0 z-[100] mt-1.5 max-h-52 w-full overflow-y-auto rounded-xl border border-club-border py-1 shadow-xl"
-        >
-          {suggestions.map((player) => (
-            <li key={player.id} role="option" aria-selected={player.id === playerId}>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectPlayer(player)}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
-                  player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
-                }`}
-              >
-                {player.display_name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      {dropdown && typeof document !== "undefined" ? createPortal(dropdown, document.body) : null}
     </div>
   );
 }
@@ -650,7 +690,7 @@ export function ImportGameForm() {
               <div
                 key={seatLabel}
                 className={`relative rounded-xl border p-3 transition-all duration-300 ease-fluid ${
-                  isNameOpen ? "z-50" : "z-0"
+                  isNameOpen ? "z-50 overflow-visible" : "z-0"
                 } ${
                   isAi
                     ? "border-club-border bg-club-surface/50 opacity-70"

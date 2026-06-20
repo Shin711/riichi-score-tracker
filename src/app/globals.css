@@ -367,6 +367,7 @@ body {
   }
 
   .seat-input-row:focus-within {
+    overflow: visible;
     border-color: rgb(15 118 110 / 0.55);
     box-shadow: 0 0 0 4px rgb(15 118 110 / 0.14);
   }

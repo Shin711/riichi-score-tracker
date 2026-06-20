@@ -393,6 +393,21 @@ body {
     text-align: left;
   }
 
+  .field-date,
+  .field-time {
+    @apply block min-w-0 max-w-full box-border;
+    width: 100%;
+  }
+
+  input[type="date"].field-date,
+  input[type="time"].field-time {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-min-logical-width: 0;
+  }
+
   .shell-bar {
     @apply border-b bg-club-cream/75 backdrop-blur-xl backdrop-saturate-150;
     border-color: color-mix(in srgb, var(--color-club-border) 70%, transparent);

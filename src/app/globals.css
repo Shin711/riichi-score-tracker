@@ -377,7 +377,20 @@ body {
   }
 
   .field-datetime {
-    @apply block w-full max-w-full min-w-0 box-border;
+    @apply block w-full min-w-0 max-w-full box-border;
+    width: 100%;
+    -webkit-min-logical-width: 0;
+  }
+
+  input[type="datetime-local"].field-datetime {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  input[type="datetime-local"].field-datetime::-webkit-date-and-time-value {
+    text-align: left;
   }
 
   .shell-bar {

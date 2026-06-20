@@ -35,14 +35,17 @@ function toDatetimeLocalValue(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function splitDatetimeLocal(value: string) {
-  const [date = "", time = ""] = value.split("T");
-  return { date, time: time.slice(0, 5) };
-}
-
-function mergeDatetimeLocal(date: string, time: string) {
-  if (!date) return "";
-  return `${date}T${time || "00:00"}`;
+function formatPlayedAtLabel(value: string) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function ImportPlayedAtInput({
@@ -52,38 +55,29 @@ function ImportPlayedAtInput({
   value: string;
   onChange: (next: string) => void;
 }) {
-  const { date, time } = splitDatetimeLocal(value);
-  const fallbackDate = splitDatetimeLocal(toDatetimeLocalValue(new Date())).date;
-
   return (
-    <>
-      <div className="mt-1.5 space-y-2 sm:hidden">
-        <div className="field flex h-11 w-full min-w-0 max-w-full items-center overflow-hidden px-3">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => onChange(mergeDatetimeLocal(e.target.value, time || "00:00"))}
-            className="datetime-bare w-full min-w-0 bg-transparent text-base text-club-ink"
-            aria-label="Date the game ended"
-          />
-        </div>
-        <div className="field flex h-11 w-full min-w-0 max-w-full items-center overflow-hidden px-3">
-          <input
-            type="time"
-            value={time}
-            onChange={(e) => onChange(mergeDatetimeLocal(date || fallbackDate, e.target.value))}
-            className="datetime-bare w-full min-w-0 bg-transparent text-base text-club-ink"
-            aria-label="Time the game ended"
-          />
-        </div>
-      </div>
+    <div className="relative mt-1.5 w-full min-w-0 max-w-full overflow-hidden">
+      {/* Visible field is a plain text input so layout never depends on the
+          native date control (iOS WebKit sizes those by content and overflows).
+          The native datetime-local sits on top, invisible and absolutely sized
+          to this box via inset-0, so it can open the picker without affecting
+          layout. */}
+      <input
+        type="text"
+        readOnly
+        tabIndex={-1}
+        value={formatPlayedAtLabel(value)}
+        placeholder="Select date & time"
+        className="field h-11 w-full min-w-0 max-w-full px-3 text-base"
+      />
       <input
         type="datetime-local"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="field field-datetime mt-1.5 hidden h-11 w-full min-w-0 max-w-full px-3 text-base sm:block"
+        aria-label="When the game ended"
+        className="datetime-overlay absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />
-    </>
+    </div>
   );
 }
 

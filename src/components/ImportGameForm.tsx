@@ -158,12 +158,14 @@ function ImportPlayerNameInput({
   displayName,
   onChange,
   onOpenChange,
+  inputClassName = "field field-combobox h-11 w-full px-3 text-sm",
 }: {
   players: PlayerOption[];
   playerId: string;
   displayName: string;
   onChange: (patch: Pick<SeatForm, "playerId" | "displayName">) => void;
   onOpenChange?: (open: boolean) => void;
+  inputClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<number | null>(null);
@@ -215,7 +217,7 @@ function ImportPlayerNameInput({
         onBlur={handleBlur}
         placeholder="Player name"
         autoComplete="off"
-        className="field field-combobox h-11 w-full px-3 text-sm"
+        className={inputClassName}
       />
       {open && players.length > 0 ? (
         <ul
@@ -647,14 +649,14 @@ export function ImportGameForm() {
             return (
               <div
                 key={seatLabel}
-                className={`rounded-xl border p-3 transition-all duration-300 ease-fluid ${
-                  isNameOpen ? "relative z-50" : ""
+                className={`relative rounded-xl border p-3 transition-all duration-300 ease-fluid ${
+                  isNameOpen ? "z-50" : "z-0"
                 } ${
                   isAi
                     ? "border-club-border bg-club-surface/50 opacity-70"
                     : isNameOpen
                       ? "border-club-border bg-club-surface shadow-md"
-                      : "border-club-border bg-club-surface hover:-translate-y-0.5 hover:shadow-md"
+                      : "border-club-border bg-club-surface sm:hover:-translate-y-0.5 sm:hover:shadow-md"
                 }`}
               >
                 {/* Row header: seat label + placement + AI toggle */}
@@ -688,14 +690,14 @@ export function ImportGameForm() {
                   </button>
                 </div>
 
-                {/* Name + score */}
-                <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
-                  <div className="min-w-0">
-                    {isAi ? (
-                      <div className="flex h-11 items-center rounded-lg border border-dashed border-club-border px-3 text-sm text-subtle">
-                        AI seat — not ranked
-                      </div>
-                    ) : (
+                {/* Name + score — single bordered row avoids iOS double-border glitches */}
+                {isAi ? (
+                  <div className="flex h-11 min-w-0 items-center rounded-xl border border-dashed border-club-border px-3 text-sm text-subtle">
+                    AI seat — not ranked
+                  </div>
+                ) : (
+                  <div className="seat-input-row">
+                    <div className="relative min-w-0 flex-1">
                       <ImportPlayerNameInput
                         players={players}
                         playerId={seats[index].playerId}
@@ -707,18 +709,20 @@ export function ImportGameForm() {
                             return current === index ? null : current;
                           })
                         }
+                        inputClassName="field-inset h-11 w-full min-w-0 px-3 text-sm"
                       />
-                    )}
+                    </div>
+                    <div className="w-px shrink-0 self-stretch bg-club-border" aria-hidden />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      value={seats[index].finalScore}
+                      onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
+                      placeholder="Score"
+                      className="field-inset h-11 w-[6.5rem] shrink-0 px-3 text-base tabular-nums sm:w-28"
+                    />
                   </div>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={seats[index].finalScore}
-                    onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
-                    placeholder="Score"
-                    className="field h-11 w-full px-3 text-base tabular-nums"
-                  />
-                </div>
+                )}
               </div>
             );
           })}

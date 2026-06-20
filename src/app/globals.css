@@ -361,6 +361,33 @@ body {
     box-shadow: 0 0 0 3px rgb(15 118 110 / 0.12);
   }
 
+  .seat-input-row {
+    @apply flex h-11 min-w-0 max-w-full items-stretch overflow-hidden rounded-xl border bg-club-surface;
+    border-color: var(--color-club-border);
+  }
+
+  .seat-input-row:focus-within {
+    border-color: rgb(15 118 110 / 0.55);
+    box-shadow: 0 0 0 4px rgb(15 118 110 / 0.14);
+  }
+
+  .field-inset {
+    @apply min-w-0 border-0 bg-transparent text-club-ink outline-none shadow-none;
+    border-radius: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .field-inset:focus {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .field-inset::placeholder {
+    color: var(--color-club-subtle);
+    opacity: 1;
+  }
+
   .combobox-dropdown {
     background-color: var(--color-club-surface);
   }

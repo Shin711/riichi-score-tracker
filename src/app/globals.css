@@ -376,29 +376,19 @@ body {
     opacity: 1;
   }
 
-  .field-datetime {
+  /* Native date/time controls on iOS Safari ignore width unless appearance is
+     reset, so they overflow their grid cell. Force them to shrink. */
+  .field-datetime,
+  .field-date,
+  .field-time {
     @apply block w-full min-w-0 max-w-full box-border;
+    -webkit-appearance: none;
+    appearance: none;
     width: 100%;
     -webkit-min-logical-width: 0;
   }
 
-  input[type="datetime-local"].field-datetime {
-    display: block;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  input[type="datetime-local"].field-datetime::-webkit-date-and-time-value {
-    text-align: left;
-  }
-
-  .field-date,
-  .field-time {
-    @apply block min-w-0 max-w-full box-border;
-    width: 100%;
-  }
-
+  input[type="datetime-local"].field-datetime,
   input[type="date"].field-date,
   input[type="time"].field-time {
     display: block;
@@ -406,6 +396,22 @@ body {
     max-width: 100%;
     min-width: 0;
     -webkit-min-logical-width: 0;
+  }
+
+  .field-datetime::-webkit-date-and-time-value,
+  .field-date::-webkit-date-and-time-value,
+  .field-time::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+    min-width: 0;
+  }
+
+  .field-datetime::-webkit-datetime-edit,
+  .field-date::-webkit-datetime-edit,
+  .field-time::-webkit-datetime-edit {
+    padding: 0;
+    min-width: 0;
+    overflow: hidden;
   }
 
   .shell-bar {

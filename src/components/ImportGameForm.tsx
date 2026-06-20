@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
-import { formatMonthLabel, getMonthPartsInTimezone } from "@/lib/leaderboard/timezone";
+import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const IMPORT_SEAT_COUNT = 4;
@@ -55,6 +55,15 @@ function ordinalPlacement(place: number) {
   return "4th";
 }
 
+function placementChipClass(place: number) {
+  if (place === 1)
+    return "bg-club-gold-muted text-club-gold border border-yellow-300/50 dark:border-yellow-700/50";
+  if (place === 2) return "bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-200";
+  if (place === 3)
+    return "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+  return "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400";
+}
+
 function formatImportPlayedAt(playedAt: string) {
   return new Date(playedAt).toLocaleString("en-US", {
     month: "short",
@@ -62,6 +71,7 @@ function formatImportPlayedAt(playedAt: string) {
     year: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: LEADERBOARD_TIMEZONE,
   });
 }
 
@@ -69,6 +79,12 @@ function importPointsClassName(delta: number) {
   if (delta > 0) return "text-emerald-700 dark:text-emerald-400";
   if (delta < 0) return "text-red-600 dark:text-red-400";
   return "text-subtle";
+}
+
+function formatScoreDifference(delta: number) {
+  if (delta === 0) return "0";
+  const sign = delta > 0 ? "+" : "-";
+  return `${sign}${Math.abs(delta).toLocaleString()}`;
 }
 
 function ImportHistoryCard({
@@ -94,7 +110,7 @@ function ImportHistoryCard({
     <li className="import-history-entry">
       <div className="import-history-entry-header">
         <div className="min-w-0">
-          <div className="text-sm font-medium text-club-ink">{playedLabel}</div>
+          <div className="text-sm font-medium text-club-ink" suppressHydrationWarning>{playedLabel}</div>
           <div className="text-xs text-subtle">Counts toward {monthLabel}</div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -231,7 +247,7 @@ export function ImportGameForm() {
   const supabase = useMemo(() => getSupabaseClient(), []);
   const [players, setPlayers] = useState<PlayerOption[]>([]);
   const [seats, setSeats] = useState<SeatForm[]>(defaultSeats);
-  const [playedAt, setPlayedAt] = useState(() => toDatetimeLocalValue(new Date()));
+  const [playedAt, setPlayedAt] = useState("");
   const [startingPoints, setStartingPoints] = useState(25000);
   const [mjsPaipuUrl, setMjsPaipuUrl] = useState("");
   const [imports, setImports] = useState<ImportedGameRow[]>([]);
@@ -245,6 +261,13 @@ export function ImportGameForm() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function init() {
+      setPlayedAt(toDatetimeLocalValue(new Date()));
+    }
+    void init();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -314,6 +337,7 @@ export function ImportGameForm() {
     return {
       expected,
       sum,
+      difference: sum - expected,
       anyEntered: entered.length > 0,
       complete: allEntered && allValid,
       balanced: allEntered && allValid && sum === expected,
@@ -346,8 +370,8 @@ export function ImportGameForm() {
     }
 
     const humanSeats = seats.filter((s) => !s.isAi);
-    if (humanSeats.length === 0) {
-      setError("Mark at least one seat as a human player.");
+    if (humanSeats.length < 2) {
+      setError("Mark at least two seats as human players.");
       return;
     }
 
@@ -399,6 +423,7 @@ export function ImportGameForm() {
       setMjsPaipuUrl("");
       setPlayedAt(toDatetimeLocalValue(new Date()));
       setHistoryPage(1);
+      setHistoryRefresh((n) => n + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -436,209 +461,243 @@ export function ImportGameForm() {
     setSeats((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
   }
 
+  const [showStartingPoints, setShowStartingPoints] = useState(false);
+
   return (
     <div className="space-y-6">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card p-4 sm:p-6"
+        className="card divide-y divide-club-border"
       >
-        <div className="text-sm font-medium">Import friendly match</div>
-        <p className="mt-1 text-sm text-muted">
-          Enter the four final scores from Mahjong Soul or any friendly table.
-        </p>
-        <ul className="mt-2 space-y-1 text-xs text-subtle">
-          <li>
-            Mark bot seats as <span className="font-medium">AI</span> — only human scores count on
-            the leaderboard.
-          </li>
-          <li>
-            Leaderboard points = (final score − starting stack) ÷ 1,000, counted in the month
-            played (US Eastern).
-          </li>
-        </ul>
-
-        <div className="mt-4 space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
-            Game details
+        {/* Player scores */}
+        <div className="space-y-3 p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">Player scores</h2>
+            <span className="text-xs text-muted">placement order doesn&apos;t matter</span>
           </div>
-          <label className="block text-xs">
-            Mahjong Soul log link (optional)
+
+          {Array.from({ length: IMPORT_SEAT_COUNT }, (_, index) => {
+            const seatLabel = `Player ${index + 1}`;
+            const placement = placementBySeat.get(index);
+            const isAi = seats[index].isAi;
+            return (
+              <div
+                key={seatLabel}
+                className={`rounded-xl border p-3 transition-colors ${
+                  isAi
+                    ? "border-club-border bg-club-surface/50 opacity-70"
+                    : "border-club-border bg-club-surface"
+                }`}
+              >
+                {/* Row header: seat label + placement + AI toggle */}
+                <div className="mb-2.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-club-ink">{seatLabel}</span>
+                    {placement ? (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${placementChipClass(placement)}`}
+                      >
+                        {ordinalPlacement(placement)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateSeat(index, {
+                        isAi: !isAi,
+                        playerId: "",
+                        displayName: "",
+                      })
+                    }
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                      isAi
+                        ? "border-club-red bg-club-red text-white"
+                        : "border-club-border text-subtle hover:border-stone-400"
+                    }`}
+                  >
+                    {isAi ? "AI bot" : "Mark as AI"}
+                  </button>
+                </div>
+
+                {/* Name + score */}
+                <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_9rem]">
+                  <div>
+                    {isAi ? (
+                      <div className="flex h-11 items-center rounded-lg border border-dashed border-club-border px-3 text-sm text-subtle">
+                        AI seat — not ranked
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          value={seats[index].playerId}
+                          onChange={(e) => {
+                            const playerId = e.target.value;
+                            const player = players.find((p) => p.id === playerId);
+                            updateSeat(index, {
+                              playerId,
+                              displayName: player?.display_name ?? seats[index].displayName,
+                            });
+                          }}
+                          className="field h-11 w-full px-3 text-sm"
+                        >
+                          <option value="">Type a new name…</option>
+                          {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.display_name}
+                            </option>
+                          ))}
+                        </select>
+                        {!seats[index].playerId ? (
+                          <input
+                            value={seats[index].displayName}
+                            onChange={(e) => updateSeat(index, { displayName: e.target.value })}
+                            placeholder="Player name"
+                            className="field mt-1.5 h-11 w-full px-3 text-sm"
+                          />
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={seats[index].finalScore}
+                    onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
+                    placeholder="Score"
+                    className="field h-11 w-full px-3 text-base tabular-nums"
+                  />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Running score total */}
+          {scoreSummary.anyEntered ? (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                scoreSummary.balanced
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  : scoreSummary.complete
+                    ? "border-club-border bg-club-cream/50 text-club-ink"
+                    : "border-club-border text-muted"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">
+                  {scoreSummary.balanced
+                    ? "Table total is 100,000 ✓"
+                    : scoreSummary.complete
+                      ? "Table total differs from 100,000"
+                      : "Total so far"}
+                </span>
+                <span className="font-mono tabular-nums">
+                  {scoreSummary.sum.toLocaleString()}
+                  {!scoreSummary.balanced ? (
+                    <span className="text-subtle"> / {scoreSummary.expected.toLocaleString()}</span>
+                  ) : null}
+                </span>
+              </div>
+              {scoreSummary.complete && !scoreSummary.balanced ? (
+                <p className="mt-1.5 text-xs leading-5 text-muted">
+                  This can be normal when riichi sticks or other table deposits are not included in
+                  the final player scores. Import the scores as shown, and only edit them if they
+                  look mistyped.
+                  <span className="block font-mono tabular-nums text-subtle">
+                    Difference: {formatScoreDifference(scoreSummary.difference)}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Game details */}
+        <div className="space-y-3 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold">Game details</h2>
+
+          <label className="block text-xs font-medium text-muted">
+            When the game ended
+            <input
+              type="datetime-local"
+              value={playedAt}
+              onChange={(e) => setPlayedAt(e.target.value)}
+              className="field mt-1.5 h-11 w-full px-3 text-sm"
+            />
+          </label>
+
+          <label className="block text-xs font-medium text-muted">
+            Mahjong Soul log link{" "}
+            <span className="font-normal text-subtle">(optional)</span>
             <input
               value={mjsPaipuUrl}
               onChange={(e) => setMjsPaipuUrl(e.target.value)}
-              placeholder="https://mahjongsoul.game.yo-star.com/?paipu=..."
-              className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
+              placeholder="https://mahjongsoul.game.yo-star.com/?paipu=…"
+              className="field mt-1.5 h-11 w-full px-3 text-sm"
             />
             {mjsPaipuUrl.trim() && !paipuValid ? (
-              <span className="mt-1 block text-xs text-red-600 dark:text-red-400">
+              <span className="mt-1 block font-normal text-red-600 dark:text-red-400">
                 Link format not recognized.
               </span>
             ) : null}
           </label>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="text-xs">
-              When the game ended
-              <input
-                type="datetime-local"
-                value={playedAt}
-                onChange={(e) => setPlayedAt(e.target.value)}
-                className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
-              />
-            </label>
-            <label className="text-xs">
-              Starting stack (each player)
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowStartingPoints((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-muted"
+            >
+              <span className="underline">Starting stack</span>
+              <span className="text-subtle">
+                {showStartingPoints ? "▲" : "▼"} currently {startingPoints.toLocaleString()}
+              </span>
+            </button>
+            {showStartingPoints ? (
               <input
                 type="number"
+                inputMode="numeric"
                 value={startingPoints}
                 onChange={(e) => setStartingPoints(Number(e.target.value))}
-                className="mt-1 h-11 w-full rounded-lg border border-stone-200 bg-club-surface px-3 text-sm dark:border-stone-600 dark:text-stone-100"
+                className="field mt-1.5 h-11 w-40 px-3 text-base"
               />
-              <span className="mt-1 block text-[11px] text-subtle">
-                Usually 25,000 · {(startingPoints * 4).toLocaleString()} on the table
-              </span>
-            </label>
-          </div>
-
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-subtle">
-              Player scores
-            </div>
-            <div className="text-xs text-muted">
-              Enter all four — placement order does not matter.
-            </div>
-            {Array.from({ length: IMPORT_SEAT_COUNT }, (_, index) => {
-              const seatLabel = `Player ${index + 1}`;
-              const placement = placementBySeat.get(index);
-              return (
-              <div
-                key={seatLabel}
-                className="grid grid-cols-[4.5rem_1fr_6.5rem] items-start gap-2 rounded-xl border border-zinc-200 p-2 dark:border-zinc-800"
-              >
-                <div className="pt-2">
-                  <div className="text-xs font-medium text-subtle">{seatLabel}</div>
-                  {placement ? (
-                    <span className="mt-1 inline-block rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-stone-700 dark:bg-stone-700 dark:text-stone-200">
-                      {ordinalPlacement(placement)}
-                    </span>
-                  ) : null}
-                </div>
-                <div className="min-w-0 space-y-1">
-                  <label className="flex items-center gap-2 text-xs text-muted">
-                    <input
-                      type="checkbox"
-                      checked={seats[index].isAi}
-                      onChange={(e) =>
-                        updateSeat(index, {
-                          isAi: e.target.checked,
-                          playerId: "",
-                          displayName: "",
-                        })
-                      }
-                      className="h-4 w-4 rounded border-zinc-300"
-                    />
-                    AI bot
-                  </label>
-                  {seats[index].isAi ? (
-                    <div className="flex h-9 items-center rounded-lg border border-dashed border-zinc-200 px-2 text-sm text-subtle dark:border-zinc-700">
-                      AI ({seatLabel})
-                    </div>
-                  ) : (
-                    <>
-                      <select
-                        value={seats[index].playerId}
-                        onChange={(e) => {
-                          const playerId = e.target.value;
-                          const player = players.find((p) => p.id === playerId);
-                          updateSeat(index, {
-                            playerId,
-                            displayName: player?.display_name ?? seats[index].displayName,
-                          });
-                        }}
-                        className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:text-stone-100"
-                      >
-                        <option value="">New name…</option>
-                        {players.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.display_name}
-                          </option>
-                        ))}
-                      </select>
-                      {!seats[index].playerId ? (
-                        <input
-                          value={seats[index].displayName}
-                          onChange={(e) => updateSeat(index, { displayName: e.target.value })}
-                          placeholder="Player name"
-                          className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm dark:border-stone-600 dark:text-stone-100"
-                        />
-                      ) : null}
-                    </>
-                  )}
-                </div>
-                <input
-                  type="number"
-                  value={seats[index].finalScore}
-                  onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
-                  placeholder="Score"
-                  className="h-9 w-full rounded-lg border border-stone-200 bg-club-surface px-2 text-sm tabular-nums dark:border-stone-600 dark:text-stone-100"
-                />
-              </div>
-            );
-            })}
-            {scoreSummary.anyEntered ? (
-              <div
-                className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs ${
-                  scoreSummary.balanced
-                    ? "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-300"
-                    : scoreSummary.complete
-                      ? "border-amber-300 text-amber-700 dark:border-amber-800 dark:text-amber-300"
-                      : "border-stone-200 text-subtle dark:border-stone-700"
-                }`}
-              >
-                <span>{scoreSummary.complete ? "Total" : "Total so far"}</span>
-                <span className="font-mono tabular-nums">
-                  {scoreSummary.sum.toLocaleString()} / {scoreSummary.expected.toLocaleString()}
-                  {scoreSummary.balanced ? " ✓" : ""}
-                </span>
-              </div>
-            ) : null}
-            {scoreSummary.complete && !scoreSummary.balanced ? (
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Scores don&apos;t add up to {scoreSummary.expected.toLocaleString()}. Double-check
-                for typos.
-              </p>
             ) : null}
           </div>
         </div>
 
-        {error ? <div className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</div> : null}
-        {status ? (
-          <div className="mt-3 text-sm text-emerald-700 dark:text-emerald-300">{status}</div>
-        ) : null}
+        {/* Submit */}
+        <div className="p-4 sm:p-5">
+          {error ? <div className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</div> : null}
+          {status ? (
+            <div className="mb-3 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+              {status}
+            </div>
+          ) : null}
 
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="h-11 flex-1 rounded-xl btn-primary disabled:opacity-40"
-          >
-            {submitting ? "Importing…" : "Import game"}
-          </button>
-          <Link
-            href="/leaderboard"
-            className="inline-flex h-11 items-center justify-center rounded-xl border border-zinc-200 px-4 text-sm font-medium dark:border-zinc-700"
-          >
-            View leaderboard
-          </Link>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="h-11 flex-1 rounded-xl btn-primary disabled:opacity-40"
+            >
+              {submitting ? "Importing…" : "Import game"}
+            </button>
+            <Link
+              href="/leaderboard"
+              className="btn-secondary inline-flex h-11 items-center justify-center px-4"
+            >
+              View leaderboard
+            </Link>
+          </div>
+
+          <p className="mt-3 text-xs text-subtle">
+            New names are added to{" "}
+            <Link href="/players" className="underline">
+              Players
+            </Link>{" "}
+            automatically. Duplicate MJS log links are rejected. LB pts = (score − {startingPoints.toLocaleString()}) ÷ 1,000.
+          </p>
         </div>
-
-        <p className="mt-3 text-xs text-subtle">
-          New names are added to{" "}
-          <Link href="/players" className="underline">
-            Players
-          </Link>{" "}
-          automatically. Duplicate Mahjong Soul log links are rejected.
-        </p>
       </form>
 
       {historyTotal > 0 || historyLoading ? (

@@ -87,6 +87,25 @@ function formatScoreDifference(delta: number) {
   return `${sign}${Math.abs(delta).toLocaleString()}`;
 }
 
+function seatPlayerName(seat: SeatForm, players: PlayerOption[]) {
+  if (seat.playerId) {
+    return players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName;
+  }
+  return seat.displayName;
+}
+
+function resolveSeatPlayerName(
+  value: string,
+  players: PlayerOption[]
+): Pick<SeatForm, "playerId" | "displayName"> {
+  const trimmed = value.trim();
+  const match = players.find((p) => p.display_name.toLowerCase() === trimmed.toLowerCase());
+  if (match) {
+    return { playerId: match.id, displayName: match.display_name };
+  }
+  return { playerId: "", displayName: value };
+}
+
 function ImportHistoryCard({
   row,
   confirmDeleteId,
@@ -467,10 +486,10 @@ export function ImportGameForm() {
     <div className="space-y-6">
       <form
         onSubmit={(e) => void onSubmit(e)}
-        className="card divide-y divide-club-border"
+        className="card min-w-0 overflow-hidden divide-y divide-club-border"
       >
         {/* Player scores */}
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3 p-4 sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-sm font-semibold">Player scores</h2>
             <span className="text-xs text-muted">placement order doesn&apos;t matter</span>
@@ -521,41 +540,32 @@ export function ImportGameForm() {
                 </div>
 
                 {/* Name + score */}
-                <div className="grid grid-cols-[1fr_7rem] gap-2 sm:grid-cols-[1fr_9rem]">
-                  <div>
+                <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2 sm:grid-cols-[minmax(0,1fr)_9rem]">
+                  <div className="min-w-0">
                     {isAi ? (
                       <div className="flex h-11 items-center rounded-lg border border-dashed border-club-border px-3 text-sm text-subtle">
                         AI seat — not ranked
                       </div>
                     ) : (
                       <>
-                        <select
-                          value={seats[index].playerId}
-                          onChange={(e) => {
-                            const playerId = e.target.value;
-                            const player = players.find((p) => p.id === playerId);
-                            updateSeat(index, {
-                              playerId,
-                              displayName: player?.display_name ?? seats[index].displayName,
-                            });
-                          }}
+                        <input
+                          list={`import-players-${index}`}
+                          value={seatPlayerName(seats[index], players)}
+                          onChange={(e) =>
+                            updateSeat(index, resolveSeatPlayerName(e.target.value, players))
+                          }
+                          onBlur={(e) =>
+                            updateSeat(index, resolveSeatPlayerName(e.target.value, players))
+                          }
+                          placeholder="Player name"
+                          autoComplete="off"
                           className="field h-11 w-full px-3 text-sm"
-                        >
-                          <option value="">Type a new name…</option>
+                        />
+                        <datalist id={`import-players-${index}`}>
                           {players.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.display_name}
-                            </option>
+                            <option key={p.id} value={p.display_name} />
                           ))}
-                        </select>
-                        {!seats[index].playerId ? (
-                          <input
-                            value={seats[index].displayName}
-                            onChange={(e) => updateSeat(index, { displayName: e.target.value })}
-                            placeholder="Player name"
-                            className="field mt-1.5 h-11 w-full px-3 text-sm"
-                          />
-                        ) : null}
+                        </datalist>
                       </>
                     )}
                   </div>
@@ -613,20 +623,20 @@ export function ImportGameForm() {
         </div>
 
         {/* Game details */}
-        <div className="space-y-3 p-4 sm:p-5">
+        <div className="min-w-0 space-y-3 p-4 sm:p-5">
           <h2 className="text-sm font-semibold">Game details</h2>
 
-          <label className="block text-xs font-medium text-muted">
+          <label className="block min-w-0 text-xs font-medium text-muted">
             When the game ended
             <input
               type="datetime-local"
               value={playedAt}
               onChange={(e) => setPlayedAt(e.target.value)}
-              className="field mt-1.5 h-11 w-full px-3 text-sm"
+              className="field field-datetime mt-1.5 h-11 px-3 text-base"
             />
           </label>
 
-          <label className="block text-xs font-medium text-muted">
+          <label className="block min-w-0 text-xs font-medium text-muted">
             Mahjong Soul log link{" "}
             <span className="font-normal text-subtle">(optional)</span>
             <input
@@ -678,13 +688,13 @@ export function ImportGameForm() {
             <button
               type="submit"
               disabled={submitting}
-              className="h-11 flex-1 rounded-xl btn-primary disabled:opacity-40"
+              className="btn-primary h-12 w-full rounded-xl text-base font-semibold disabled:opacity-40 sm:h-11 sm:flex-1"
             >
               {submitting ? "Importing…" : "Import game"}
             </button>
             <Link
               href="/leaderboard"
-              className="btn-secondary inline-flex h-11 items-center justify-center px-4"
+              className="btn-secondary inline-flex h-11 w-full items-center justify-center px-4 sm:w-auto"
             >
               View leaderboard
             </Link>

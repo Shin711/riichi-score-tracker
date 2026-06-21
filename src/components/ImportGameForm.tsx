@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
@@ -169,7 +168,7 @@ function ImportPlayerNameInput({
   inputClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({ visibility: "hidden" });
+  const [placement, setPlacement] = useState<"below" | "above">("below");
   const blurTimer = useRef<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
@@ -177,6 +176,13 @@ function ImportPlayerNameInput({
   function setDropdownOpen(next: boolean) {
     setOpen(next);
     onOpenChange?.(next);
+  }
+
+  function clearBlurTimer() {
+    if (blurTimer.current !== null) {
+      window.clearTimeout(blurTimer.current);
+      blurTimer.current = null;
+    }
   }
 
   const suggestions = useMemo(() => {
@@ -187,85 +193,55 @@ function ImportPlayerNameInput({
     return (matches.length > 0 ? matches : players).slice(0, 12);
   }, [players, value]);
 
+  function updatePlacement() {
+    const input = inputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+    const viewportOffsetTop = viewport?.offsetTop ?? 0;
+    const inputTop = rect.top - viewportOffsetTop;
+    const inputBottom = rect.bottom - viewportOffsetTop;
+    const spaceBelow = viewportHeight - inputBottom - 8;
+    const spaceAbove = inputTop - 8;
+    const minSpace = 120;
+    setPlacement(spaceBelow < minSpace && spaceAbove > spaceBelow ? "above" : "below");
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updatePlacement();
+    const viewport = window.visualViewport;
+    viewport?.addEventListener("resize", updatePlacement);
+    viewport?.addEventListener("scroll", updatePlacement);
+    return () => {
+      viewport?.removeEventListener("resize", updatePlacement);
+      viewport?.removeEventListener("scroll", updatePlacement);
+    };
+  }, [open, suggestions.length]);
+
   function handleFocus() {
-    if (blurTimer.current !== null) {
-      window.clearTimeout(blurTimer.current);
-      blurTimer.current = null;
-    }
+    clearBlurTimer();
     setDropdownOpen(true);
   }
 
   function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const related = e.relatedTarget as HTMLElement | null;
+    if (related?.closest('[role="listbox"]')) return;
+
     const current = e.target.value;
     blurTimer.current = window.setTimeout(() => {
       setDropdownOpen(false);
       onChange(resolveSeatPlayerName(current, players));
-    }, 150);
+    }, 200);
   }
 
   function selectPlayer(player: PlayerOption) {
-    if (blurTimer.current !== null) {
-      window.clearTimeout(blurTimer.current);
-      blurTimer.current = null;
-    }
+    clearBlurTimer();
     onChange({ playerId: player.id, displayName: player.display_name });
     setDropdownOpen(false);
+    inputRef.current?.blur();
   }
-
-  useEffect(() => {
-    if (!open || !inputRef.current) return;
-
-    // Calculate position once when dropdown opens
-    const input = inputRef.current;
-    const rect = input.getBoundingClientRect();
-    setDropdownStyle({
-      position: "fixed",
-      top: rect.bottom + 6,
-      left: rect.left,
-      width: rect.width,
-      zIndex: 9999,
-      visibility: "visible",
-    });
-
-    // On mobile, repositioning during scroll/momentum is unreliable — close instead
-    function handleScrollOrResize() {
-      setDropdownOpen(false);
-    }
-
-    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
-    window.addEventListener("resize", handleScrollOrResize, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScrollOrResize, true);
-      window.removeEventListener("resize", handleScrollOrResize);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const dropdown =
-    open && players.length > 0 ? (
-      <ul
-        role="listbox"
-        style={dropdownStyle}
-        className="combobox-dropdown max-h-52 overflow-y-auto rounded-xl border border-club-border py-1 shadow-xl"
-      >
-        {suggestions.map((player) => (
-          <li key={player.id} role="option" aria-selected={player.id === playerId}>
-            <button
-              type="button"
-              onPointerDown={(e) => {
-                e.preventDefault();
-                selectPlayer(player);
-              }}
-              className={`block w-full px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
-                player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
-              }`}
-            >
-              {player.display_name}
-            </button>
-          </li>
-        ))}
-      </ul>
-    ) : null;
 
   return (
     <div className="relative min-w-0">
@@ -280,9 +256,35 @@ function ImportPlayerNameInput({
         onBlur={handleBlur}
         placeholder="Player name"
         autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        spellCheck={false}
+        enterKeyHint="done"
         className={inputClassName}
       />
-      {dropdown && typeof document !== "undefined" ? createPortal(dropdown, document.body) : null}
+      {open && players.length > 0 ? (
+        <ul
+          role="listbox"
+          className={`combobox-dropdown absolute left-0 z-[100] max-h-52 w-full touch-manipulation overflow-y-auto overscroll-contain rounded-xl border border-club-border py-1 shadow-xl ${
+            placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          }`}
+        >
+          {suggestions.map((player) => (
+            <li key={player.id} role="option" aria-selected={player.id === playerId}>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectPlayer(player)}
+                className={`block w-full px-3 py-2.5 text-left text-sm active:bg-stone-100 dark:active:bg-stone-800 ${
+                  player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
+                }`}
+              >
+                {player.display_name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
@@ -739,7 +741,7 @@ export function ImportGameForm() {
                     AI seat — not ranked
                   </div>
                 ) : (
-                  <div className="seat-input-row">
+                  <div className={`seat-input-row${isNameOpen ? " seat-input-row--open" : ""}`}>
                     <div className="relative min-w-0 flex-1">
                       <ImportPlayerNameInput
                         players={players}

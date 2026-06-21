@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
@@ -212,31 +212,34 @@ function ImportPlayerNameInput({
     setDropdownOpen(false);
   }
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!open || !inputRef.current) return;
 
-    function updatePosition() {
-      const input = inputRef.current;
-      if (!input) return;
-      const rect = input.getBoundingClientRect();
-      setDropdownStyle({
-        position: "fixed",
-        top: rect.bottom + 6,
-        left: rect.left,
-        width: rect.width,
-        zIndex: 9999,
-        visibility: "visible",
-      });
+    // Calculate position once when dropdown opens
+    const input = inputRef.current;
+    const rect = input.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 6,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+      visibility: "visible",
+    });
+
+    // On mobile, repositioning during scroll/momentum is unreliable — close instead
+    function handleScrollOrResize() {
+      setDropdownOpen(false);
     }
 
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", handleScrollOrResize, { capture: true, passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
     return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", handleScrollOrResize, true);
+      window.removeEventListener("resize", handleScrollOrResize);
     };
-  }, [open, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const dropdown =
     open && players.length > 0 ? (

@@ -366,6 +366,8 @@ body {
     border-color: var(--color-club-border);
   }
 
+  .seat-input-row--open,
+  .seat-input-row:has(.combobox-dropdown),
   .seat-input-row:focus-within {
     overflow: visible;
     border-color: rgb(15 118 110 / 0.55);

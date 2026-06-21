@@ -170,6 +170,8 @@ function ImportPlayerNameInput({
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<"below" | "above">("below");
   const blurTimer = useRef<number | null>(null);
+  const skipBlurResolveRef = useRef(false);
+  const lastSelectedAtRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
 
@@ -229,18 +231,29 @@ function ImportPlayerNameInput({
     const related = e.relatedTarget as HTMLElement | null;
     if (related?.closest('[role="listbox"]')) return;
 
+    if (skipBlurResolveRef.current) {
+      skipBlurResolveRef.current = false;
+      setDropdownOpen(false);
+      return;
+    }
+
     const current = e.target.value;
     blurTimer.current = window.setTimeout(() => {
       setDropdownOpen(false);
+      if (skipBlurResolveRef.current || Date.now() - lastSelectedAtRef.current < 500) {
+        skipBlurResolveRef.current = false;
+        return;
+      }
       onChange(resolveSeatPlayerName(current, players));
     }, 200);
   }
 
   function selectPlayer(player: PlayerOption) {
     clearBlurTimer();
+    skipBlurResolveRef.current = true;
+    lastSelectedAtRef.current = Date.now();
     onChange({ playerId: player.id, displayName: player.display_name });
     setDropdownOpen(false);
-    inputRef.current?.blur();
   }
 
   return (
@@ -273,8 +286,10 @@ function ImportPlayerNameInput({
             <li key={player.id} role="option" aria-selected={player.id === playerId}>
               <button
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => selectPlayer(player)}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  selectPlayer(player);
+                }}
                 className={`block w-full px-3 py-2.5 text-left text-sm active:bg-stone-100 dark:active:bg-stone-800 ${
                   player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
                 }`}

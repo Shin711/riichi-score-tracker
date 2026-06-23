@@ -12,6 +12,7 @@ export default function Home() {
         title={SITE_NAME}
         description={SITE_DESCRIPTION}
         badge="Riichi mahjong"
+        showLogo
         action={
           <Link href="/import" className="btn-primary h-11 px-6">
             Import scores

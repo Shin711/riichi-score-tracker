@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/"
             className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight transition-opacity duration-300 hover:opacity-90"
           >
-            <BrandMark className="h-9 w-9 text-base" />
+            <BrandMark className="h-9 w-9" priority />
             <span className="text-club-ink">
               <span className="sm:hidden">{SITE_HEADER}</span>
               <span className="hidden sm:inline">{SITE_NAME}</span>

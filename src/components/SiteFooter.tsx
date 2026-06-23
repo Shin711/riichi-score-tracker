@@ -1,10 +1,14 @@
+import { BrandMark } from "@/components/BrandMark";
 import { DISCORD_INVITE_URL, SITE_NAME } from "@/lib/site";
 
 export function SiteFooter() {
   return (
     <footer className="shell-bar mt-auto border-t py-6 pb-20 sm:pb-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:text-left">
-        <p className="text-muted text-xs">{SITE_NAME}</p>
+        <div className="flex items-center gap-2.5">
+          <BrandMark className="h-8 w-8" />
+          <p className="text-muted text-xs">{SITE_NAME}</p>
+        </div>
         <a
           href={DISCORD_INVITE_URL}
           target="_blank"

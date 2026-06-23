@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
 
+import { BrandMark } from "@/components/BrandMark";
+
 type PageHeaderProps = {
   title: string;
   description?: string;
   badge?: string;
   action?: ReactNode;
+  showLogo?: boolean;
 };
 
-export function PageHeader({ title, description, badge, action }: PageHeaderProps) {
+export function PageHeader({ title, description, badge, action, showLogo = false }: PageHeaderProps) {
   return (
     <div className="hero-card p-6 sm:p-8">
       <div
@@ -20,6 +23,7 @@ export function PageHeader({ title, description, badge, action }: PageHeaderProp
       />
       <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-3">
+          {showLogo ? <BrandMark className="h-16 w-16 sm:h-20 sm:w-20" priority /> : null}
           {badge ? (
             <span className="inline-flex items-center rounded-full border border-club-border bg-club-surface/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-club-red backdrop-blur-sm dark:text-red-200">
               {badge}

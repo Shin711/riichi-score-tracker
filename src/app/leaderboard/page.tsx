@@ -22,9 +22,11 @@ function pointsClassName(points: number) {
 function LeaderboardTable({
   entries,
   emptyMessage,
+  startRank = 0,
 }: {
   entries: LeaderboardEntry[];
   emptyMessage: string;
+  startRank?: number;
 }) {
   if (entries.length === 0) {
     return <div className="px-4 py-8 text-sm text-muted">{emptyMessage}</div>;
@@ -32,43 +34,84 @@ function LeaderboardTable({
 
   return (
     <ul className="divide-y divide-club-border">
-      {entries.map((entry, index) => (
-        <li
-          key={entry.playerId}
-          className="px-4 py-4 transition-colors duration-300 ease-fluid hover:bg-club-surface/50 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
-        >
-          <div className="flex items-center gap-3 sm:contents">
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                index === 0
-                  ? "rank-badge-1"
-                  : index === 1
-                    ? "rank-badge-2"
-                    : index === 2
-                      ? "rank-badge-3"
-                      : "rank-badge-n"
-              }`}
-            >
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
-              <div className="mt-1 text-xs text-subtle sm:hidden">
-                {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+      {entries.map((entry, i) => {
+        const index = startRank + i;
+        const rank = index + 1;
+        const isPositive = entry.points > 0;
+        const badgeClass =
+          index === 0
+            ? "rank-badge-1"
+            : index === 1
+              ? "rank-badge-2"
+              : index === 2
+                ? "rank-badge-3"
+                : isPositive
+                  ? "rank-badge-pos"
+                  : entry.points < 0
+                    ? "rank-badge-neg"
+                    : "rank-badge-n";
+        return (
+          <li
+            key={entry.playerId}
+            className={`lb-row ${isPositive ? "lb-row--pos" : ""} px-4 py-4 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3`}
+          >
+            <div className="flex items-center gap-3 sm:contents">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${badgeClass}`}
+              >
+                {rank}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
+                <div className="mt-1 text-xs text-subtle sm:hidden">
+                  {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+                </div>
+              </div>
+              <div
+                className={`lb-points ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
+              >
+                {formatLeaderboardPoints(entry.totalDelta)}
               </div>
             </div>
-            <div
-              className={`ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
-            >
+            <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
+              {entry.gamesPlayed}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Podium({ entries }: { entries: LeaderboardEntry[] }) {
+  if (entries.length === 0) return null;
+
+  const tiers = [
+    { tone: "podium-1", label: "1st", suffix: "Champion" },
+    { tone: "podium-2", label: "2nd", suffix: "Runner-up" },
+    { tone: "podium-3", label: "3rd", suffix: "Third" },
+  ];
+
+  return (
+    <div className="podium grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:gap-4 sm:p-5">
+      {entries.slice(0, 3).map((entry, i) => {
+        const tier = tiers[i];
+        return (
+          <div key={entry.playerId} className={`podium-card ${tier.tone}`}>
+            <div className="podium-rank" aria-hidden>
+              {tier.label}
+            </div>
+            <div className="podium-name">{entry.displayName}</div>
+            <div className={`podium-score ${entry.points > 0 ? "podium-score-pos" : entry.points < 0 ? "podium-score-neg" : ""}`}>
               {formatLeaderboardPoints(entry.totalDelta)}
             </div>
+            <div className="podium-meta">
+              {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"} · {tier.suffix}
+            </div>
           </div>
-          <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
-            {entry.gamesPlayed}
-          </div>
-        </li>
-      ))}
-    </ul>
+        );
+      })}
+    </div>
   );
 }
 
@@ -111,16 +154,31 @@ function LeaderboardSections({
   entries,
   minGamesForRank,
   rankedEmptyMessage,
+  showPodium = false,
 }: {
   entries: LeaderboardEntry[];
   minGamesForRank: number;
   rankedEmptyMessage: string;
+  showPodium?: boolean;
 }) {
   const { ranked, unranked } = useMemo(() => splitLeaderboardEntries(entries), [entries]);
 
   return (
     <>
-      <LeaderboardTable entries={ranked} emptyMessage={rankedEmptyMessage} />
+      {showPodium && ranked.length > 0 ? <Podium entries={ranked} /> : null}
+      {showPodium && ranked.length > 3 ? (
+        <div className="border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
+          <span>Rank</span>
+          <span>Name</span>
+          <span className="text-right">Points</span>
+          <span className="text-right">Games</span>
+        </div>
+      ) : null}
+      <LeaderboardTable
+        entries={showPodium ? ranked.slice(3) : ranked}
+        startRank={showPodium ? 3 : 0}
+        emptyMessage={rankedEmptyMessage}
+      />
       {unranked.length > 0 ? (
         <div className="border-t border-club-border">
           <div className="border-b border-club-border px-4 py-3">
@@ -234,12 +292,6 @@ export default function LeaderboardPage() {
             · points = (ending − start) ÷ 1,000 · ranked after {minGamesForRank}+ games
           </div>
         </div>
-        <div className="hidden border-b border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
-          <span>Rank</span>
-          <span>Name</span>
-          <span className="text-right">Points</span>
-          <span className="text-right">Games</span>
-        </div>
 
         {loading ? (
           <div className="px-4 py-8 text-sm text-muted">Loading standings…</div>
@@ -261,6 +313,7 @@ export default function LeaderboardPage() {
             entries={entries}
             minGamesForRank={minGamesForRank}
             rankedEmptyMessage={`No players with ${minGamesForRank}+ games yet this month.`}
+            showPodium
           />
         )}
       </div>

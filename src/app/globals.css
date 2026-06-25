@@ -34,8 +34,8 @@
     --color-club-cream: #181614;
     --color-club-surface: #22201d;
     --color-club-ink: #f6f3ee;
-    --color-club-muted: #d9d4cc;
-    --color-club-subtle: #bbb3a8;
+    --color-club-muted: #e2ddd4;
+    --color-club-subtle: #cdc6bb;
     --color-club-border: #4b453e;
   }
 }
@@ -489,6 +489,62 @@ body {
     @apply bg-stone-100 text-stone-800;
   }
 
+  /* Leaderboard table rows — dial up presence while keeping AA contrast */
+  .lb-row {
+    position: relative;
+    transition:
+      background-color 0.3s var(--ease-fluid),
+      transform 0.3s var(--ease-fluid),
+      box-shadow 0.3s var(--ease-fluid);
+  }
+  .lb-row::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: transparent;
+    transition: background 0.3s var(--ease-fluid);
+  }
+  /* Uniform zebra striping across the whole table */
+  .lb-row:nth-child(even) {
+    background: color-mix(in srgb, var(--color-club-surface) 80%, transparent);
+  }
+  /* Hover highlight — no translateY so divide-y borders stay visible */
+  .lb-row:hover {
+    background: color-mix(in srgb, var(--color-club-surface) 96%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-club-border) 60%, transparent);
+  }
+  .lb-row:hover::before {
+    background: linear-gradient(
+      to bottom,
+      rgb(196 30 58 / 0.85),
+      rgb(15 118 110 / 0.85)
+    );
+  }
+  /* Positive-point rows get a warm accent rail */
+  .lb-row--pos::before {
+    background: linear-gradient(
+      to bottom,
+      rgb(217 119 6 / 0.9),
+      rgb(180 83 9 / 0.5)
+    );
+  }
+  .lb-row--pos:hover::before {
+    background: linear-gradient(
+      to bottom,
+      rgb(217 119 6 / 0.95),
+      rgb(196 30 58 / 0.7)
+    );
+  }
+
+  /* Rank badges keyed to points (amber = positive, cool = negative) */
+  .rank-badge-pos {
+    @apply bg-amber-50 text-amber-900 ring-1 ring-amber-500/30;
+  }
+  .rank-badge-neg {
+    @apply bg-stone-100 text-stone-800 ring-1 ring-red-400/25;
+  }
+
   .chip-neutral {
     @apply rounded-md bg-stone-200 px-2 py-0.5 text-[10px] font-medium text-stone-800;
   }
@@ -762,18 +818,477 @@ body {
   }
 }
 
+/* ============================================================
+   Arcade vibe — bold tiles, neon glow, playful motion (home + shell)
+   ============================================================ */
+.arcade-title {
+    @apply font-bold tracking-tight;
+    background: linear-gradient(
+      100deg,
+      var(--color-club-red) 0%,
+      #e0506a 22%,
+      var(--color-club-gold) 52%,
+      var(--color-club-jade) 82%,
+      #16a394 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .arcade-badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em];
+    border-color: rgb(196 30 58 / 0.35);
+    color: var(--color-club-red);
+    background: color-mix(in srgb, var(--color-club-red-muted) 70%, transparent);
+    box-shadow:
+      0 0 0 1px rgb(196 30 58 / 0.08),
+      0 6px 18px rgb(196 30 58 / 0.12);
+  }
+
+  .arcade-badge-dot {
+    @apply h-1.5 w-1.5 rounded-full;
+    background: var(--color-club-red);
+    box-shadow: 0 0 8px 1px rgb(196 30 58 / 0.7);
+    animation: arcade-pulse 1.8s ease-in-out infinite;
+  }
+
+  /* Big floating mahjong tiles used as the hero centerpiece */
+  .wind-tile-arcade {
+    @apply relative flex items-center justify-center rounded-2xl border-2 text-3xl font-black sm:text-4xl;
+    height: 5.5rem;
+    width: 4.5rem;
+    color: var(--tile-fg, var(--color-club-ink));
+    border-color: var(--tile-edge, var(--color-club-border));
+    background:
+      linear-gradient(160deg, var(--color-club-surface) 0%, color-mix(in srgb, var(--color-club-surface) 84%, var(--tile-glow, transparent)) 100%);
+    box-shadow:
+      0 10px 24px rgb(28 25 23 / 0.12),
+      0 0 0 1px rgb(255 255 255 / 0.4) inset,
+      0 0 22px -6px var(--tile-glow, transparent);
+    animation: tile-bob 3.4s var(--ease-fluid) infinite;
+    transition: transform 0.3s var(--ease-spring);
+    cursor: default;
+  }
+
+  .wind-tile-arcade:hover {
+    transform: translateY(-8px) rotate(-3deg) scale(1.06);
+  }
+
+  .wind-tile-east {
+    --tile-fg: var(--color-club-red);
+    --tile-edge: rgb(196 30 58 / 0.45);
+    --tile-glow: rgb(196 30 58 / 0.55);
+  }
+  .wind-tile-south {
+    --tile-fg: var(--color-club-gold);
+    --tile-edge: rgb(184 134 11 / 0.45);
+    --tile-glow: rgb(184 134 11 / 0.5);
+  }
+  .wind-tile-west {
+    --tile-fg: var(--color-club-jade);
+    --tile-edge: rgb(15 118 110 / 0.45);
+    --tile-glow: rgb(15 118 110 / 0.55);
+  }
+  .wind-tile-north {
+    --tile-fg: #3b6fb8;
+    --tile-edge: rgb(59 111 184 / 0.45);
+    --tile-glow: rgb(59 111 184 / 0.5);
+  }
+
+  /* Arcade game tiles replacing the home feature cards */
+  .arcade-tile {
+    @apply relative flex h-full flex-col overflow-hidden rounded-3xl border-2 p-6 sm:p-7;
+    border-color: var(--tile-edge, var(--color-club-border));
+    background:
+      radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tile-glow, transparent) 22%, var(--color-club-surface)) 0%, var(--color-club-surface) 55%);
+    box-shadow:
+      0 14px 34px rgb(28 25 23 / 0.1),
+      0 0 0 1px rgb(255 255 255 / 0.35) inset;
+    transition:
+      transform 0.35s var(--ease-spring),
+      box-shadow 0.35s var(--ease-fluid);
+    cursor: pointer;
+  }
+
+  .arcade-tile::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    padding: 2px;
+    background: linear-gradient(135deg, var(--tile-glow, transparent), transparent 55%);
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s var(--ease-fluid);
+    pointer-events: none;
+  }
+
+  .arcade-tile:hover {
+    transform: translateY(-6px) scale(1.015);
+    box-shadow:
+      0 24px 50px -12px var(--tile-glow, rgb(28 25 23 / 0.25)),
+      0 0 0 1px rgb(255 255 255 / 0.4) inset;
+  }
+
+  .arcade-tile:active {
+    transform: translateY(-2px) scale(0.99);
+  }
+
+  .arcade-tile:hover::after {
+    opacity: 1;
+  }
+
+  .arcade-tile-red {
+    --tile-edge: rgb(196 30 58 / 0.4);
+    --tile-glow: rgb(196 30 58 / 0.6);
+  }
+  .arcade-tile-gold {
+    --tile-edge: rgb(184 134 11 / 0.4);
+    --tile-glow: rgb(184 134 11 / 0.55);
+  }
+  .arcade-tile-jade {
+    --tile-edge: rgb(15 118 110 / 0.4);
+    --tile-glow: rgb(15 118 110 / 0.55);
+  }
+
+  .arcade-glyph {
+    @apply flex items-center justify-center rounded-2xl text-2xl font-black;
+    height: 3.25rem;
+    width: 3.25rem;
+    color: var(--tile-fg, var(--color-club-ink));
+    background: color-mix(in srgb, var(--tile-glow, transparent) 16%, var(--color-club-surface));
+    border: 1.5px solid var(--tile-edge, var(--color-club-border));
+    box-shadow: 0 0 18px -4px var(--tile-glow, transparent);
+    transition: transform 0.35s var(--ease-spring);
+  }
+
+  .arcade-tile:hover .arcade-glyph {
+    transform: rotate(-6deg) scale(1.08);
+  }
+
+  .arcade-tile-red .arcade-glyph {
+    --tile-fg: var(--color-club-red);
+  }
+  .arcade-tile-gold .arcade-glyph {
+    --tile-fg: var(--color-club-gold);
+  }
+  .arcade-tile-jade .arcade-glyph {
+    --tile-fg: var(--color-club-jade);
+  }
+
+  .arcade-cta {
+    @apply mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-bold;
+    color: var(--tile-fg, var(--color-club-red));
+    transition: gap 0.3s var(--ease-fluid);
+  }
+
+  .arcade-tile-red .arcade-cta {
+    --tile-fg: var(--color-club-red);
+  }
+  .arcade-tile-gold .arcade-cta {
+    --tile-fg: var(--color-club-gold);
+  }
+  .arcade-tile-jade .arcade-cta {
+    --tile-fg: var(--color-club-jade);
+  }
+
+  .arcade-tile:hover .arcade-cta {
+    gap: 0.625rem;
+  }
+
+  .arcade-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-300;
+    border-color: var(--color-club-border);
+    color: var(--color-club-muted);
+    background: var(--color-club-surface);
+  }
+
+  .arcade-chip:hover {
+    transform: translateY(-2px);
+    color: var(--color-club-ink);
+    border-color: rgb(196 30 58 / 0.4);
+    box-shadow: 0 8px 20px -6px rgb(196 30 58 / 0.3);
+  }
+
+  /* Apple-style page hero — big display type, accent rule, soft color washes */
+  .page-hero {
+    @apply relative overflow-hidden rounded-[2rem] border px-6 py-12 sm:px-12 sm:py-16;
+    border-color: var(--color-club-border);
+    background: var(--color-club-surface);
+    background-image:
+      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-club-red-muted) 55%, transparent) 0%, transparent 60%);
+    box-shadow:
+      0 24px 60px -28px rgb(28 25 23 / 0.28),
+      0 0 0 1px rgb(255 255 255 / 0.4) inset;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .page-hero {
+      background-image:
+        radial-gradient(120% 90% at 50% 0%, rgb(196 30 58 / 0.18) 0%, transparent 60%);
+      box-shadow:
+        0 24px 60px -28px rgb(0 0 0 / 0.5),
+        0 0 0 1px rgb(255 255 255 / 0.05) inset;
+    }
+  }
+
+  .page-hero-wash {
+    @apply pointer-events-none absolute rounded-full blur-3xl;
+  }
+
+  .page-hero-wash-red {
+    top: -5rem;
+    right: -4rem;
+    width: 18rem;
+    height: 18rem;
+    background: radial-gradient(circle, rgb(196 30 58 / 0.22), transparent 65%);
+  }
+
+  .page-hero-wash-jade {
+    bottom: -6rem;
+    left: -5rem;
+    width: 16rem;
+    height: 16rem;
+    background: radial-gradient(circle, rgb(15 118 110 / 0.18), transparent 65%);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .page-hero-wash-red {
+      background: radial-gradient(circle, rgb(196 30 58 / 0.32), transparent 65%);
+    }
+    .page-hero-wash-jade {
+      background: radial-gradient(circle, rgb(15 118 110 / 0.26), transparent 65%);
+    }
+  }
+
+  .page-hero-rule {
+    @apply absolute left-1/2 top-6 h-1 w-12 -translate-x-1/2 rounded-full;
+    background: linear-gradient(90deg, var(--color-club-red), var(--color-club-gold), var(--color-club-jade));
+    box-shadow: 0 0 18px -2px rgb(196 30 58 / 0.5);
+  }
+
+  .page-hero-title {
+    @apply font-bold tracking-tight;
+    background: linear-gradient(
+      100deg,
+      var(--color-club-red) 0%,
+      #e0506a 22%,
+      var(--color-club-gold) 52%,
+      var(--color-club-jade) 82%,
+      #16a394 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-size: clamp(2.25rem, 6vw, 4rem);
+    line-height: 1.04;
+    letter-spacing: -0.02em;
+  }
+
+  .page-hero-desc {
+    @apply text-base leading-7 sm:text-lg;
+    color: var(--color-club-muted);
+    max-width: 42rem;
+    margin-inline: auto;
+  }
+
+  .page-hero-action {
+    @apply flex flex-wrap items-center justify-center gap-3 pt-1;
+  }
+
+  /* Leaderboard top-3 podium — big display numbers, medal accents */
+  .podium {
+    @apply grid gap-3 sm:gap-4;
+  }
+
+  .podium-card {
+    @apply relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border px-5 py-6 text-center sm:py-7;
+    border-color: var(--podium-edge, var(--color-club-border));
+    background:
+      radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--podium-glow, transparent) 20%, var(--color-club-surface)) 0%, var(--color-club-surface) 60%);
+    box-shadow: 0 14px 34px -18px var(--podium-glow, rgb(28 25 23 / 0.25));
+  }
+
+  .podium-1 {
+    --podium-edge: rgb(217 119 6 / 0.45);
+    --podium-glow: rgb(217 119 6 / 0.5);
+    --podium-rank: rgb(245 158 11);
+  }
+  .podium-2 {
+    --podium-edge: rgb(161 161 170 / 0.45);
+    --podium-glow: rgb(161 161 170 / 0.5);
+    --podium-rank: rgb(196 193 188);
+  }
+  .podium-3 {
+    --podium-edge: rgb(194 65 12 / 0.45);
+    --podium-glow: rgb(194 65 12 / 0.5);
+    --podium-rank: rgb(234 88 12);
+  }
+
+  .podium-rank {
+    @apply text-[11px] font-bold uppercase tracking-[0.18em];
+    color: var(--podium-rank, var(--color-club-muted));
+  }
+
+  .podium-name {
+    @apply truncate text-base font-bold tracking-tight text-club-ink;
+    max-width: 100%;
+  }
+
+  .podium-score {
+    @apply font-mono font-black tabular-nums;
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--color-club-ink);
+  }
+
+  .podium-score-pos {
+    color: #059669;
+  }
+  .podium-score-neg {
+    color: #dc2626;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .podium-score-pos {
+      color: #34d399;
+    }
+    .podium-score-neg {
+      color: #f87171;
+    }
+  }
+
+  .podium-meta {
+    @apply text-xs;
+    color: var(--color-club-subtle);
+  }
+
+  /* Calculator result — dramatic Apple-style display number on a jade field */
+  .calc-result {
+    @apply relative overflow-hidden rounded-3xl border-2 p-5 sm:p-7;
+    border-color: rgb(15 118 110 / 0.4);
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgb(15 118 110 / 0.18), transparent 55%),
+      linear-gradient(160deg, var(--color-club-jade-muted), color-mix(in srgb, var(--color-club-jade-muted) 85%, var(--color-club-surface)));
+    box-shadow: 0 18px 44px -20px rgb(15 118 110 / 0.45);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .calc-result {
+      background:
+        radial-gradient(120% 100% at 0% 0%, rgb(15 118 110 / 0.28), transparent 55%),
+        linear-gradient(160deg, rgb(18 63 59 / 0.6), rgb(18 63 59 / 0.35));
+      box-shadow: 0 18px 44px -20px rgb(0 0 0 / 0.6);
+    }
+  }
+
+  .calc-result-label {
+    @apply text-xs font-bold uppercase tracking-[0.18em];
+    color: var(--color-club-jade-label);
+  }
+
+  .calc-result-chip {
+    @apply rounded-full px-2.5 py-0.5 text-[11px] font-semibold;
+    background: rgb(15 118 110 / 0.16);
+    color: var(--color-club-jade-fg);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .calc-result-chip {
+      background: rgb(255 255 255 / 0.1);
+      color: var(--color-club-jade-label);
+    }
+  }
+
+  .calc-result-total {
+    @apply font-mono font-black tabular-nums;
+    font-size: clamp(2.75rem, 9vw, 4.25rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    color: var(--color-club-jade-fg);
+    text-shadow: 0 2px 24px rgb(15 118 110 / 0.25);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .calc-result-total {
+      color: #ecfdf5;
+    }
+  }
+
+  .calc-result-unit {
+    @apply ml-2 text-lg font-semibold;
+    color: var(--color-club-jade-label);
+    letter-spacing: 0;
+  }
+
+  .calc-breakdown {
+    @apply border-0 bg-white/55 backdrop-blur-sm;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .calc-breakdown {
+      background: rgb(255 255 255 / 0.06);
+    }
+  }
+
+  .bottom-nav-active {
+    background: color-mix(in srgb, var(--color-club-red-muted) 80%, transparent);
+    box-shadow:
+      0 0 0 1px rgb(196 30 58 / 0.25),
+      0 6px 16px -6px rgb(196 30 58 / 0.45);
+  }
+
+  /* Glowing rank-1 badge for the leaderboard */
+  .rank-badge-1 {
+    box-shadow:
+      0 0 0 1px rgb(217 119 6 / 0.4),
+      0 4px 14px -3px rgb(217 119 6 / 0.5);
+  }
+
+@keyframes arcade-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.78);
+  }
+}
+
+@keyframes tile-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
   .page-enter > *,
   .score-pop,
-  .ambient-orb {
+  .ambient-orb,
+  .arcade-badge-dot,
+  .wind-tile-arcade {
     animation: none !important;
   }
 
   .card-interactive:hover,
   .btn-primary:hover,
   .btn-secondary:hover,
-  .wind-tile:hover {
+  .wind-tile:hover,
+  .wind-tile-arcade:hover,
+  .arcade-tile:hover {
     transform: none;
   }
 }

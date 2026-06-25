@@ -1,95 +1,118 @@
 import Link from "next/link";
 
-import { PageHeader } from "@/components/PageHeader";
+import { BrandMark } from "@/components/BrandMark";
 import { DISCORD_INVITE_URL, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 
-const WINDS = ["東", "南", "西", "北"] as const;
+const WINDS = [
+  { glyph: "東", tone: "wind-tile-east" },
+  { glyph: "南", tone: "wind-tile-south" },
+  { glyph: "西", tone: "wind-tile-west" },
+  { glyph: "北", tone: "wind-tile-north" },
+] as const;
+
+const TILES = [
+  {
+    href: "/import",
+    glyph: "入",
+    tone: "arcade-tile-red",
+    title: "Import game",
+    body: "Finished playing? Enter final scores from Mahjong Soul or your notes to update the monthly leaderboard.",
+    cta: "Import scores",
+    span: "md:col-span-7",
+  },
+  {
+    href: "/calculator",
+    glyph: "符",
+    tone: "arcade-tile-gold",
+    title: "Score calculator",
+    body: "At the table? Tap ron or tsumo and pick a common hand to see who pays.",
+    cta: "Open calculator",
+    span: "md:col-span-5",
+  },
+  {
+    href: "/leaderboard",
+    glyph: "順",
+    tone: "arcade-tile-jade",
+    title: "Leaderboard",
+    body: "See who's on top this month and how the standings are shifting.",
+    cta: "View standings",
+    span: "md:col-span-12",
+  },
+] as const;
 
 export default function Home() {
   return (
-    <main className="space-y-8">
-      <PageHeader
-        title={SITE_NAME}
-        description={SITE_DESCRIPTION}
-        badge="Riichi mahjong"
-        showLogo
-        action={
-          <Link href="/import" className="btn-primary h-11 px-6">
-            Import scores
-          </Link>
-        }
-      />
+    <main className="space-y-9">
+      <section className="page-hero px-6 py-14 sm:px-12 sm:py-20">
+        <div className="page-hero-wash page-hero-wash-red" aria-hidden />
+        <div className="page-hero-wash page-hero-wash-jade" aria-hidden />
 
-      <div className="flex justify-center gap-2.5 py-2" aria-hidden>
-        {WINDS.map((wind, i) => (
-          <span key={wind} className="wind-tile" style={{ animationDelay: `${i * 80}ms` }}>
-            {wind}
+        <div className="relative flex flex-col items-center gap-6 text-center">
+          <BrandMark className="h-24 w-24 ring-4 ring-white/40 sm:h-28 sm:w-28" priority />
+
+          <span className="arcade-badge">
+            <span className="arcade-badge-dot" aria-hidden />
+            Riichi mahjong
           </span>
+
+          <h1 className="page-hero-title">{SITE_NAME}</h1>
+
+          <p className="page-hero-desc">{SITE_DESCRIPTION}</p>
+
+          <div className="page-hero-action pt-2">
+            <Link href="/import" className="btn-primary h-12 px-7 text-base">
+              Import scores
+            </Link>
+            <Link href="/leaderboard" className="btn-secondary h-12 px-6 text-base">
+              Leaderboard
+            </Link>
+          </div>
+
+          <div className="flex justify-center gap-4 pt-6 sm:gap-5" aria-hidden>
+            {WINDS.map((wind, i) => (
+              <span
+                key={wind.glyph}
+                className={`wind-tile-arcade ${wind.tone}`}
+                style={{ animationDelay: `${i * 220}ms` }}
+              >
+                {wind.glyph}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 md:grid-cols-12">
+        {TILES.map((tile) => (
+          <Link key={tile.href} href={tile.href} className={`arcade-tile ${tile.tone} group ${tile.span}`}>
+            <div className="flex items-center gap-3.5">
+              <span className="arcade-glyph" aria-hidden>
+                {tile.glyph}
+              </span>
+              <h2 className="text-xl font-bold tracking-tight text-club-ink sm:text-2xl">{tile.title}</h2>
+            </div>
+            <p className="text-muted mt-3 max-w-md text-sm leading-7">{tile.body}</p>
+            <span className="arcade-cta">
+              {tile.cta}
+              <span className="feature-card-cta-arrow" aria-hidden>
+                →
+              </span>
+            </span>
+          </Link>
         ))}
       </div>
 
-      <div className="grid gap-5 md:grid-cols-12">
-        <Link href="/import" className="feature-card group md:col-span-7">
-          <div className="relative flex h-full flex-col">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-club-red-muted text-base font-bold text-club-red transition-transform duration-300 ease-fluid group-hover:scale-110">
-                入
-              </span>
-              <h2 className="text-xl font-bold tracking-tight text-club-ink">Import game</h2>
-            </div>
-            <p className="text-muted relative mt-3 max-w-md text-sm leading-7">
-              Finished playing? Enter final scores from Mahjong Soul or your notes to update the monthly
-              leaderboard — the usual end-of-night workflow.
-            </p>
-            <span className="feature-card-cta mt-auto">
-              Import scores
-              <span className="feature-card-cta-arrow" aria-hidden>
-                →
-              </span>
-            </span>
-          </div>
-        </Link>
-
-        <Link href="/calculator" className="feature-card group md:col-span-5">
-          <div className="relative flex h-full flex-col">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-club-gold-muted text-base font-bold text-club-gold transition-transform duration-300 ease-fluid group-hover:scale-110">
-                符
-              </span>
-              <h2 className="text-xl font-bold tracking-tight text-club-ink">Score calculator</h2>
-            </div>
-            <p className="text-muted relative mt-3 text-sm leading-7">
-              At the table? Tap ron or tsumo and pick a common hand to see who pays.
-            </p>
-            <span className="feature-card-cta mt-auto">
-              Open calculator
-              <span className="feature-card-cta-arrow" aria-hidden>
-                →
-              </span>
-            </span>
-          </div>
-        </Link>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-2 text-center">
-        <Link
-          href="/my/sessions"
-          className="rounded-full border border-club-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-club-surface/80 hover:text-club-ink"
-        >
+      <div className="flex flex-wrap items-center justify-center gap-2.5 text-center">
+        <Link href="/my/sessions" className="arcade-chip">
           My games
         </Link>
-        <Link
-          href="/experimental"
-          className="rounded-full border border-club-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-club-surface/80 hover:text-club-ink"
-        >
+        <Link href="/players" className="arcade-chip">
+          Players
+        </Link>
+        <Link href="/experimental" className="arcade-chip">
           Live session tracker
         </Link>
-        <a
-          href={DISCORD_INVITE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rounded-full border border-club-border px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-club-surface/80 hover:text-club-ink"
-        >
+        <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer" className="arcade-chip">
           Discord
         </a>
       </div>

@@ -34,9 +34,7 @@ function BottomNavItem({ href, label }: { href: string; label: string }) {
     <Link
       href={href}
       className={`relative mx-0.5 my-1 flex flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-medium transition-all duration-300 ease-fluid ${
-        active
-          ? "bg-club-surface text-club-red shadow-sm ring-1 ring-club-border dark:text-red-300"
-          : "text-muted"
+        active ? "bottom-nav-active font-semibold text-club-red dark:text-red-300" : "text-muted"
       }`}
     >
       <span className="text-xs">{label}</span>
@@ -56,9 +54,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight transition-opacity duration-300 hover:opacity-90"
           >
             <BrandMark className="h-11 w-11" priority />
-            <span className="text-club-ink">
+            <span className="arcade-title">
               <span className="sm:hidden">{SITE_HEADER}</span>
-              <span className="hidden sm:inline">{SITE_NAME}</span>
+              <span className="hidden sm:inline">{SITE_HEADER}</span>
             </span>
           </Link>
           <nav className="hidden items-center gap-1 sm:flex">

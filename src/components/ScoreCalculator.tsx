@@ -81,31 +81,26 @@ export function ScoreCalculator() {
   return (
     <div className="space-y-5">
       {result ? (
-        <section className="jade-panel sticky top-16 z-30 p-4 sm:p-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="jade-panel-label">You receive</span>
-            <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-medium text-white/90 dark:bg-white/10">
+        <section className="calc-result p-5 sm:p-7">
+          <div className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-club-jade/20 blur-3xl" aria-hidden />
+          <div className="relative flex flex-wrap items-center gap-2">
+            <span className="calc-result-label">You receive</span>
+            <span className="calc-result-chip">
               {winType === "ron" ? "Ron" : "Tsumo"}
               {winnerIsDealer ? " · Dealer" : ""}
             </span>
-            <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-medium text-white/90 dark:bg-white/10">
-              {result.handLabel}
-            </span>
-            {honba > 0 ? (
-              <span className="rounded-full bg-black/10 px-2 py-0.5 text-[11px] font-medium text-white/90 dark:bg-white/10">
-                {honba} honba
-              </span>
-            ) : null}
+            <span className="calc-result-chip">{result.handLabel}</span>
+            {honba > 0 ? <span className="calc-result-chip">{honba} honba</span> : null}
           </div>
           <div
             key={result.total}
-            className="score-display score-pop jade-panel-fg mt-1.5 text-4xl sm:text-5xl"
+            className="score-display score-pop calc-result-total mt-2"
           >
             {result.total.toLocaleString()}
-            <span className="jade-panel-label ml-2 text-lg font-semibold normal-case">pts</span>
+            <span className="calc-result-unit">pts</span>
           </div>
 
-          <div className="card mt-4 p-3.5">
+          <div className="calc-breakdown card mt-4 p-3.5">
             <div className="text-xs font-semibold uppercase tracking-wide text-subtle">Who pays</div>
             <ul className="mt-2 space-y-1.5">
               {result.payments.map((row) => (

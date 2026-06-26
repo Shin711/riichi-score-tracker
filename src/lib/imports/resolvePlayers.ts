@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { ImportedGameEntry } from "@/lib/imports/types";
+import {
+  DUPLICATE_PLAYER_NAME_MESSAGE,
+  findPlayerByDisplayName,
+  isDuplicatePlayerNameError,
+  normalizePlayerDisplayName,
+  playerNameKey,
+} from "@/lib/players/names";
 
 export type ImportSeatInput = {
   playerId?: string;
@@ -19,7 +26,7 @@ export async function resolveImportPlayers(
 
   const byId = new Map((existing ?? []).map((p) => [p.id, p.display_name]));
   const byNameLower = new Map(
-    (existing ?? []).map((p) => [p.display_name.trim().toLowerCase(), p])
+    (existing ?? []).map((p) => [playerNameKey(p.display_name), p])
   );
 
   const resolved: ImportedGameEntry[] = [];
@@ -44,7 +51,7 @@ export async function resolveImportPlayers(
       continue;
     }
 
-    const name = seat.displayName?.trim() ?? "";
+    const name = normalizePlayerDisplayName(seat.displayName ?? "");
     if (!name) {
       throw new Error("Each human seat needs a player name.");
     }
@@ -55,7 +62,7 @@ export async function resolveImportPlayers(
     }
 
     if (!playerId) {
-      const match = byNameLower.get(name.toLowerCase());
+      const match = byNameLower.get(playerNameKey(name));
       if (match) {
         playerId = match.id;
       } else {
@@ -64,10 +71,26 @@ export async function resolveImportPlayers(
           .insert({ display_name: name })
           .select("id, display_name")
           .single();
-        if (createErr) throw new Error(createErr.message);
-        playerId = created.id;
-        byId.set(playerId, created.display_name);
-        byNameLower.set(name.toLowerCase(), created);
+
+        if (createErr) {
+          if (isDuplicatePlayerNameError(createErr)) {
+            const { data: retryPlayers, error: retryErr } = await supabase
+              .from("players")
+              .select("id, display_name");
+            if (retryErr) throw new Error(retryErr.message);
+            const retryMatch = findPlayerByDisplayName(retryPlayers ?? [], name);
+            if (!retryMatch) throw new Error(DUPLICATE_PLAYER_NAME_MESSAGE);
+            playerId = retryMatch.id;
+            byId.set(playerId, retryMatch.display_name);
+            byNameLower.set(playerNameKey(retryMatch.display_name), retryMatch);
+          } else {
+            throw new Error(createErr.message);
+          }
+        } else {
+          playerId = created.id;
+          byId.set(playerId, created.display_name);
+          byNameLower.set(playerNameKey(created.display_name), created);
+        }
       }
     }
 

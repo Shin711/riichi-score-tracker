@@ -7,6 +7,7 @@ import { importSeatWindLabel, type ImportedGameEntry, type ImportedGameRow } fro
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
 import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
+import { findPlayerByDisplayName } from "@/lib/players/names";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const IMPORT_SEAT_COUNT = 4;
@@ -144,8 +145,7 @@ function resolveSeatPlayerName(
   value: string,
   players: PlayerOption[]
 ): Pick<SeatForm, "playerId" | "displayName"> {
-  const trimmed = value.trim();
-  const match = players.find((p) => p.display_name.toLowerCase() === trimmed.toLowerCase());
+  const match = findPlayerByDisplayName(players, value);
   if (match) {
     return { playerId: match.id, displayName: match.display_name };
   }
@@ -169,10 +169,12 @@ function ImportPlayerNameInput({
 }) {
   const [open, setOpen] = useState(false);
   const [placement, setPlacement] = useState<"below" | "above">("below");
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const blurTimer = useRef<number | null>(null);
   const skipBlurResolveRef = useRef(false);
   const lastSelectedAtRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
 
   function setDropdownOpen(next: boolean) {
@@ -254,7 +256,46 @@ function ImportPlayerNameInput({
     lastSelectedAtRef.current = Date.now();
     onChange({ playerId: player.id, displayName: player.display_name });
     setDropdownOpen(false);
+    setHighlightedIndex(-1);
   }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (players.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) {
+        setDropdownOpen(true);
+        return;
+      }
+      setHighlightedIndex((i) => (suggestions.length === 0 ? -1 : (i + 1) % suggestions.length));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!open) {
+        setDropdownOpen(true);
+        return;
+      }
+      setHighlightedIndex((i) =>
+        suggestions.length === 0 ? -1 : i <= 0 ? suggestions.length - 1 : i - 1
+      );
+    } else if (e.key === "Enter") {
+      if (open && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
+        e.preventDefault();
+        selectPlayer(suggestions[highlightedIndex]);
+      }
+    } else if (e.key === "Escape") {
+      if (open) {
+        e.preventDefault();
+        setDropdownOpen(false);
+        setHighlightedIndex(-1);
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (highlightedIndex < 0 || !listRef.current) return;
+    const el = listRef.current.children[highlightedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
 
   return (
     <div className="relative min-w-0">
@@ -264,9 +305,19 @@ function ImportPlayerNameInput({
         onChange={(e) => {
           onChange(resolveSeatPlayerName(e.target.value, players));
           setDropdownOpen(true);
+          setHighlightedIndex(-1);
         }}
         onFocus={handleFocus}
         onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls="import-player-listbox"
+        aria-activedescendant={
+          highlightedIndex >= 0 && highlightedIndex < suggestions.length
+            ? `import-player-option-${suggestions[highlightedIndex].id}`
+            : undefined
+        }
         placeholder="Player name"
         autoComplete="off"
         autoCorrect="off"
@@ -277,27 +328,43 @@ function ImportPlayerNameInput({
       />
       {open && players.length > 0 ? (
         <ul
+          ref={listRef}
+          id="import-player-listbox"
           role="listbox"
           className={`combobox-dropdown absolute left-0 z-[100] max-h-52 w-full touch-manipulation overflow-y-auto overscroll-contain rounded-xl border border-club-border py-1 shadow-xl ${
             placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5"
           }`}
         >
-          {suggestions.map((player) => (
-            <li key={player.id} role="option" aria-selected={player.id === playerId}>
-              <button
-                type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  selectPlayer(player);
-                }}
-                className={`block w-full px-3 py-2.5 text-left text-sm active:bg-stone-100 dark:active:bg-stone-800 ${
-                  player.id === playerId ? "bg-club-red-muted font-medium text-club-ink" : "text-club-ink"
-                }`}
+          {suggestions.map((player, index) => {
+            const isHighlighted = index === highlightedIndex;
+            const isSelected = player.id === playerId;
+            return (
+              <li
+                key={player.id}
+                id={`import-player-option-${player.id}`}
+                role="option"
+                aria-selected={isHighlighted || isSelected}
               >
-                {player.display_name}
-              </button>
-            </li>
-          ))}
+                <button
+                  type="button"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    selectPlayer(player);
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  className={`block w-full px-3 py-2.5 text-left text-sm ${
+                    isHighlighted
+                      ? "bg-club-red-muted text-club-ink"
+                      : isSelected
+                        ? "bg-club-red-muted font-medium text-club-ink"
+                        : "text-club-ink"
+                  }`}
+                >
+                  {player.display_name}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </div>

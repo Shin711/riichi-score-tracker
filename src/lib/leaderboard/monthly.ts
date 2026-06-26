@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
-import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
+import { formatLeaderboardPoints, formatLeaderboardRating } from "@/lib/leaderboard/points";
 import {
-  LEADERBOARD_MIN_GAMES_FOR_RANK,
+  getLeaderboardScoringOptions,
+  minGamesForLeaderboardRank,
   splitLeaderboardEntries,
 } from "@/lib/leaderboard/qualification";
 import { buildLeaderboardForPeriod } from "@/lib/leaderboard/server";
@@ -45,8 +46,8 @@ export function* iterateMonthsUntilExclusive(
   }
 }
 
-function withRanks(entries: LeaderboardEntry[]): MonthlyArchiveEntry[] {
-  const { ranked, unranked } = splitLeaderboardEntries(entries);
+function withRanks(entries: LeaderboardEntry[], period: { year: number; month: number }) {
+  const { ranked, unranked } = splitLeaderboardEntries(entries, period);
   return [
     ...ranked.map((entry, index) => ({ ...entry, rank: index + 1 })),
     ...unranked.map((entry) => ({ ...entry, rank: null })),
@@ -59,8 +60,13 @@ export async function archiveLeaderboardMonth(
   month: number
 ): Promise<MonthlyArchive | null> {
   const { startIso, endIso } = getMonthPeriodBounds(year, month);
-  const { entries, gamesWithPlayers } = await buildLeaderboardForPeriod(supabase, startIso, endIso);
-  const ranked = withRanks(entries);
+  const { entries, gamesWithPlayers } = await buildLeaderboardForPeriod(
+    supabase,
+    startIso,
+    endIso,
+    { year, month }
+  );
+  const ranked = withRanks(entries, { year, month });
 
   const { data, error } = await supabase
     .from("leaderboard_monthly_archives")
@@ -151,27 +157,49 @@ function csvName(displayName: string) {
 }
 
 export function archiveToCsv(archive: MonthlyArchive) {
-  const { ranked, unranked } = splitLeaderboardEntries(archive.entries);
-  const lines = ["Rank,Name,Points,Games"];
+  const period = { year: archive.year, month: archive.month };
+  const { useRating } = getLeaderboardScoringOptions(period);
+  const minGamesForRank = minGamesForLeaderboardRank(archive.year, archive.month);
+  const { ranked, unranked } = splitLeaderboardEntries(archive.entries, period);
 
+  if (useRating) {
+    const lines = ["Rank,Name,Rating,Net,Games"];
+    for (const [index, entry] of ranked.entries()) {
+      lines.push(
+        `${index + 1},${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
+      );
+    }
+    if (unranked.length > 0) {
+      lines.push("");
+      lines.push(`Unranked (under ${minGamesForRank} games)`);
+      lines.push("Name,Rating,Net,Games,Games needed");
+      for (const entry of unranked) {
+        const needed = minGamesForRank - entry.gamesPlayed;
+        lines.push(
+          `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
+        );
+      }
+    }
+    return lines.join("\n");
+  }
+
+  const lines = ["Rank,Name,Points,Games"];
   for (const [index, entry] of ranked.entries()) {
     lines.push(
       `${index + 1},${csvName(entry.displayName)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
     );
   }
-
   if (unranked.length > 0) {
     lines.push("");
-    lines.push(`Unranked (under ${LEADERBOARD_MIN_GAMES_FOR_RANK} games)`);
+    lines.push(`Unranked (under ${minGamesForRank} games)`);
     lines.push("Name,Points,Games,Games needed");
     for (const entry of unranked) {
-      const needed = LEADERBOARD_MIN_GAMES_FOR_RANK - entry.gamesPlayed;
+      const needed = minGamesForRank - entry.gamesPlayed;
       lines.push(
         `${csvName(entry.displayName)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
       );
     }
   }
-
   return lines.join("\n");
 }
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
+import { importSeatWindLabel, type ImportedGameEntry, type ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
 import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
@@ -702,7 +702,7 @@ export function ImportGameForm() {
           </div>
 
           {Array.from({ length: IMPORT_SEAT_COUNT }, (_, index) => {
-            const seatLabel = `Player ${index + 1}`;
+            const seatLabel = importSeatWindLabel(index);
             const placement = placementBySeat.get(index);
             const isAi = seats[index].isAi;
             const isNameOpen = openNameSeatIndex === index;

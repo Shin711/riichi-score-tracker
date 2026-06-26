@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { ensureMonthlyArchivesUpToDate } from "@/lib/leaderboard/monthly";
-import { LEADERBOARD_MIN_GAMES_FOR_RANK } from "@/lib/leaderboard/qualification";
 import { buildCurrentMonthLeaderboard } from "@/lib/leaderboard/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -17,7 +16,8 @@ export async function GET() {
 
     return NextResponse.json({
       entries: result.entries,
-      minGamesForRank: LEADERBOARD_MIN_GAMES_FOR_RANK,
+      minGamesForRank: result.minGamesForRank,
+      useRating: result.useRating,
       gamesWithPlayers: result.gamesWithPlayers,
       sessionGames: result.sessionGames,
       importedGames: result.importedGames,

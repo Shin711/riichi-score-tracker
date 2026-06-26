@@ -6,11 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import type { MonthlyArchive } from "@/lib/leaderboard/monthly";
-import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
+import { formatLeaderboardPoints, formatLeaderboardRating } from "@/lib/leaderboard/points";
 import {
   gamesUntilLeaderboardRank,
-  LEADERBOARD_MIN_GAMES_FOR_RANK,
+  getLeaderboardScoringOptions,
+  LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY,
   splitLeaderboardEntries,
+  type LeaderboardScoringPeriod,
 } from "@/lib/leaderboard/qualification";
 
 function pointsClassName(points: number) {
@@ -19,14 +21,22 @@ function pointsClassName(points: number) {
   return "";
 }
 
+function formatHeadlineScore(entry: LeaderboardEntry, useRating: boolean) {
+  return useRating
+    ? formatLeaderboardRating(entry.points, entry.gamesPlayed)
+    : formatLeaderboardPoints(entry.totalDelta);
+}
+
 function LeaderboardTable({
   entries,
   emptyMessage,
   startRank = 0,
+  useRating,
 }: {
   entries: LeaderboardEntry[];
   emptyMessage: string;
   startRank?: number;
+  useRating: boolean;
 }) {
   if (entries.length === 0) {
     return <div className="px-4 py-8 text-sm text-muted">{emptyMessage}</div>;
@@ -63,14 +73,24 @@ function LeaderboardTable({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
-                <div className="mt-1 text-xs text-subtle sm:hidden">
-                  {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
-                </div>
+                {useRating ? (
+                  <div className="mt-1 text-xs text-subtle">
+                    Net {formatLeaderboardPoints(entry.totalDelta)}
+                    <span className="sm:hidden">
+                      {" "}
+                      · {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xs text-subtle sm:hidden">
+                    {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+                  </div>
+                )}
               </div>
               <div
                 className={`lb-points ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
               >
-                {formatLeaderboardPoints(entry.totalDelta)}
+                {formatHeadlineScore(entry, useRating)}
               </div>
             </div>
             <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
@@ -83,7 +103,13 @@ function LeaderboardTable({
   );
 }
 
-function Podium({ entries }: { entries: LeaderboardEntry[] }) {
+function Podium({
+  entries,
+  useRating,
+}: {
+  entries: LeaderboardEntry[];
+  useRating: boolean;
+}) {
   if (entries.length === 0) return null;
 
   const tiers = [
@@ -103,9 +129,10 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
             </div>
             <div className="podium-name">{entry.displayName}</div>
             <div className={`podium-score ${entry.points > 0 ? "podium-score-pos" : entry.points < 0 ? "podium-score-neg" : ""}`}>
-              {formatLeaderboardPoints(entry.totalDelta)}
+              {formatHeadlineScore(entry, useRating)}
             </div>
             <div className="podium-meta">
+              {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
               {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"} · {tier.suffix}
             </div>
           </div>
@@ -115,13 +142,21 @@ function Podium({ entries }: { entries: LeaderboardEntry[] }) {
   );
 }
 
-function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
+function UnrankedLeaderboardList({
+  entries,
+  minGamesForRank,
+  useRating,
+}: {
+  entries: LeaderboardEntry[];
+  minGamesForRank: number;
+  useRating: boolean;
+}) {
   if (entries.length === 0) return null;
 
   return (
     <ul className="divide-y divide-club-border">
       {entries.map((entry) => {
-        const needed = gamesUntilLeaderboardRank(entry.gamesPlayed);
+        const needed = gamesUntilLeaderboardRank(entry.gamesPlayed, minGamesForRank);
         return (
           <li
             key={entry.playerId}
@@ -131,13 +166,14 @@ function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 <div className="mt-1 text-xs text-subtle">
+                  {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
                   {needed} more game{needed === 1 ? "" : "s"} to rank · {entry.gamesPlayed} played
                 </div>
               </div>
               <div
                 className={`ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
               >
-                {formatLeaderboardPoints(entry.totalDelta)}
+                {formatHeadlineScore(entry, useRating)}
               </div>
             </div>
             <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
@@ -152,25 +188,34 @@ function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
 
 function LeaderboardSections({
   entries,
+  period,
   minGamesForRank,
+  useRating,
   rankedEmptyMessage,
   showPodium = false,
 }: {
   entries: LeaderboardEntry[];
+  period: LeaderboardScoringPeriod;
   minGamesForRank: number;
+  useRating: boolean;
   rankedEmptyMessage: string;
   showPodium?: boolean;
 }) {
-  const { ranked, unranked } = useMemo(() => splitLeaderboardEntries(entries), [entries]);
+  const { ranked, unranked } = useMemo(
+    () => splitLeaderboardEntries(entries, period),
+    [entries, period]
+  );
 
   return (
     <>
-      {showPodium && ranked.length > 0 ? <Podium entries={ranked} /> : null}
+      {showPodium && ranked.length > 0 ? (
+        <Podium entries={ranked} useRating={useRating} />
+      ) : null}
       {showPodium && ranked.length > 3 ? (
         <div className="border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
           <span>Rank</span>
           <span>Name</span>
-          <span className="text-right">Points</span>
+          <span className="text-right">{useRating ? "Rating" : "Points"}</span>
           <span className="text-right">Games</span>
         </div>
       ) : null}
@@ -178,6 +223,7 @@ function LeaderboardSections({
         entries={showPodium ? ranked.slice(3) : ranked}
         startRank={showPodium ? 3 : 0}
         emptyMessage={rankedEmptyMessage}
+        useRating={useRating}
       />
       {unranked.length > 0 ? (
         <div className="border-t border-club-border">
@@ -188,7 +234,11 @@ function LeaderboardSections({
               your total once you qualify.
             </p>
           </div>
-          <UnrankedLeaderboardList entries={unranked} />
+          <UnrankedLeaderboardList
+            entries={unranked}
+            minGamesForRank={minGamesForRank}
+            useRating={useRating}
+          />
         </div>
       ) : null}
     </>
@@ -197,10 +247,10 @@ function LeaderboardSections({
 
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [minGamesForRank, setMinGamesForRank] = useState(LEADERBOARD_MIN_GAMES_FOR_RANK);
+  const [minGamesForRank, setMinGamesForRank] = useState(LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY);
+  const [useRating, setUseRating] = useState(false);
+  const [period, setPeriod] = useState<LeaderboardScoringPeriod | null>(null);
   const [gamesWithPlayers, setGamesWithPlayers] = useState(0);
-  const [sessionGames, setSessionGames] = useState(0);
-  const [importedGames, setImportedGames] = useState(0);
   const [periodLabel, setPeriodLabel] = useState("");
   const [archives, setArchives] = useState<MonthlyArchive[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -220,10 +270,9 @@ export default function LeaderboardPage() {
         const currentJson = (await currentRes.json()) as {
           entries?: LeaderboardEntry[];
           minGamesForRank?: number;
+          useRating?: boolean;
           gamesWithPlayers?: number;
-          sessionGames?: number;
-          importedGames?: number;
-          period?: { label?: string };
+          period?: { year?: number; month?: number; label?: string };
           error?: string;
         };
         const archivesJson = (await archivesRes.json()) as {
@@ -237,11 +286,16 @@ export default function LeaderboardPage() {
         if (!cancelled) {
           setEntries(currentJson.entries ?? []);
           setMinGamesForRank(
-            currentJson.minGamesForRank ?? LEADERBOARD_MIN_GAMES_FOR_RANK
+            currentJson.minGamesForRank ?? LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY
           );
+          setUseRating(currentJson.useRating ?? false);
+          if (currentJson.period?.year && currentJson.period?.month) {
+            setPeriod({
+              year: currentJson.period.year,
+              month: currentJson.period.month,
+            });
+          }
           setGamesWithPlayers(currentJson.gamesWithPlayers ?? 0);
-          setSessionGames(currentJson.sessionGames ?? 0);
-          setImportedGames(currentJson.importedGames ?? 0);
           setPeriodLabel(currentJson.period?.label ?? "This month");
           setArchives(archivesJson.archives ?? []);
         }
@@ -261,8 +315,11 @@ export default function LeaderboardPage() {
   }, []);
 
   const { ranked, unranked, inactive } = useMemo(
-    () => splitLeaderboardEntries(entries),
-    [entries]
+    () =>
+      period
+        ? splitLeaderboardEntries(entries, period)
+        : { ranked: [], unranked: [], inactive: [] },
+    [entries, period]
   );
   const hasAnyActivity = ranked.length > 0 || unranked.length > 0;
 
@@ -271,7 +328,7 @@ export default function LeaderboardPage() {
       <PageHeader
         badge="Monthly standings"
         title="Leaderboard"
-        description="Standings reset each calendar month (US Eastern). Includes in-person sessions (ended on the site) and imported friendly games. Past months can be downloaded below."
+        description="Standings reset each calendar month (US Eastern). Counts all finished games for the month. Past months can be downloaded below."
         action={
           <Link href="/import" className="btn-primary h-11 shrink-0 px-4">
             Import game
@@ -285,12 +342,16 @@ export default function LeaderboardPage() {
         <div className="border-b border-club-border px-4 py-3.5">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
           <div className="mt-0.5 text-xs text-subtle">
-            {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month
-            {sessionGames > 0 || importedGames > 0
-              ? ` (${sessionGames} in-person${importedGames > 0 ? `, ${importedGames} imported` : ""})`
-              : ""}{" "}
-            · points = (ending − start) ÷ 1,000 · ranked after {minGamesForRank}+ games
+            {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month ·{" "}
+            {useRating ? "net" : "points"} = (ending − start) ÷ 1,000 · ranked after{" "}
+            {minGamesForRank}+ games
           </div>
+          {useRating ? (
+            <div className="mt-1 text-xs text-subtle">
+              Rating = net points weighted by games played, so a few lucky games can&apos;t outrank a
+              longer record. Keep playing and your rating climbs toward your net.
+            </div>
+          ) : null}
         </div>
 
         {loading ? (
@@ -298,9 +359,9 @@ export default function LeaderboardPage() {
         ) : !hasAnyActivity ? (
           <div className="space-y-3 px-4 py-8 text-sm text-muted">
             <p>
-              No games this month yet. End an in-person session on the site, or{" "}
+              No games this month yet. End a session on the site or{" "}
               <Link href="/import" className="font-medium underline">
-                import a Mahjong Soul game
+                import a game
               </Link>
               .
             </p>
@@ -308,14 +369,16 @@ export default function LeaderboardPage() {
               Add players
             </Link>
           </div>
-        ) : (
+        ) : period ? (
           <LeaderboardSections
             entries={entries}
+            period={period}
             minGamesForRank={minGamesForRank}
+            useRating={useRating}
             rankedEmptyMessage={`No players with ${minGamesForRank}+ games yet this month.`}
             showPodium
           />
-        )}
+        ) : null}
       </div>
 
       {!loading && inactive.length > 0 ? (
@@ -375,11 +438,19 @@ export default function LeaderboardPage() {
                       View standings
                     </summary>
                     <div className="mt-2 overflow-hidden rounded-xl border border-club-border bg-club-surface">
-                      <LeaderboardSections
-                        entries={archive.entries}
-                        minGamesForRank={minGamesForRank}
-                        rankedEmptyMessage="No ranked players that month."
-                      />
+                      {(() => {
+                        const archivePeriod = { year: archive.year, month: archive.month };
+                        const archiveScoring = getLeaderboardScoringOptions(archivePeriod);
+                        return (
+                          <LeaderboardSections
+                            entries={archive.entries}
+                            period={archivePeriod}
+                            minGamesForRank={archiveScoring.minGamesForRank}
+                            useRating={archiveScoring.useRating}
+                            rankedEmptyMessage="No ranked players that month."
+                          />
+                        );
+                      })()}
                     </div>
                   </details>
                 ) : null}

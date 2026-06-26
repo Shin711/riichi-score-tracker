@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
-import { humanImportEntries } from "@/lib/imports/types";
+import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
         displayName: s.displayName ?? "",
         finalScore: Number(s.finalScore),
         isAi: s.isAi === true,
-        windLabel: `Player ${index + 1}`,
+        windLabel: importSeatWindLabel(index),
       }))
     );
 

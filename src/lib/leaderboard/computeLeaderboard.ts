@@ -60,7 +60,8 @@ export function parseRules(rulesJson: unknown): Rules {
 
 export function computeLeaderboard(
   sessionSnapshots: SessionSnapshot[],
-  allPlayers: Array<{ id: string; display_name: string }> = []
+  allPlayers: Array<{ id: string; display_name: string }> = [],
+  options?: { useRating?: boolean }
 ): LeaderboardEntry[] {
   const byPlayer = new Map<
     string,
@@ -113,7 +114,7 @@ export function computeLeaderboard(
       ...entry,
       points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
     }))
-    .sort(compareLeaderboardEntries);
+    .sort((a, b) => compareLeaderboardEntries(a, b, { useRating: options?.useRating ?? false }));
 }
 
 export function groupSessionSnapshots(input: {

@@ -6,6 +6,7 @@ import {
   groupSessionSnapshots,
 } from "@/lib/leaderboard/computeLeaderboard";
 import { mergeImportedGamesIntoLeaderboard } from "@/lib/leaderboard/mergeImports";
+import { getLeaderboardScoringOptions } from "@/lib/leaderboard/qualification";
 import {
   formatMonthLabel,
   getMonthPartsInTimezone,
@@ -15,7 +16,8 @@ import {
 export async function buildLeaderboardForPeriod(
   supabase: SupabaseClient,
   periodStartIso: string,
-  periodEndIso: string
+  periodEndIso: string,
+  period: { year: number; month: number }
 ) {
   const sessionsRes = await supabase
     .from("sessions")
@@ -61,16 +63,19 @@ export async function buildLeaderboardForPeriod(
     events: eventsRes.data ?? [],
   });
 
+  const { useRating } = getLeaderboardScoringOptions(period);
+
   const sessionEntries = computeLeaderboard(
     snapshots,
     (playersRes.data ?? []).map((p) => ({
       id: p.id,
       display_name: p.display_name,
-    }))
+    })),
+    { useRating }
   );
 
   const imports = (importsRes.data ?? []) as ImportedGameRow[];
-  const entries = mergeImportedGamesIntoLeaderboard(sessionEntries, imports);
+  const entries = mergeImportedGamesIntoLeaderboard(sessionEntries, imports, { useRating });
 
   const sessionGames = snapshots.filter((s) => s.assignments.length > 0).length;
 
@@ -85,9 +90,11 @@ export async function buildLeaderboardForPeriod(
 export async function buildCurrentMonthLeaderboard(supabase: SupabaseClient, now = new Date()) {
   const { year, month } = getMonthPartsInTimezone(now);
   const { startIso, endIso } = getMonthPeriodBounds(year, month);
-  const result = await buildLeaderboardForPeriod(supabase, startIso, endIso);
+  const result = await buildLeaderboardForPeriod(supabase, startIso, endIso, { year, month });
+  const scoring = getLeaderboardScoringOptions({ year, month });
   return {
     ...result,
+    ...scoring,
     period: {
       year,
       month,

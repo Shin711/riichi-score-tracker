@@ -6,11 +6,13 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import type { MonthlyArchive } from "@/lib/leaderboard/monthly";
-import { formatLeaderboardPoints } from "@/lib/leaderboard/points";
+import { formatLeaderboardPoints, formatLeaderboardRating } from "@/lib/leaderboard/points";
 import {
   gamesUntilLeaderboardRank,
-  LEADERBOARD_MIN_GAMES_FOR_RANK,
+  getLeaderboardScoringOptions,
+  LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY,
   splitLeaderboardEntries,
+  type LeaderboardScoringPeriod,
 } from "@/lib/leaderboard/qualification";
 
 function pointsClassName(points: number) {
@@ -19,12 +21,22 @@ function pointsClassName(points: number) {
   return "";
 }
 
+function formatHeadlineScore(entry: LeaderboardEntry, useRating: boolean) {
+  return useRating
+    ? formatLeaderboardRating(entry.points, entry.gamesPlayed)
+    : formatLeaderboardPoints(entry.totalDelta);
+}
+
 function LeaderboardTable({
   entries,
   emptyMessage,
+  startRank = 0,
+  useRating,
 }: {
   entries: LeaderboardEntry[];
   emptyMessage: string;
+  startRank?: number;
+  useRating: boolean;
 }) {
   if (entries.length === 0) {
     return <div className="px-4 py-8 text-sm text-muted">{emptyMessage}</div>;
@@ -32,53 +44,119 @@ function LeaderboardTable({
 
   return (
     <ul className="divide-y divide-club-border">
-      {entries.map((entry, index) => (
-        <li
-          key={entry.playerId}
-          className="px-4 py-4 transition-colors duration-300 ease-fluid hover:bg-club-surface/50 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
-        >
-          <div className="flex items-center gap-3 sm:contents">
-            <span
-              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-                index === 0
-                  ? "rank-badge-1"
-                  : index === 1
-                    ? "rank-badge-2"
-                    : index === 2
-                      ? "rank-badge-3"
-                      : "rank-badge-n"
-              }`}
-            >
-              {index + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
-              <div className="mt-1 text-xs text-subtle sm:hidden">
-                {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+      {entries.map((entry, i) => {
+        const index = startRank + i;
+        const rank = index + 1;
+        const isPositive = entry.points > 0;
+        const badgeClass =
+          index === 0
+            ? "rank-badge-1"
+            : index === 1
+              ? "rank-badge-2"
+              : index === 2
+                ? "rank-badge-3"
+                : isPositive
+                  ? "rank-badge-pos"
+                  : entry.points < 0
+                    ? "rank-badge-neg"
+                    : "rank-badge-n";
+        return (
+          <li
+            key={entry.playerId}
+            className={`lb-row ${isPositive ? "lb-row--pos" : ""} px-4 py-4 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3`}
+          >
+            <div className="flex items-center gap-3 sm:contents">
+              <span
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${badgeClass}`}
+              >
+                {rank}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
+                {useRating ? (
+                  <div className="mt-1 text-xs text-subtle">
+                    Net {formatLeaderboardPoints(entry.totalDelta)}
+                    <span className="sm:hidden">
+                      {" "}
+                      · {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xs text-subtle sm:hidden">
+                    {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
+                  </div>
+                )}
+              </div>
+              <div
+                className={`lb-points ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
+              >
+                {formatHeadlineScore(entry, useRating)}
               </div>
             </div>
-            <div
-              className={`ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
-            >
-              {formatLeaderboardPoints(entry.totalDelta)}
+            <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
+              {entry.gamesPlayed}
             </div>
-          </div>
-          <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
-            {entry.gamesPlayed}
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
+function Podium({
+  entries,
+  useRating,
+}: {
+  entries: LeaderboardEntry[];
+  useRating: boolean;
+}) {
+  if (entries.length === 0) return null;
+
+  const tiers = [
+    { tone: "podium-1", label: "1st", suffix: "Champion" },
+    { tone: "podium-2", label: "2nd", suffix: "Runner-up" },
+    { tone: "podium-3", label: "3rd", suffix: "Third" },
+  ];
+
+  return (
+    <div className="podium grid grid-cols-1 gap-3 p-4 sm:grid-cols-3 sm:gap-4 sm:p-5">
+      {entries.slice(0, 3).map((entry, i) => {
+        const tier = tiers[i];
+        return (
+          <div key={entry.playerId} className={`podium-card ${tier.tone}`}>
+            <div className="podium-rank" aria-hidden>
+              {tier.label}
+            </div>
+            <div className="podium-name">{entry.displayName}</div>
+            <div className={`podium-score ${entry.points > 0 ? "podium-score-pos" : entry.points < 0 ? "podium-score-neg" : ""}`}>
+              {formatHeadlineScore(entry, useRating)}
+            </div>
+            <div className="podium-meta">
+              {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
+              {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"} · {tier.suffix}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function UnrankedLeaderboardList({
+  entries,
+  minGamesForRank,
+  useRating,
+}: {
+  entries: LeaderboardEntry[];
+  minGamesForRank: number;
+  useRating: boolean;
+}) {
   if (entries.length === 0) return null;
 
   return (
     <ul className="divide-y divide-club-border">
       {entries.map((entry) => {
-        const needed = gamesUntilLeaderboardRank(entry.gamesPlayed);
+        const needed = gamesUntilLeaderboardRank(entry.gamesPlayed, minGamesForRank);
         return (
           <li
             key={entry.playerId}
@@ -88,13 +166,14 @@ function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 <div className="mt-1 text-xs text-subtle">
+                  {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
                   {needed} more game{needed === 1 ? "" : "s"} to rank · {entry.gamesPlayed} played
                 </div>
               </div>
               <div
                 className={`ml-auto font-mono text-lg font-semibold tabular-nums sm:ml-0 sm:text-right sm:text-base ${pointsClassName(entry.points)}`}
               >
-                {formatLeaderboardPoints(entry.totalDelta)}
+                {formatHeadlineScore(entry, useRating)}
               </div>
             </div>
             <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
@@ -109,18 +188,43 @@ function UnrankedLeaderboardList({ entries }: { entries: LeaderboardEntry[] }) {
 
 function LeaderboardSections({
   entries,
+  period,
   minGamesForRank,
+  useRating,
   rankedEmptyMessage,
+  showPodium = false,
 }: {
   entries: LeaderboardEntry[];
+  period: LeaderboardScoringPeriod;
   minGamesForRank: number;
+  useRating: boolean;
   rankedEmptyMessage: string;
+  showPodium?: boolean;
 }) {
-  const { ranked, unranked } = useMemo(() => splitLeaderboardEntries(entries), [entries]);
+  const { ranked, unranked } = useMemo(
+    () => splitLeaderboardEntries(entries, period),
+    [entries, period]
+  );
 
   return (
     <>
-      <LeaderboardTable entries={ranked} emptyMessage={rankedEmptyMessage} />
+      {showPodium && ranked.length > 0 ? (
+        <Podium entries={ranked} useRating={useRating} />
+      ) : null}
+      {showPodium && ranked.length > 3 ? (
+        <div className="border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
+          <span>Rank</span>
+          <span>Name</span>
+          <span className="text-right">{useRating ? "Rating" : "Points"}</span>
+          <span className="text-right">Games</span>
+        </div>
+      ) : null}
+      <LeaderboardTable
+        entries={showPodium ? ranked.slice(3) : ranked}
+        startRank={showPodium ? 3 : 0}
+        emptyMessage={rankedEmptyMessage}
+        useRating={useRating}
+      />
       {unranked.length > 0 ? (
         <div className="border-t border-club-border">
           <div className="border-b border-club-border px-4 py-3">
@@ -130,7 +234,11 @@ function LeaderboardSections({
               your total once you qualify.
             </p>
           </div>
-          <UnrankedLeaderboardList entries={unranked} />
+          <UnrankedLeaderboardList
+            entries={unranked}
+            minGamesForRank={minGamesForRank}
+            useRating={useRating}
+          />
         </div>
       ) : null}
     </>
@@ -139,10 +247,10 @@ function LeaderboardSections({
 
 export default function LeaderboardPage() {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [minGamesForRank, setMinGamesForRank] = useState(LEADERBOARD_MIN_GAMES_FOR_RANK);
+  const [minGamesForRank, setMinGamesForRank] = useState(LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY);
+  const [useRating, setUseRating] = useState(false);
+  const [period, setPeriod] = useState<LeaderboardScoringPeriod | null>(null);
   const [gamesWithPlayers, setGamesWithPlayers] = useState(0);
-  const [sessionGames, setSessionGames] = useState(0);
-  const [importedGames, setImportedGames] = useState(0);
   const [periodLabel, setPeriodLabel] = useState("");
   const [archives, setArchives] = useState<MonthlyArchive[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -162,10 +270,9 @@ export default function LeaderboardPage() {
         const currentJson = (await currentRes.json()) as {
           entries?: LeaderboardEntry[];
           minGamesForRank?: number;
+          useRating?: boolean;
           gamesWithPlayers?: number;
-          sessionGames?: number;
-          importedGames?: number;
-          period?: { label?: string };
+          period?: { year?: number; month?: number; label?: string };
           error?: string;
         };
         const archivesJson = (await archivesRes.json()) as {
@@ -179,11 +286,16 @@ export default function LeaderboardPage() {
         if (!cancelled) {
           setEntries(currentJson.entries ?? []);
           setMinGamesForRank(
-            currentJson.minGamesForRank ?? LEADERBOARD_MIN_GAMES_FOR_RANK
+            currentJson.minGamesForRank ?? LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY
           );
+          setUseRating(currentJson.useRating ?? false);
+          if (currentJson.period?.year && currentJson.period?.month) {
+            setPeriod({
+              year: currentJson.period.year,
+              month: currentJson.period.month,
+            });
+          }
           setGamesWithPlayers(currentJson.gamesWithPlayers ?? 0);
-          setSessionGames(currentJson.sessionGames ?? 0);
-          setImportedGames(currentJson.importedGames ?? 0);
           setPeriodLabel(currentJson.period?.label ?? "This month");
           setArchives(archivesJson.archives ?? []);
         }
@@ -203,8 +315,11 @@ export default function LeaderboardPage() {
   }, []);
 
   const { ranked, unranked, inactive } = useMemo(
-    () => splitLeaderboardEntries(entries),
-    [entries]
+    () =>
+      period
+        ? splitLeaderboardEntries(entries, period)
+        : { ranked: [], unranked: [], inactive: [] },
+    [entries, period]
   );
   const hasAnyActivity = ranked.length > 0 || unranked.length > 0;
 
@@ -213,7 +328,7 @@ export default function LeaderboardPage() {
       <PageHeader
         badge="Monthly standings"
         title="Leaderboard"
-        description="Standings reset each calendar month (US Eastern). Includes in-person sessions (ended on the site) and imported friendly games. Past months can be downloaded below."
+        description="Standings reset each calendar month (US Eastern). Counts all finished games for the month. Past months can be downloaded below."
         action={
           <Link href="/import" className="btn-primary h-11 shrink-0 px-4">
             Import game
@@ -227,18 +342,16 @@ export default function LeaderboardPage() {
         <div className="border-b border-club-border px-4 py-3.5">
           <div className="text-sm font-medium">{periodLabel || "This month"}</div>
           <div className="mt-0.5 text-xs text-subtle">
-            {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month
-            {sessionGames > 0 || importedGames > 0
-              ? ` (${sessionGames} in-person${importedGames > 0 ? `, ${importedGames} imported` : ""})`
-              : ""}{" "}
-            · points = (ending − start) ÷ 1,000 · ranked after {minGamesForRank}+ games
+            {gamesWithPlayers} game{gamesWithPlayers === 1 ? "" : "s"} this month ·{" "}
+            {useRating ? "net" : "points"} = (ending − start) ÷ 1,000 · ranked after{" "}
+            {minGamesForRank}+ games
           </div>
-        </div>
-        <div className="hidden border-b border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
-          <span>Rank</span>
-          <span>Name</span>
-          <span className="text-right">Points</span>
-          <span className="text-right">Games</span>
+          {useRating ? (
+            <div className="mt-1 text-xs text-subtle">
+              Rating = net points weighted by games played, so a few lucky games can&apos;t outrank a
+              longer record. Keep playing and your rating climbs toward your net.
+            </div>
+          ) : null}
         </div>
 
         {loading ? (
@@ -246,9 +359,9 @@ export default function LeaderboardPage() {
         ) : !hasAnyActivity ? (
           <div className="space-y-3 px-4 py-8 text-sm text-muted">
             <p>
-              No games this month yet. End an in-person session on the site, or{" "}
+              No games this month yet. End a session on the site or{" "}
               <Link href="/import" className="font-medium underline">
-                import a Mahjong Soul game
+                import a game
               </Link>
               .
             </p>
@@ -256,13 +369,16 @@ export default function LeaderboardPage() {
               Add players
             </Link>
           </div>
-        ) : (
+        ) : period ? (
           <LeaderboardSections
             entries={entries}
+            period={period}
             minGamesForRank={minGamesForRank}
+            useRating={useRating}
             rankedEmptyMessage={`No players with ${minGamesForRank}+ games yet this month.`}
+            showPodium
           />
-        )}
+        ) : null}
       </div>
 
       {!loading && inactive.length > 0 ? (
@@ -322,11 +438,19 @@ export default function LeaderboardPage() {
                       View standings
                     </summary>
                     <div className="mt-2 overflow-hidden rounded-xl border border-club-border bg-club-surface">
-                      <LeaderboardSections
-                        entries={archive.entries}
-                        minGamesForRank={minGamesForRank}
-                        rankedEmptyMessage="No ranked players that month."
-                      />
+                      {(() => {
+                        const archivePeriod = { year: archive.year, month: archive.month };
+                        const archiveScoring = getLeaderboardScoringOptions(archivePeriod);
+                        return (
+                          <LeaderboardSections
+                            entries={archive.entries}
+                            period={archivePeriod}
+                            minGamesForRank={archiveScoring.minGamesForRank}
+                            useRating={archiveScoring.useRating}
+                            rankedEmptyMessage="No ranked players that month."
+                          />
+                        );
+                      })()}
                     </div>
                   </details>
                 ) : null}

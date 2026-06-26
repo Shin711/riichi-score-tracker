@@ -1,3 +1,9 @@
+export const IMPORT_SEAT_WIND_LABELS = ["East", "South", "West", "North"] as const;
+
+export function importSeatWindLabel(seatIndex: number): string {
+  return IMPORT_SEAT_WIND_LABELS[seatIndex] ?? `Seat ${seatIndex + 1}`;
+}
+
 export type ImportedGameEntry = {
   player_id?: string;
   display_name: string;

@@ -12,30 +12,31 @@ type PageHeaderProps = {
 
 export function PageHeader({ title, description, badge, action, showLogo = false }: PageHeaderProps) {
   return (
-    <div className="hero-card p-6 sm:p-8">
-      <div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-club-red/[0.12] blur-3xl dark:bg-club-red/[0.18]"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-club-jade/[0.1] blur-3xl dark:bg-club-jade/[0.15]"
-        aria-hidden
-      />
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-3">
-          {showLogo ? <BrandMark className="h-16 w-16 sm:h-20 sm:w-20" priority /> : null}
-          {badge ? (
-            <span className="inline-flex items-center rounded-full border border-club-border bg-club-surface/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-club-red backdrop-blur-sm dark:text-red-200">
-              {badge}
-            </span>
-          ) : null}
-          <h1 className="text-3xl font-bold tracking-tight text-club-ink sm:text-4xl">{title}</h1>
-          {description ? (
-            <p className="text-muted max-w-2xl text-sm leading-7 sm:text-base">{description}</p>
-          ) : null}
-        </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+    <header className="page-hero">
+      <div className="page-hero-wash page-hero-wash-red" aria-hidden />
+      <div className="page-hero-wash page-hero-wash-jade" aria-hidden />
+      <div className="page-hero-rule" aria-hidden />
+
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5 text-center sm:gap-6">
+        {showLogo ? (
+          <BrandMark className="h-20 w-20 ring-4 ring-white/40 sm:h-24 sm:w-24" priority />
+        ) : null}
+
+        {badge ? (
+          <span className="arcade-badge">
+            <span className="arcade-badge-dot" aria-hidden />
+            {badge}
+          </span>
+        ) : null}
+
+        <h1 className="page-hero-title text-balance">{title}</h1>
+
+        {description ? (
+          <p className="page-hero-desc text-pretty">{description}</p>
+        ) : null}
+
+        {action ? <div className="page-hero-action">{action}</div> : null}
       </div>
-    </div>
+    </header>
   );
 }

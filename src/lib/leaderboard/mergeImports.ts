@@ -6,7 +6,8 @@ import type { ImportedGameRow } from "@/lib/imports/types";
 
 export function mergeImportedGamesIntoLeaderboard(
   entries: LeaderboardEntry[],
-  imports: ImportedGameRow[]
+  imports: ImportedGameRow[],
+  options?: { useRating?: boolean }
 ): LeaderboardEntry[] {
   const byPlayer = new Map<string, LeaderboardEntry>();
 
@@ -42,5 +43,5 @@ export function mergeImportedGamesIntoLeaderboard(
       ...entry,
       points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
     }))
-    .sort(compareLeaderboardEntries);
+    .sort((a, b) => compareLeaderboardEntries(a, b, { useRating: options?.useRating ?? false }));
 }

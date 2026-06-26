@@ -6,6 +6,12 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 
 import type { PlayerRow } from "@/lib/db/types";
+import {
+  DUPLICATE_PLAYER_NAME_MESSAGE,
+  findPlayerByDisplayName,
+  isDuplicatePlayerNameError,
+  normalizePlayerDisplayName,
+} from "@/lib/players/names";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 function useSupabaseOrNull() {
@@ -81,8 +87,13 @@ export default function PlayersPage() {
     setError(null);
     setStatus(null);
     if (!supabase) return;
-    const display_name = name.trim();
+    const display_name = normalizePlayerDisplayName(name);
     if (!display_name) return;
+
+    if (findPlayerByDisplayName(players, display_name)) {
+      setError(DUPLICATE_PLAYER_NAME_MESSAGE);
+      return;
+    }
 
     const { data, error: insertErr } = await supabase
       .from("players")
@@ -91,7 +102,11 @@ export default function PlayersPage() {
       .single();
 
     if (insertErr) {
-      setError(insertErr.message);
+      setError(
+        isDuplicatePlayerNameError(insertErr)
+          ? DUPLICATE_PLAYER_NAME_MESSAGE
+          : insertErr.message
+      );
       return;
     }
 
@@ -147,7 +162,7 @@ export default function PlayersPage() {
     <main className="space-y-6">
       <PageHeader
         title="Players"
-        description="Simple player profiles (names). Assign them to seats when you start a game."
+        description="Simple player profiles (names). Names must be unique. Assign them to seats when you start a game."
       />
 
       {isAdmin ? (

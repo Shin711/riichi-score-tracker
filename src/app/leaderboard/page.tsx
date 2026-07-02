@@ -27,8 +27,32 @@ function formatHeadlineScore(entry: LeaderboardEntry, useRating: boolean) {
     : formatLeaderboardPoints(entry.totalDelta);
 }
 
-function formatRatingSecondary(entry: LeaderboardEntry) {
-  return `Avg ${formatLeaderboardAverage(entry.points, entry.gamesPlayed)}/game · Net ${formatLeaderboardPoints(entry.totalDelta)}`;
+function formatNetSecondary(entry: LeaderboardEntry) {
+  return `Net ${formatLeaderboardPoints(entry.totalDelta)}`;
+}
+
+function leaderboardTableGridClass(useRating: boolean) {
+  return useRating
+    ? "sm:grid-cols-[2.5rem_1fr_6rem_4rem_5rem]"
+    : "sm:grid-cols-[2.5rem_1fr_6rem_5rem]";
+}
+
+function unrankedTableGridClass(useRating: boolean) {
+  return useRating ? "sm:grid-cols-[1fr_6rem_4rem_5rem]" : "sm:grid-cols-[1fr_6rem_5rem]";
+}
+
+function LeaderboardColumnHeader({ useRating }: { useRating: boolean }) {
+  return (
+    <div
+      className={`border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle ${leaderboardTableGridClass(useRating)} sm:grid sm:gap-3`}
+    >
+      <span>Rank</span>
+      <span>Name</span>
+      <span className="text-right">{useRating ? "Rating" : "Points"}</span>
+      <span className="text-right">Games</span>
+      {useRating ? <span className="text-right">Avg</span> : null}
+    </div>
+  );
 }
 
 function LeaderboardTable({
@@ -67,7 +91,7 @@ function LeaderboardTable({
         return (
           <li
             key={entry.playerId}
-            className={`lb-row ${isPositive ? "lb-row--pos" : ""} px-4 py-4 sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3`}
+            className={`lb-row ${isPositive ? "lb-row--pos" : ""} px-4 py-4 sm:grid sm:items-center sm:gap-3 sm:py-3 ${leaderboardTableGridClass(useRating)}`}
           >
             <div className="flex items-center gap-3 sm:contents">
               <span
@@ -79,7 +103,10 @@ function LeaderboardTable({
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 {useRating ? (
                   <div className="mt-1 text-xs text-subtle">
-                    {formatRatingSecondary(entry)}
+                    <span className="sm:hidden">
+                      Avg {formatLeaderboardAverage(entry.points, entry.gamesPlayed)}/game ·{" "}
+                    </span>
+                    {formatNetSecondary(entry)}
                     <span className="sm:hidden">
                       {" "}
                       · {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
@@ -100,6 +127,13 @@ function LeaderboardTable({
             <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
               {entry.gamesPlayed}
             </div>
+            {useRating ? (
+              <div
+                className={`hidden font-mono text-sm font-medium tabular-nums sm:block sm:text-right ${pointsClassName(entry.points)}`}
+              >
+                {formatLeaderboardAverage(entry.points, entry.gamesPlayed)}
+              </div>
+            ) : null}
           </li>
         );
       })}
@@ -136,7 +170,9 @@ function Podium({
               {formatHeadlineScore(entry, useRating)}
             </div>
             <div className="podium-meta">
-              {useRating ? `${formatRatingSecondary(entry)} · ` : ""}
+              {useRating
+                ? `Avg ${formatLeaderboardAverage(entry.points, entry.gamesPlayed)}/game · ${formatNetSecondary(entry)} · `
+                : ""}
               {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"} · {tier.suffix}
             </div>
           </div>
@@ -164,13 +200,20 @@ function UnrankedLeaderboardList({
         return (
           <li
             key={entry.playerId}
-            className="px-4 py-4 sm:grid sm:grid-cols-[1fr_6rem_5rem] sm:items-center sm:gap-3 sm:py-3"
+            className={`px-4 py-4 sm:grid sm:items-center sm:gap-3 sm:py-3 ${unrankedTableGridClass(useRating)}`}
           >
             <div className="flex items-center gap-3 sm:contents">
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 <div className="mt-1 text-xs text-subtle">
-                  {useRating ? `${formatRatingSecondary(entry)} · ` : ""}
+                  {useRating ? (
+                    <>
+                      <span className="sm:hidden">
+                        Avg {formatLeaderboardAverage(entry.points, entry.gamesPlayed)}/game ·{" "}
+                      </span>
+                      {formatNetSecondary(entry)} ·{" "}
+                    </>
+                  ) : null}
                   {needed} more game{needed === 1 ? "" : "s"} to rank · {entry.gamesPlayed} played
                 </div>
               </div>
@@ -183,6 +226,13 @@ function UnrankedLeaderboardList({
             <div className="hidden text-right text-sm tabular-nums text-subtle sm:block">
               {entry.gamesPlayed}
             </div>
+            {useRating ? (
+              <div
+                className={`hidden font-mono text-sm font-medium tabular-nums sm:block sm:text-right ${pointsClassName(entry.points)}`}
+              >
+                {formatLeaderboardAverage(entry.points, entry.gamesPlayed)}
+              </div>
+            ) : null}
           </li>
         );
       })}
@@ -216,12 +266,9 @@ function LeaderboardSections({
         <Podium entries={ranked} useRating={useRating} />
       ) : null}
       {showPodium && ranked.length > 3 ? (
-        <div className="border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle sm:grid sm:grid-cols-[2.5rem_1fr_6rem_5rem] sm:gap-3">
-          <span>Rank</span>
-          <span>Name</span>
-          <span className="text-right">{useRating ? "Rating" : "Points"}</span>
-          <span className="text-right">Games</span>
-        </div>
+        <LeaderboardColumnHeader useRating={useRating} />
+      ) : !showPodium && ranked.length > 0 ? (
+        <LeaderboardColumnHeader useRating={useRating} />
       ) : null}
       <LeaderboardTable
         entries={showPodium ? ranked.slice(3) : ranked}

@@ -19,7 +19,7 @@ export function PageHeader({ title, description, badge, action, showLogo = false
 
       <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5 text-center sm:gap-6">
         {showLogo ? (
-          <BrandMark className="h-20 w-20 ring-4 ring-white/40 sm:h-24 sm:w-24" priority />
+          <BrandMark className="h-32 w-32 sm:h-36 sm:w-36" priority />
         ) : null}
 
         {badge ? (

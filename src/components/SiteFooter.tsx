@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="shell-bar mt-auto border-t py-6 pb-20 sm:pb-6">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="flex items-center gap-2.5">
-          <BrandMark className="h-8 w-8" />
+          <BrandMark className="h-10 w-10" />
           <p className="text-muted text-xs">{SITE_NAME}</p>
         </div>
         <a

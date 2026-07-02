@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/"
             className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight transition-opacity duration-300 hover:opacity-90"
           >
-            <BrandMark className="h-11 w-11" priority />
+            <BrandMark className="h-16 w-16" priority />
             <span className="arcade-title">
               <span className="sm:hidden">{SITE_HEADER}</span>
               <span className="hidden sm:inline">{SITE_HEADER}</span>

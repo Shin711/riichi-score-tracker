@@ -48,7 +48,7 @@ export default function Home() {
         <div className="page-hero-wash page-hero-wash-jade" aria-hidden />
 
         <div className="relative flex flex-col items-center gap-6 text-center">
-          <BrandMark className="h-24 w-24 ring-4 ring-white/40 sm:h-28 sm:w-28" priority />
+          <BrandMark className="h-36 w-36 sm:h-44 sm:w-44" priority />
 
           <span className="arcade-badge">
             <span className="arcade-badge-dot" aria-hidden />

@@ -56,6 +56,22 @@ function ImportPlayedAtInput({
   value: string;
   onChange: (next: string) => void;
 }) {
+  const nativeInputRef = useRef<HTMLInputElement>(null);
+
+  function openNativePicker() {
+    const input = nativeInputRef.current;
+    if (!input) return;
+    // Mobile browsers open the picker on tap by themselves; desktop browsers
+    // only focus the (invisible) input, so ask for the picker explicitly.
+    try {
+      input.showPicker?.();
+    } catch {
+      // showPicker can throw without user activation; focus still allows
+      // keyboard editing as a fallback.
+      input.focus();
+    }
+  }
+
   return (
     <div className="relative mt-1.5 w-full min-w-0 max-w-full overflow-hidden">
       {/* Visible field is a plain text input so layout never depends on the
@@ -72,9 +88,11 @@ function ImportPlayedAtInput({
         className="field h-11 w-full min-w-0 max-w-full px-3 text-base"
       />
       <input
+        ref={nativeInputRef}
         type="datetime-local"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onClick={openNativePicker}
         aria-label="When the game ended"
         className="datetime-overlay absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />

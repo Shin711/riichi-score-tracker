@@ -10,7 +10,9 @@ import {
   HAND_SCENARIOS,
   previewScenarioTotal,
   RON_POINT_PRESETS,
+  scenarioAcceptsExtras,
   scoreScenario,
+  type ScenarioExtras,
 } from "@/lib/scoring/calculatorDisplay";
 import type { WinType } from "@/lib/scoring/hanFu";
 
@@ -54,6 +56,13 @@ export function ScoreCalculator() {
   const [han, setHan] = useState(2);
   const [fu, setFu] = useState(30);
   const [ronPoints, setRonPoints] = useState<number | null>(null);
+  const [dora, setDora] = useState(0);
+  const [ippatsu, setIppatsu] = useState(false);
+
+  const extras = useMemo<ScenarioExtras>(() => ({ dora, ippatsu }), [dora, ippatsu]);
+  const activeScenario = HAND_SCENARIOS.find((s) => s.id === scenarioId) ?? null;
+  const extrasApply =
+    mode === "scenario" && activeScenario != null && scenarioAcceptsExtras(activeScenario);
 
   const result = useMemo(() => {
     if (mode === "points" && winType === "ron" && ronPoints != null) {
@@ -64,8 +73,8 @@ export function ScoreCalculator() {
     }
     const scenario = HAND_SCENARIOS.find((s) => s.id === scenarioId);
     if (!scenario) return null;
-    return scoreScenario(scenario, winType, winnerIsDealer, honba);
-  }, [mode, winType, winnerIsDealer, honba, scenarioId, han, fu, ronPoints]);
+    return scoreScenario(scenario, winType, winnerIsDealer, honba, extras);
+  }, [mode, winType, winnerIsDealer, honba, scenarioId, han, fu, ronPoints, extras]);
 
   function pickScenario(id: string) {
     setMode("scenario");
@@ -90,6 +99,12 @@ export function ScoreCalculator() {
               {winnerIsDealer ? " · Dealer" : ""}
             </span>
             <span className="calc-result-chip">{result.handLabel}</span>
+            {extrasApply && dora > 0 ? (
+              <span className="calc-result-chip">
+                +{dora} dora
+              </span>
+            ) : null}
+            {extrasApply && ippatsu ? <span className="calc-result-chip">Ippatsu</span> : null}
             {honba > 0 ? <span className="calc-result-chip">{honba} honba</span> : null}
           </div>
           <div
@@ -167,11 +182,17 @@ export function ScoreCalculator() {
           <h2 className="text-sm font-semibold">Common hands</h2>
           <p className="text-muted mt-1 text-xs">
             Tap your hand — amounts update for ron/tsumo and dealer. Self-draws include menzen tsumo
-            automatically.
+            automatically. Add dora below and the totals update.
           </p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {HAND_SCENARIOS.map((scenario) => {
-              const preview = previewScenarioTotal(scenario, winType, winnerIsDealer, honba);
+              const preview = previewScenarioTotal(
+                scenario,
+                winType,
+                winnerIsDealer,
+                honba,
+                scenarioAcceptsExtras(scenario) ? extras : undefined
+              );
               const active = mode === "scenario" && scenarioId === scenario.id;
               return (
                 <button
@@ -205,6 +226,79 @@ export function ScoreCalculator() {
               );
             })}
           </div>
+        </div>
+
+        <div>
+          <h2 className="text-sm font-semibold">Dora &amp; ippatsu</h2>
+          <p className="text-muted mt-1 text-xs">
+            Count everything together: dora + ura dora + red fives. Each is +1 han on top of the
+            hand picked above.
+          </p>
+          {mode === "scenario" && activeScenario != null && !scenarioAcceptsExtras(activeScenario) ? (
+            <p className="mt-2 rounded-lg bg-club-gold-muted px-3 py-2 text-xs text-club-gold">
+              {activeScenario.label} is already a final tier — dora is counted in it, so the picker
+              below is ignored. Pick a riichi hand above to stack dora.
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {[0, 1, 2, 3, 4, 5, 6].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => {
+                  setDora(n);
+                  if (mode !== "scenario") {
+                    setMode("scenario");
+                    setRonPoints(null);
+                  }
+                }}
+                className={`h-10 min-w-10 rounded-full border px-3 text-sm font-medium ${
+                  dora === n
+                    ? "border-club-red bg-club-red text-white"
+                    : "border-club-border text-club-ink"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <span>More</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={7}
+                max={20}
+                value={dora >= 7 ? dora : ""}
+                placeholder="7+"
+                onChange={(e) => {
+                  setDora(Math.max(0, Number(e.target.value) || 0));
+                  if (mode !== "scenario") {
+                    setMode("scenario");
+                    setRonPoints(null);
+                  }
+                }}
+                className="field h-10 w-16 px-2 text-base"
+                aria-label="Dora count (7 or more)"
+              />
+            </label>
+          </div>
+          <label className="mt-3 flex cursor-pointer items-center gap-3 rounded-xl border border-club-border px-3 py-3">
+            <input
+              type="checkbox"
+              checked={ippatsu}
+              onChange={(e) => {
+                setIppatsu(e.target.checked);
+                if (mode !== "scenario") {
+                  setMode("scenario");
+                  setRonPoints(null);
+                }
+              }}
+              className="h-4 w-4 rounded border-club-border"
+            />
+            <span className="text-sm text-club-ink">
+              Ippatsu — won within one turn of riichi <span className="text-subtle">(+1 han)</span>
+            </span>
+          </label>
         </div>
 
         <div>
@@ -282,7 +376,8 @@ export function ScoreCalculator() {
           Advanced — custom han & fu
         </summary>
         <p className="text-muted mt-2 text-xs">
-          Use when your hand is not in the list above. Fu is rounded up to the nearest 10.
+          Use when your hand is not in the list above. Count dora into the han number here. Fu is
+          rounded up to the nearest 10.
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <label className="text-xs">

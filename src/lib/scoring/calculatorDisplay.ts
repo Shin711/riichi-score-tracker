@@ -48,7 +48,7 @@ export type HandScenario = {
  * self-draws correctly include menzen tsumo, and pinfu uses its fixed fu.
  */
 export const HAND_SCENARIOS: HandScenario[] = [
-  { id: "riichi", label: "Riichi only", hint: "No other yaku or dora", closedYakuHan: 1 },
+  { id: "riichi", label: "Riichi only", hint: "No other yaku — add dora below", closedYakuHan: 1 },
   { id: "riichi-pinfu", label: "Riichi + pinfu", hint: "All sequences, no-fu wait", closedYakuHan: 2, isPinfu: true },
   { id: "riichi-tanyao", label: "Riichi + tanyao", hint: "All simples (2–8)", closedYakuHan: 2 },
   {
@@ -64,16 +64,39 @@ export const HAND_SCENARIOS: HandScenario[] = [
   { id: "yakuman", label: "Yakuman", hint: "13 han / special hand", fixedHan: 13 },
 ];
 
+export type ScenarioExtras = {
+  /** Total dora counted together: regular dora + ura dora + red fives. Each adds 1 han. */
+  dora: number;
+  /** Won within one uninterrupted turn of declaring riichi (+1 han). */
+  ippatsu: boolean;
+};
+
+export const NO_SCENARIO_EXTRAS: ScenarioExtras = { dora: 0, ippatsu: false };
+
+/**
+ * Tier presets (mangan and above) describe the FINAL han count, so dora and
+ * ippatsu must already be counted into the tier — extras never stack on them.
+ */
+export function scenarioAcceptsExtras(scenario: HandScenario): boolean {
+  return scenario.fixedHan == null;
+}
+
 /**
  * Resolve a scenario to concrete han/fu for the given win type.
  * Riichi-based hands are always closed, so a self-draw adds menzen tsumo (+1 han).
+ * Dora and ippatsu stack additional han on yaku-based scenarios only.
  */
-export function resolveScenarioHanFu(scenario: HandScenario, winType: WinType): { han: number; fu: number } {
+export function resolveScenarioHanFu(
+  scenario: HandScenario,
+  winType: WinType,
+  extras: ScenarioExtras = NO_SCENARIO_EXTRAS
+): { han: number; fu: number } {
   if (scenario.fixedHan != null) {
     return { han: scenario.fixedHan, fu: 30 };
   }
   const isTsumo = winType === "tsumo";
-  const han = (scenario.closedYakuHan ?? 1) + (isTsumo ? 1 : 0);
+  const extraHan = Math.max(0, Math.floor(extras.dora)) + (extras.ippatsu ? 1 : 0);
+  const han = (scenario.closedYakuHan ?? 1) + (isTsumo ? 1 : 0) + extraHan;
   let fu: number;
   if (scenario.isPinfu) {
     fu = isTsumo ? 20 : 30;
@@ -197,9 +220,10 @@ export function scoreScenario(
   scenario: HandScenario,
   winType: WinType,
   winnerIsDealer: boolean,
-  honba = 0
+  honba = 0,
+  extras: ScenarioExtras = NO_SCENARIO_EXTRAS
 ): CalculatorResult | null {
-  const { han, fu } = resolveScenarioHanFu(scenario, winType);
+  const { han, fu } = resolveScenarioHanFu(scenario, winType, extras);
   return calculateHandScore({ winType, winnerIsDealer, han, fu, honba });
 }
 
@@ -207,7 +231,8 @@ export function previewScenarioTotal(
   scenario: HandScenario,
   winType: WinType,
   winnerIsDealer: boolean,
-  honba = 0
+  honba = 0,
+  extras: ScenarioExtras = NO_SCENARIO_EXTRAS
 ): number | null {
-  return scoreScenario(scenario, winType, winnerIsDealer, honba)?.total ?? null;
+  return scoreScenario(scenario, winType, winnerIsDealer, honba, extras)?.total ?? null;
 }

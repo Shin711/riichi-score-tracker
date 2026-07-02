@@ -41,12 +41,21 @@ function unrankedTableGridClass(useRating: boolean) {
   return useRating ? "sm:grid-cols-[1fr_6rem_4rem_5rem]" : "sm:grid-cols-[1fr_6rem_5rem]";
 }
 
-function LeaderboardColumnHeader({ useRating }: { useRating: boolean }) {
+function LeaderboardColumnHeader({
+  useRating,
+  showRank = true,
+}: {
+  useRating: boolean;
+  showRank?: boolean;
+}) {
+  const gridClass = showRank
+    ? leaderboardTableGridClass(useRating)
+    : unrankedTableGridClass(useRating);
   return (
     <div
-      className={`border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle ${leaderboardTableGridClass(useRating)} sm:grid sm:gap-3`}
+      className={`hidden border-t border-club-border px-4 py-3 text-xs font-medium uppercase tracking-wide text-subtle ${gridClass} sm:grid sm:gap-3`}
     >
-      <span>Rank</span>
+      {showRank ? <span>Rank</span> : null}
       <span>Name</span>
       <span className="text-right">{useRating ? "Rating" : "Points"}</span>
       <span className="text-right">Games</span>
@@ -285,6 +294,7 @@ function LeaderboardSections({
               your total once you qualify.
             </p>
           </div>
+          <LeaderboardColumnHeader useRating={useRating} showRank={false} />
           <UnrankedLeaderboardList
             entries={unranked}
             minGamesForRank={minGamesForRank}

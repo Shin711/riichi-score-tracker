@@ -9,7 +9,7 @@ export const SITE_HEADER = "Flushing Riichi";
 export const SITE_DESCRIPTION =
   "Import finished games, track the monthly leaderboard, and use the in-table score calculator for Flushing Riichi Mahjong Club.";
 
-export const SITE_LOGO_PATH = "/club-logo.png";
+export const SITE_LOGO_PATH = "/club-logo.png?v=2";
 
 export const SITE_LOGO_ALT = "Flushing Riichi Mahjong Club logo";
 

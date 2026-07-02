@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
-import { formatLeaderboardPoints, formatLeaderboardRating } from "@/lib/leaderboard/points";
+import { formatLeaderboardPoints, formatLeaderboardAverage, formatLeaderboardRating } from "@/lib/leaderboard/points";
 import {
   getLeaderboardScoringOptions,
   minGamesForLeaderboardRank,
@@ -163,20 +163,20 @@ export function archiveToCsv(archive: MonthlyArchive) {
   const { ranked, unranked } = splitLeaderboardEntries(archive.entries, period);
 
   if (useRating) {
-    const lines = ["Rank,Name,Rating,Net,Games"];
+    const lines = ["Rank,Name,Rating,Avg,Net,Games"];
     for (const [index, entry] of ranked.entries()) {
       lines.push(
-        `${index + 1},${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
+        `${index + 1},${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
       );
     }
     if (unranked.length > 0) {
       lines.push("");
       lines.push(`Unranked (under ${minGamesForRank} games)`);
-      lines.push("Name,Rating,Net,Games,Games needed");
+      lines.push("Name,Rating,Avg,Net,Games,Games needed");
       for (const entry of unranked) {
         const needed = minGamesForRank - entry.gamesPlayed;
         lines.push(
-          `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
+          `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
         );
       }
     }

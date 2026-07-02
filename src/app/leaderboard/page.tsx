@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
 import type { MonthlyArchive } from "@/lib/leaderboard/monthly";
-import { formatLeaderboardPoints, formatLeaderboardRating } from "@/lib/leaderboard/points";
+import { formatLeaderboardPoints, formatLeaderboardAverage, formatLeaderboardRating } from "@/lib/leaderboard/points";
 import {
   gamesUntilLeaderboardRank,
   getLeaderboardScoringOptions,
@@ -25,6 +25,10 @@ function formatHeadlineScore(entry: LeaderboardEntry, useRating: boolean) {
   return useRating
     ? formatLeaderboardRating(entry.points, entry.gamesPlayed)
     : formatLeaderboardPoints(entry.totalDelta);
+}
+
+function formatRatingSecondary(entry: LeaderboardEntry) {
+  return `Avg ${formatLeaderboardAverage(entry.points, entry.gamesPlayed)}/game · Net ${formatLeaderboardPoints(entry.totalDelta)}`;
 }
 
 function LeaderboardTable({
@@ -75,7 +79,7 @@ function LeaderboardTable({
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 {useRating ? (
                   <div className="mt-1 text-xs text-subtle">
-                    Net {formatLeaderboardPoints(entry.totalDelta)}
+                    {formatRatingSecondary(entry)}
                     <span className="sm:hidden">
                       {" "}
                       · {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"}
@@ -132,7 +136,7 @@ function Podium({
               {formatHeadlineScore(entry, useRating)}
             </div>
             <div className="podium-meta">
-              {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
+              {useRating ? `${formatRatingSecondary(entry)} · ` : ""}
               {entry.gamesPlayed} game{entry.gamesPlayed === 1 ? "" : "s"} · {tier.suffix}
             </div>
           </div>
@@ -166,7 +170,7 @@ function UnrankedLeaderboardList({
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-club-ink">{entry.displayName}</div>
                 <div className="mt-1 text-xs text-subtle">
-                  {useRating ? `Net ${formatLeaderboardPoints(entry.totalDelta)} · ` : ""}
+                  {useRating ? `${formatRatingSecondary(entry)} · ` : ""}
                   {needed} more game{needed === 1 ? "" : "s"} to rank · {entry.gamesPlayed} played
                 </div>
               </div>
@@ -348,8 +352,8 @@ export default function LeaderboardPage() {
           </div>
           {useRating ? (
             <div className="mt-1 text-xs text-subtle">
-              Rating = net points weighted by games played, so a few lucky games can&apos;t outrank a
-              longer record. Keep playing and your rating climbs toward your net.
+              Rating = confidence-weighted net total (more games with the same net ranks higher).
+              Avg shows net per game — one hot or cold game matters less as you play more.
             </div>
           ) : null}
         </div>

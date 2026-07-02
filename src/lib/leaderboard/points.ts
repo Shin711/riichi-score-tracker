@@ -25,20 +25,27 @@ export function leaderboardConfidenceWeight(gamesPlayed: number): number {
 }
 
 /**
- * Confidence-adjusted points used for ranking. Pulls low-game players toward 0
- * so a lucky short run can't outrank a proven record. Converges to the raw
- * points as games played grows.
+ * Rating used for ranking: confidence-weighted net total.
+ * Pulls low-game players toward 0 so a lucky short run can't outrank a proven
+ * record. With the same net, more games means a higher rating (the grinder
+ * isn't punished for playing more).
  */
 export function adjustedLeaderboardPoints(points: number, gamesPlayed: number): number {
   return points * leaderboardConfidenceWeight(gamesPlayed);
 }
 
+/** Per-game average net points (net ÷ games). One outlier matters less as games grow. */
+export function leaderboardAveragePoints(points: number, gamesPlayed: number): number {
+  if (gamesPlayed <= 0) return 0;
+  return points / gamesPlayed;
+}
+
 /** Format a points-scale value with a sign (e.g. +25.6, -27.2, 0). */
-export function formatPointsValue(points: number): string {
+export function formatPointsValue(points: number, decimals = 1): string {
   if (Object.is(points, -0) || points === 0) return "0";
   const formatted = points.toLocaleString(undefined, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
   return points > 0 ? `+${formatted}` : formatted;
 }
@@ -48,7 +55,12 @@ export function formatLeaderboardPoints(totalDelta: number): string {
   return formatPointsValue(leaderboardPoints(totalDelta));
 }
 
-/** Format the confidence-weighted rating for a player's record. */
+/** Format the confidence-weighted rating used for ranking. */
 export function formatLeaderboardRating(points: number, gamesPlayed: number): string {
   return formatPointsValue(adjustedLeaderboardPoints(points, gamesPlayed));
+}
+
+/** Format per-game average net points. */
+export function formatLeaderboardAverage(points: number, gamesPlayed: number): string {
+  return formatPointsValue(leaderboardAveragePoints(points, gamesPlayed), 2);
 }

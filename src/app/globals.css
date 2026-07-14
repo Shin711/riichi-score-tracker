@@ -349,6 +349,12 @@ body {
     @apply rounded-xl border bg-club-surface/95 text-club-ink outline-none backdrop-blur-sm transition-all duration-300;
     border-color: var(--color-club-border);
     transition-timing-function: var(--ease-fluid);
+    line-height: 1.25rem;
+  }
+
+  input.field {
+    display: block;
+    min-height: 0;
   }
 
   .field:focus {

@@ -18,6 +18,55 @@ import type { WinType } from "@/lib/scoring/hanFu";
 
 type CalcMode = "scenario" | "points" | "advanced";
 
+function clampInt(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function NumericField({
+  label,
+  value,
+  min,
+  max,
+  disabled,
+  onCommit,
+  hint,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  disabled?: boolean;
+  onCommit: (next: number) => void;
+  hint?: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  return (
+    <label className="text-xs">
+      {label}
+      {hint ? ` ${hint}` : ""}
+      <input
+        type="text"
+        inputMode="numeric"
+        disabled={disabled}
+        value={draft ?? String(value)}
+        onFocus={() => setDraft(String(value))}
+        onChange={(e) => {
+          const next = e.target.value.replace(/\D/g, "");
+          setDraft(next);
+          if (next !== "") onCommit(clampInt(Number(next), min, max));
+        }}
+        onBlur={() => {
+          const parsed = draft === "" || draft == null ? value : Number(draft);
+          onCommit(clampInt(Number.isFinite(parsed) ? parsed : value, min, max));
+          setDraft(null);
+        }}
+        className="field mt-1 block h-11 w-full px-3 text-base tabular-nums disabled:opacity-50"
+      />
+    </label>
+  );
+}
+
 function PillRow<T extends string>({
   value,
   options,
@@ -264,20 +313,23 @@ export function ScoreCalculator() {
             <label className="flex items-center gap-2 text-xs text-muted">
               <span>More</span>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={7}
-                max={20}
-                value={dora >= 7 ? dora : ""}
+                value={dora >= 7 ? String(dora) : ""}
                 placeholder="7+"
                 onChange={(e) => {
-                  setDora(Math.max(0, Number(e.target.value) || 0));
+                  const digits = e.target.value.replace(/\D/g, "");
+                  if (digits === "") {
+                    setDora(0);
+                  } else {
+                    setDora(Math.max(0, Number(digits)));
+                  }
                   if (mode !== "scenario") {
                     setMode("scenario");
                     setRonPoints(null);
                   }
                 }}
-                className="field h-10 w-16 px-2 text-base"
+                className="field h-10 w-16 px-2 text-base tabular-nums"
                 aria-label="Dora count (7 or more)"
               />
             </label>
@@ -325,14 +377,15 @@ export function ScoreCalculator() {
             <label className="flex items-center gap-2 text-xs text-muted">
               <span>More</span>
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={4}
-                max={20}
-                value={honba >= 4 ? honba : ""}
+                value={honba >= 4 ? String(honba) : ""}
                 placeholder="4+"
-                onChange={(e) => setHonba(Math.max(0, Number(e.target.value) || 0))}
-                className="field h-10 w-16 px-2 text-base"
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, "");
+                  setHonba(digits === "" ? 0 : Math.max(0, Number(digits)));
+                }}
+                className="field h-10 w-16 px-2 text-base tabular-nums"
                 aria-label="Honba sticks (4 or more)"
               />
             </label>
@@ -380,40 +433,30 @@ export function ScoreCalculator() {
           rounded up to the nearest 10.
         </p>
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <label className="text-xs">
-            Han
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={99}
-              value={han}
-              onChange={(e) => {
-                setMode("advanced");
-                setRonPoints(null);
-                setHan(Math.max(1, Number(e.target.value) || 1));
-              }}
-              className="field mt-1 h-11 w-full px-2 text-base"
-            />
-          </label>
-          <label className="text-xs">
-            Fu {han >= 5 ? "(limit hand)" : ""}
-            <input
-              type="number"
-              inputMode="numeric"
-              min={20}
-              max={110}
-              step={10}
-              value={fu}
-              disabled={han >= 5}
-              onChange={(e) => {
-                setMode("advanced");
-                setRonPoints(null);
-                setFu(Number(e.target.value) || 30);
-              }}
-              className="field mt-1 h-11 w-full px-2 text-base disabled:opacity-50"
-            />
-          </label>
+          <NumericField
+            label="Han"
+            value={han}
+            min={1}
+            max={99}
+            onCommit={(next) => {
+              setMode("advanced");
+              setRonPoints(null);
+              setHan(next);
+            }}
+          />
+          <NumericField
+            label="Fu"
+            hint={han >= 5 ? "(limit hand)" : undefined}
+            value={fu}
+            min={20}
+            max={110}
+            disabled={han >= 5}
+            onCommit={(next) => {
+              setMode("advanced");
+              setRonPoints(null);
+              setFu(next);
+            }}
+          />
         </div>
         <FuHelper
           winType={winType}

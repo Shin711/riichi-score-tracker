@@ -152,6 +152,16 @@ function formatScoreDifference(delta: number) {
   return `${sign}${Math.abs(delta).toLocaleString()}`;
 }
 
+/** Keep draft as a string; only digits (optional leading minus). Avoids type=number wheel-scroll bugs. */
+function sanitizeIntegerDraft(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed === "-") return trimmed === "-" ? "-" : "";
+  const negative = trimmed.startsWith("-");
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return negative ? "-" : "";
+  return negative ? `-${digits}` : digits;
+}
+
 function seatPlayerName(seat: SeatForm, players: PlayerOption[]) {
   if (seat.playerId) {
     return players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName;
@@ -859,10 +869,12 @@ export function ImportGameForm() {
                     </div>
                     <div className="w-px shrink-0 self-stretch bg-club-border" aria-hidden />
                     <input
-                      type="number"
+                      type="text"
                       inputMode="numeric"
                       value={seats[index].finalScore}
-                      onChange={(e) => updateSeat(index, { finalScore: e.target.value })}
+                      onChange={(e) =>
+                        updateSeat(index, { finalScore: sanitizeIntegerDraft(e.target.value) })
+                      }
                       placeholder="Score"
                       className="field-inset h-11 w-[6.5rem] shrink-0 px-3 text-base tabular-nums sm:w-28"
                     />
@@ -952,11 +964,15 @@ export function ImportGameForm() {
             </button>
             {showStartingPoints ? (
               <input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                value={startingPoints}
-                onChange={(e) => setStartingPoints(Number(e.target.value))}
-                className="field mt-1.5 h-11 w-40 px-3 text-base"
+                value={String(startingPoints)}
+                onChange={(e) => {
+                  const next = sanitizeIntegerDraft(e.target.value);
+                  if (next === "" || next === "-") return;
+                  setStartingPoints(Number(next));
+                }}
+                className="field mt-1.5 h-11 w-40 px-3 text-base tabular-nums"
               />
             ) : null}
           </div>

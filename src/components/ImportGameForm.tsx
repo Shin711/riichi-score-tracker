@@ -154,10 +154,10 @@ function formatScoreDifference(delta: number) {
 
 /** Keep draft as a string; only digits (optional leading minus). Avoids type=number wheel-scroll bugs. */
 function sanitizeIntegerDraft(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed === "" || trimmed === "-") return trimmed === "-" ? "-" : "";
-  const negative = trimmed.startsWith("-");
-  const digits = trimmed.replace(/\D/g, "");
+  const normalized = raw.trim().replace(/[\u2212\u2013\u2014]/g, "-");
+  if (normalized === "" || normalized === "-") return normalized === "-" ? "-" : "";
+  const negative = normalized.startsWith("-");
+  const digits = normalized.replace(/\D/g, "");
   if (!digits) return negative ? "-" : "";
   return negative ? `-${digits}` : digits;
 }
@@ -812,6 +812,11 @@ export function ImportGameForm() {
             <h2 className="text-sm font-semibold">Player scores</h2>
             <span className="text-xs text-muted">placement order doesn&apos;t matter</span>
           </div>
+          <p className="text-xs text-subtle">
+            Negative score? Tap <span className="font-medium text-muted">+/−</span> next to Score
+            (phone keypads often have no minus). On a keyboard you can also type{" "}
+            <span className="font-mono">-</span>.
+          </p>
 
           {Array.from({ length: IMPORT_SEAT_COUNT }, (_, index) => {
             const seatLabel = importSeatWindLabel(index);
@@ -902,7 +907,7 @@ export function ImportGameForm() {
                           ? "Make score positive"
                           : "Make score negative"
                       }
-                      title="Toggle +/− (mobile keypads often have no minus key)"
+                      title="Toggle +/− for negative scores"
                     >
                       {isNegativeIntegerDraft(seats[index].finalScore) ? "−" : "+"}
                     </button>
@@ -910,26 +915,18 @@ export function ImportGameForm() {
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={
-                        seats[index].finalScore === "-"
-                          ? ""
-                          : isNegativeIntegerDraft(seats[index].finalScore)
-                            ? seats[index].finalScore.replace(/^-/, "")
-                            : seats[index].finalScore
-                      }
-                      onChange={(e) => {
-                        const digits = sanitizeIntegerDraft(e.target.value).replace(/^-/, "");
-                        const negative = isNegativeIntegerDraft(seats[index].finalScore);
-                        if (digits === "") {
-                          updateSeat(index, { finalScore: negative ? "-" : "" });
-                          return;
-                        }
+                      value={seats[index].finalScore}
+                      onChange={(e) =>
                         updateSeat(index, {
-                          finalScore: negative ? `-${digits}` : digits,
-                        });
-                      }}
+                          finalScore: sanitizeIntegerDraft(e.target.value),
+                        })
+                      }
                       placeholder="Score"
-                      className="field-inset h-11 w-[5.5rem] shrink-0 px-2 text-base tabular-nums sm:w-24"
+                      className={`field-inset h-11 w-[6.5rem] shrink-0 px-2 text-base tabular-nums sm:w-28 ${
+                        isNegativeIntegerDraft(seats[index].finalScore)
+                          ? "text-red-600 dark:text-red-400"
+                          : ""
+                      }`}
                     />
                   </div>
                 )}

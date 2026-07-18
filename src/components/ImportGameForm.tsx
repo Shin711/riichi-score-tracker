@@ -162,6 +162,17 @@ function sanitizeIntegerDraft(raw: string): string {
   return negative ? `-${digits}` : digits;
 }
 
+function toggleIntegerSign(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed === "-") return trimmed === "-" ? "" : "-";
+  if (trimmed.startsWith("-")) return trimmed.slice(1);
+  return `-${trimmed}`;
+}
+
+function isNegativeIntegerDraft(raw: string): boolean {
+  return raw.trim().startsWith("-");
+}
+
 function seatPlayerName(seat: SeatForm, players: PlayerOption[]) {
   if (seat.playerId) {
     return players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName;
@@ -642,7 +653,10 @@ export function ImportGameForm() {
 
   const scoreSummary = useMemo(() => {
     const expected = startingPoints * 4;
-    const entered = seats.filter((s) => s.finalScore.trim() !== "");
+    const entered = seats.filter((s) => {
+      const t = s.finalScore.trim();
+      return t !== "" && t !== "-";
+    });
     const allEntered = entered.length === seats.length;
     const allValid = entered.every((s) => Number.isFinite(Number(s.finalScore)));
     const sum = entered.reduce((a, s) => a + (Number(s.finalScore) || 0), 0);
@@ -662,7 +676,10 @@ export function ImportGameForm() {
       .map((s, i) => ({
         i,
         score: Number(s.finalScore),
-        ok: s.finalScore.trim() !== "" && Number.isFinite(Number(s.finalScore)),
+        ok:
+          s.finalScore.trim() !== "" &&
+          s.finalScore.trim() !== "-" &&
+          Number.isFinite(Number(s.finalScore)),
       }))
       .filter((s) => s.ok);
     if (valid.length !== seats.length) return map;
@@ -868,15 +885,51 @@ export function ImportGameForm() {
                       />
                     </div>
                     <div className="w-px shrink-0 self-stretch bg-club-border" aria-hidden />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSeat(index, {
+                          finalScore: toggleIntegerSign(seats[index].finalScore),
+                        })
+                      }
+                      className={`flex h-11 w-10 shrink-0 items-center justify-center text-base font-semibold tabular-nums transition-colors ${
+                        isNegativeIntegerDraft(seats[index].finalScore)
+                          ? "bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                          : "text-club-ink"
+                      }`}
+                      aria-label={
+                        isNegativeIntegerDraft(seats[index].finalScore)
+                          ? "Make score positive"
+                          : "Make score negative"
+                      }
+                      title="Toggle +/− (mobile keypads often have no minus key)"
+                    >
+                      {isNegativeIntegerDraft(seats[index].finalScore) ? "−" : "+"}
+                    </button>
+                    <div className="w-px shrink-0 self-stretch bg-club-border" aria-hidden />
                     <input
                       type="text"
                       inputMode="numeric"
-                      value={seats[index].finalScore}
-                      onChange={(e) =>
-                        updateSeat(index, { finalScore: sanitizeIntegerDraft(e.target.value) })
+                      value={
+                        seats[index].finalScore === "-"
+                          ? ""
+                          : isNegativeIntegerDraft(seats[index].finalScore)
+                            ? seats[index].finalScore.replace(/^-/, "")
+                            : seats[index].finalScore
                       }
+                      onChange={(e) => {
+                        const digits = sanitizeIntegerDraft(e.target.value).replace(/^-/, "");
+                        const negative = isNegativeIntegerDraft(seats[index].finalScore);
+                        if (digits === "") {
+                          updateSeat(index, { finalScore: negative ? "-" : "" });
+                          return;
+                        }
+                        updateSeat(index, {
+                          finalScore: negative ? `-${digits}` : digits,
+                        });
+                      }}
                       placeholder="Score"
-                      className="field-inset h-11 w-[6.5rem] shrink-0 px-3 text-base tabular-nums sm:w-28"
+                      className="field-inset h-11 w-[5.5rem] shrink-0 px-2 text-base tabular-nums sm:w-24"
                     />
                   </div>
                 )}

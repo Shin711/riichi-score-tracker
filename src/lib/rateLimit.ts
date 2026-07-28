@@ -6,6 +6,9 @@ export const SESSION_CREATE_HOURLY_LIMIT = 10;
 /** Max new sessions per IP per day. */
 export const SESSION_CREATE_DAILY_LIMIT = 30;
 
+/** Max Mahjong Soul lookups per IP per hour — each one costs a full MJS login. */
+export const MJS_IMPORT_HOURLY_LIMIT = 20;
+
 const HOUR_SECONDS = 3600;
 const DAY_SECONDS = 86400;
 
@@ -42,6 +45,19 @@ export async function checkSessionCreateRateLimit(
   if (!hourlyOk) return { allowed: false, reason: "hourly" };
 
   return { allowed: true };
+}
+
+export async function checkMajsoulImportRateLimit(
+  supabase: SupabaseClient,
+  ip: string
+): Promise<{ allowed: boolean; reason?: "hourly" }> {
+  const ok = await withinLimit(
+    supabase,
+    `mjs_import:${ip}:hour`,
+    HOUR_SECONDS,
+    MJS_IMPORT_HOURLY_LIMIT
+  );
+  return ok ? { allowed: true } : { allowed: false, reason: "hourly" };
 }
 
 export function rateLimitRetryAfterSeconds(reason: "hourly" | "daily"): number {

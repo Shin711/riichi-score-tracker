@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname),
   },
+  // `ws` resolves optional native addons (bufferutil, utf-8-validate) at
+  // runtime; bundling it breaks those requires. Keep it external on the server.
+  serverExternalPackages: ["ws"],
 };
 
 export default nextConfig;

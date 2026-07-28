@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { MajsoulQuickImport } from "@/components/MajsoulQuickImport";
 import { importSeatWindLabel, type ImportedGameEntry, type ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
@@ -802,6 +803,14 @@ export function ImportGameForm() {
 
   return (
     <div className="min-w-0 max-w-full space-y-7 overflow-x-hidden">
+      <MajsoulQuickImport
+        onImported={() => {
+          setStatus(null);
+          setHistoryPage(1);
+          setHistoryRefresh((n) => n + 1);
+        }}
+      />
+
       <form
         onSubmit={(e) => void onSubmit(e)}
         className="card min-w-0 max-w-full divide-y divide-club-border overflow-x-clip"
@@ -985,13 +994,13 @@ export function ImportGameForm() {
 
           <label className="block min-w-0 max-w-full text-xs font-medium text-muted">
             <span className="break-words">
-              Mahjong Soul log link{" "}
+              Mahjong Soul game ID or log link{" "}
               <span className="font-normal text-subtle">(optional)</span>
             </span>
             <input
               value={mjsPaipuUrl}
               onChange={(e) => setMjsPaipuUrl(e.target.value)}
-              placeholder="https://mahjongsoul.game.yo-star.com/?paipu=…"
+              placeholder="250728-abc12345-… or https://mahjongsoul.game.yo-star.com/?paipu=…"
               className="field mt-1.5 h-11 w-full min-w-0 max-w-full px-3 text-sm"
             />
             {mjsPaipuUrl.trim() && !paipuValid ? (

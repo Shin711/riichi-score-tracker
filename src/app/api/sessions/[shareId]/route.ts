@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSessionForEdit } from "@/lib/api/sessionEdit";
+import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { DEFAULT_SESSION_TITLE } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -104,6 +105,13 @@ export async function PATCH(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  // Only ending (or reopening) a game moves the standings — a title or rules
+  // edit on a live session does not.
+  if (body.end === true || body.reopen === true) {
+    refreshDiscordLeaderboardAfterResponse();
+  }
+
   return NextResponse.json({ session: data });
 }
 
@@ -139,6 +147,8 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  refreshDiscordLeaderboardAfterResponse();
 
   return NextResponse.json({ ok: true });
 }

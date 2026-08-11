@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
+import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
 import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
@@ -152,6 +153,8 @@ export async function POST(req: Request) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    refreshDiscordLeaderboardAfterResponse();
 
     return NextResponse.json({ import: data as ImportedGameRow });
   } catch (e) {

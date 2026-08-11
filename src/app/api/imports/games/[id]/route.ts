@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export async function DELETE(
@@ -17,6 +18,8 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
+
+  refreshDiscordLeaderboardAfterResponse();
 
   return NextResponse.json({ ok: true });
 }

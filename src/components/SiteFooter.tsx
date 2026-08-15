@@ -3,19 +3,19 @@ import { DISCORD_INVITE_URL, SITE_NAME } from "@/lib/site";
 
 export function SiteFooter() {
   return (
-    <footer className="shell-bar mt-auto border-t py-6 pb-20 sm:pb-6">
+    <footer className="shell-bar mt-auto border-t py-5 pb-20 sm:pb-5">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-4 text-center sm:flex-row sm:justify-between sm:text-left">
         <div className="flex items-center gap-2.5">
-          <BrandMark className="h-10 w-10" />
-          <p className="text-muted text-xs">{SITE_NAME}</p>
+          <BrandMark className="h-8 w-8" />
+          <p className="text-xs text-muted">{SITE_NAME}</p>
         </div>
         <a
           href={DISCORD_INVITE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#5865F2] transition-colors hover:bg-[#5865F2]/10"
+          className="inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium text-[#5865F2] transition-colors hover:bg-[#5865F2]/10"
         >
-          <DiscordIcon className="h-5 w-5" />
+          <DiscordIcon className="h-4 w-4" />
           Join our Discord
         </a>
       </div>

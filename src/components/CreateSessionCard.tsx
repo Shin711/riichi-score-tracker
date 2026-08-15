@@ -7,10 +7,7 @@ export function CreateSessionCard() {
 
   return (
     <div className="card-accent card-interactive relative overflow-hidden p-6 sm:p-7">
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-club-red/40 via-club-gold/30 to-club-jade/40"
-        aria-hidden
-      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-club-red/50" aria-hidden />
       <h2 className="text-xl font-bold tracking-tight text-club-ink">Start a live session</h2>
       <p className="text-muted mt-2 text-sm leading-6">
         One person creates the session on their phone and records each hand. Everyone else can follow

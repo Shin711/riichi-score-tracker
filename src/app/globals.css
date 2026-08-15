@@ -79,60 +79,11 @@ body {
   }
 }
 
-/* Soft warm backdrop + ambient depth */
 .app-shell-bg {
   position: relative;
   isolation: isolate;
   overflow-x: clip;
   background-color: var(--color-club-cream);
-  background-image:
-    radial-gradient(ellipse 90% 55% at 50% -15%, rgb(196 30 58 / 0.08), transparent 62%),
-    radial-gradient(ellipse 55% 40% at 100% 5%, rgb(15 118 110 / 0.07), transparent 58%),
-    radial-gradient(ellipse 40% 35% at 0% 40%, rgb(184 134 11 / 0.05), transparent 55%);
-}
-
-.ambient-orb {
-  pointer-events: none;
-  position: fixed;
-  z-index: 0;
-  border-radius: 9999px;
-  filter: blur(80px);
-  opacity: 0.55;
-  animation: orb-drift 18s var(--ease-fluid) infinite alternate;
-}
-
-.ambient-orb-red {
-  top: -8rem;
-  right: -4rem;
-  width: 22rem;
-  height: 22rem;
-  background: rgb(196 30 58 / 0.22);
-}
-
-.ambient-orb-jade {
-  bottom: 10rem;
-  left: -6rem;
-  width: 20rem;
-  height: 20rem;
-  background: rgb(15 118 110 / 0.18);
-  animation-delay: -6s;
-}
-
-@media (prefers-color-scheme: dark) {
-  .app-shell-bg {
-    background-image:
-      radial-gradient(ellipse 90% 55% at 50% -15%, rgb(196 30 58 / 0.16), transparent 62%),
-      radial-gradient(ellipse 55% 40% at 100% 5%, rgb(15 118 110 / 0.12), transparent 58%),
-      radial-gradient(ellipse 40% 35% at 0% 40%, rgb(184 134 11 / 0.08), transparent 55%);
-  }
-
-  .ambient-orb-red {
-    background: rgb(196 30 58 / 0.28);
-  }
-
-  .ambient-orb-jade {
-    background: rgb(15 118 110 / 0.22);
-  }
 }
 
 @layer components {
@@ -217,12 +168,7 @@ body {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      135deg,
-      rgb(196 30 58 / 0.04) 0%,
-      transparent 40%,
-      rgb(15 118 110 / 0.05) 100%
-    );
+    background: rgb(196 30 58 / 0.03);
     opacity: 0;
     transition: opacity 0.35s var(--ease-fluid);
   }
@@ -253,34 +199,6 @@ body {
     @apply relative overflow-hidden rounded-2xl border bg-club-surface/95 shadow-md shadow-stone-900/[0.06] backdrop-blur-sm transition-all duration-300 dark:bg-club-surface/90 dark:shadow-black/40;
     border-color: var(--color-club-border);
     transition-timing-function: var(--ease-fluid);
-    background: linear-gradient(
-      145deg,
-      var(--color-club-surface) 0%,
-      color-mix(in srgb, var(--color-club-surface) 88%, var(--color-club-jade-muted)) 100%
-    );
-  }
-
-  .hero-card::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      135deg,
-      rgb(196 30 58 / 0.25),
-      rgb(15 118 110 / 0.2),
-      rgb(184 134 11 / 0.15)
-    );
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
   }
 
   .score-display {
@@ -314,19 +232,10 @@ body {
     transition-timing-function: var(--ease-fluid);
   }
 
-  .btn-primary:hover {
-    transform: translateY(-2px);
-  }
-
   .btn-secondary {
     @apply inline-flex items-center justify-center rounded-xl border bg-club-surface/90 px-4 text-sm font-medium text-club-ink shadow-sm backdrop-blur-sm transition-all duration-300 hover:bg-club-surface active:scale-[0.98];
     border-color: var(--color-club-border);
     transition-timing-function: var(--ease-fluid);
-  }
-
-  .btn-secondary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgb(28 25 23 / 0.08);
   }
 
   .nav-link-active {
@@ -444,8 +353,8 @@ body {
   }
 
   .shell-bar {
-    @apply border-b bg-club-cream/75 backdrop-blur-xl backdrop-saturate-150;
-    border-color: color-mix(in srgb, var(--color-club-border) 70%, transparent);
+    @apply border-b bg-club-cream/80 backdrop-blur-xl;
+    border-color: color-mix(in srgb, var(--color-club-border) 75%, transparent);
   }
 
   .divide-club > :not(:last-child) {
@@ -454,14 +363,10 @@ body {
 
   /* Teal accent panels — text tokens flip with the jade background */
   .jade-panel {
-    @apply rounded-2xl border-2 p-5 shadow-lg;
-    border-color: rgb(15 118 110 / 0.4);
-    background: linear-gradient(
-      160deg,
-      var(--color-club-jade-muted) 0%,
-      color-mix(in srgb, var(--color-club-jade-muted) 80%, var(--color-club-surface)) 100%
-    );
-    box-shadow: 0 12px 32px rgb(15 118 110 / 0.12);
+    @apply rounded-2xl border p-5 shadow-md;
+    border-color: rgb(15 118 110 / 0.35);
+    background: var(--color-club-jade-muted);
+    box-shadow: 0 10px 28px rgb(15 118 110 / 0.1);
   }
 
   .jade-panel-label {
@@ -521,26 +426,14 @@ body {
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-club-border) 60%, transparent);
   }
   .lb-row:hover::before {
-    background: linear-gradient(
-      to bottom,
-      rgb(196 30 58 / 0.85),
-      rgb(15 118 110 / 0.85)
-    );
+    background: var(--color-club-red);
   }
   /* Positive-point rows get a warm accent rail */
   .lb-row--pos::before {
-    background: linear-gradient(
-      to bottom,
-      rgb(217 119 6 / 0.9),
-      rgb(180 83 9 / 0.5)
-    );
+    background: rgb(217 119 6 / 0.85);
   }
   .lb-row--pos:hover::before {
-    background: linear-gradient(
-      to bottom,
-      rgb(217 119 6 / 0.95),
-      rgb(196 30 58 / 0.7)
-    );
+    background: rgb(180 83 9 / 0.95);
   }
 
   /* Rank badges keyed to points (amber = positive, cool = negative) */
@@ -815,297 +708,94 @@ body {
   }
 }
 
-@keyframes orb-drift {
-  from {
-    transform: translate(0, 0) scale(1);
-  }
-  to {
-    transform: translate(24px, -18px) scale(1.08);
-  }
+/* ============================================================
+   Club chrome — single accent, no multi-hue treatments
+   ============================================================ */
+.site-title,
+.arcade-title {
+  @apply font-semibold tracking-tight text-club-ink;
 }
 
-/* ============================================================
-   Arcade vibe — bold tiles, neon glow, playful motion (home + shell)
-   ============================================================ */
-.arcade-title {
-    @apply font-bold tracking-tight;
-    background: linear-gradient(
-      100deg,
-      var(--color-club-red) 0%,
-      #e0506a 22%,
-      var(--color-club-gold) 52%,
-      var(--color-club-jade) 82%,
-      #16a394 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+.club-badge,
+.arcade-badge,
+.club-eyebrow {
+  @apply mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-club-red;
+}
 
-  .arcade-badge {
-    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em];
-    border-color: rgb(196 30 58 / 0.35);
-    color: var(--color-club-red);
-    background: color-mix(in srgb, var(--color-club-red-muted) 70%, transparent);
-    box-shadow:
-      0 0 0 1px rgb(196 30 58 / 0.08),
-      0 6px 18px rgb(196 30 58 / 0.12);
-  }
+.arcade-badge-dot {
+  @apply hidden;
+}
 
-  .arcade-badge-dot {
-    @apply h-1.5 w-1.5 rounded-full;
-    background: var(--color-club-red);
-    box-shadow: 0 0 8px 1px rgb(196 30 58 / 0.7);
-    animation: arcade-pulse 1.8s ease-in-out infinite;
-  }
+.home-hero {
+  @apply flex flex-col items-center gap-6 rounded-2xl border bg-club-surface px-6 py-12 text-center sm:gap-7 sm:px-10 sm:py-14;
+  border-color: var(--color-club-border);
+  box-shadow: 0 10px 32px -20px rgb(28 25 23 / 0.2);
+}
 
-  /* Big floating mahjong tiles used as the hero centerpiece */
-  .wind-tile-arcade {
-    @apply relative flex items-center justify-center rounded-2xl border-2 text-3xl font-black sm:text-4xl;
-    height: 5.5rem;
-    width: 4.5rem;
-    color: var(--tile-fg, var(--color-club-ink));
-    border-color: var(--tile-edge, var(--color-club-border));
-    background:
-      linear-gradient(160deg, var(--color-club-surface) 0%, color-mix(in srgb, var(--color-club-surface) 84%, var(--tile-glow, transparent)) 100%);
-    box-shadow:
-      0 10px 24px rgb(28 25 23 / 0.12),
-      0 0 0 1px rgb(255 255 255 / 0.4) inset,
-      0 0 22px -6px var(--tile-glow, transparent);
-    animation: tile-bob 3.4s var(--ease-fluid) infinite;
-    transition: transform 0.3s var(--ease-spring);
-    cursor: default;
-  }
+.home-hero-title {
+  @apply font-semibold tracking-tight text-club-ink;
+  font-size: clamp(1.85rem, 4vw, 2.6rem);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
 
-  .wind-tile-arcade:hover {
-    transform: translateY(-8px) rotate(-3deg) scale(1.06);
-  }
+.home-hero-desc {
+  @apply mx-auto max-w-xl text-base leading-7;
+  color: var(--color-club-muted);
+}
 
-  .wind-tile-east {
-    --tile-fg: var(--color-club-red);
-    --tile-edge: rgb(196 30 58 / 0.45);
-    --tile-glow: rgb(196 30 58 / 0.55);
-  }
-  .wind-tile-south {
-    --tile-fg: var(--color-club-gold);
-    --tile-edge: rgb(184 134 11 / 0.45);
-    --tile-glow: rgb(184 134 11 / 0.5);
-  }
-  .wind-tile-west {
-    --tile-fg: var(--color-club-jade);
-    --tile-edge: rgb(15 118 110 / 0.45);
-    --tile-glow: rgb(15 118 110 / 0.55);
-  }
-  .wind-tile-north {
-    --tile-fg: #3b6fb8;
-    --tile-edge: rgb(59 111 184 / 0.45);
-    --tile-glow: rgb(59 111 184 / 0.5);
-  }
+.home-card {
+  @apply flex h-full flex-col rounded-2xl border bg-club-surface p-5 sm:p-6;
+  border-color: var(--color-club-border);
+  box-shadow: 0 8px 24px -18px rgb(28 25 23 / 0.18);
+  transition:
+    border-color 0.2s var(--ease-fluid),
+    box-shadow 0.2s var(--ease-fluid);
+}
 
-  /* Arcade game tiles replacing the home feature cards */
-  .arcade-tile {
-    @apply relative flex h-full flex-col overflow-hidden rounded-3xl border-2 p-6 sm:p-7;
-    border-color: var(--tile-edge, var(--color-club-border));
-    background:
-      radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--tile-glow, transparent) 22%, var(--color-club-surface)) 0%, var(--color-club-surface) 55%);
-    box-shadow:
-      0 14px 34px rgb(28 25 23 / 0.1),
-      0 0 0 1px rgb(255 255 255 / 0.35) inset;
-    transition:
-      transform 0.35s var(--ease-spring),
-      box-shadow 0.35s var(--ease-fluid);
-    cursor: pointer;
-  }
+.home-card:hover {
+  border-color: color-mix(in srgb, var(--color-club-red) 35%, var(--color-club-border));
+  box-shadow: 0 12px 28px -16px rgb(28 25 23 / 0.22);
+}
 
-  .arcade-tile::after {
-    content: "";
-    position: absolute;
-    inset: -2px;
-    border-radius: inherit;
-    padding: 2px;
-    background: linear-gradient(135deg, var(--tile-glow, transparent), transparent 55%);
-    -webkit-mask:
-      linear-gradient(#fff 0 0) content-box,
-      linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0;
-    transition: opacity 0.35s var(--ease-fluid);
-    pointer-events: none;
-  }
+.home-card-cta {
+  @apply mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-club-red;
+  transition: gap 0.2s var(--ease-fluid);
+}
 
-  .arcade-tile:hover {
-    transform: translateY(-6px) scale(1.015);
-    box-shadow:
-      0 24px 50px -12px var(--tile-glow, rgb(28 25 23 / 0.25)),
-      0 0 0 1px rgb(255 255 255 / 0.4) inset;
-  }
+.home-card:hover .home-card-cta {
+  gap: 0.5rem;
+}
 
-  .arcade-tile:active {
-    transform: translateY(-2px) scale(0.99);
-  }
+.home-link,
+.home-chip,
+.arcade-chip {
+  @apply font-medium text-club-muted transition-colors duration-200 hover:text-club-ink;
+}
 
-  .arcade-tile:hover::after {
-    opacity: 1;
-  }
+.page-header,
+.page-hero {
+  @apply border-b pb-6;
+  border-color: var(--color-club-border);
+}
 
-  .arcade-tile-red {
-    --tile-edge: rgb(196 30 58 / 0.4);
-    --tile-glow: rgb(196 30 58 / 0.6);
-  }
-  .arcade-tile-gold {
-    --tile-edge: rgb(184 134 11 / 0.4);
-    --tile-glow: rgb(184 134 11 / 0.55);
-  }
-  .arcade-tile-jade {
-    --tile-edge: rgb(15 118 110 / 0.4);
-    --tile-glow: rgb(15 118 110 / 0.55);
-  }
+.page-header-title,
+.page-hero-title {
+  @apply font-semibold tracking-tight text-club-ink;
+  font-size: clamp(1.7rem, 3.2vw, 2.15rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
 
-  .arcade-glyph {
-    @apply flex items-center justify-center rounded-2xl text-2xl font-black;
-    height: 3.25rem;
-    width: 3.25rem;
-    color: var(--tile-fg, var(--color-club-ink));
-    background: color-mix(in srgb, var(--tile-glow, transparent) 16%, var(--color-club-surface));
-    border: 1.5px solid var(--tile-edge, var(--color-club-border));
-    box-shadow: 0 0 18px -4px var(--tile-glow, transparent);
-    transition: transform 0.35s var(--ease-spring);
-  }
+.page-header-desc,
+.page-hero-desc {
+  @apply max-w-2xl text-sm leading-6 sm:text-base sm:leading-7;
+  color: var(--color-club-muted);
+}
 
-  .arcade-tile:hover .arcade-glyph {
-    transform: rotate(-6deg) scale(1.08);
-  }
-
-  .arcade-tile-red .arcade-glyph {
-    --tile-fg: var(--color-club-red);
-  }
-  .arcade-tile-gold .arcade-glyph {
-    --tile-fg: var(--color-club-gold);
-  }
-  .arcade-tile-jade .arcade-glyph {
-    --tile-fg: var(--color-club-jade);
-  }
-
-  .arcade-cta {
-    @apply mt-auto inline-flex items-center gap-1.5 pt-5 text-sm font-bold;
-    color: var(--tile-fg, var(--color-club-red));
-    transition: gap 0.3s var(--ease-fluid);
-  }
-
-  .arcade-tile-red .arcade-cta {
-    --tile-fg: var(--color-club-red);
-  }
-  .arcade-tile-gold .arcade-cta {
-    --tile-fg: var(--color-club-gold);
-  }
-  .arcade-tile-jade .arcade-cta {
-    --tile-fg: var(--color-club-jade);
-  }
-
-  .arcade-tile:hover .arcade-cta {
-    gap: 0.625rem;
-  }
-
-  .arcade-chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-xs font-semibold transition-all duration-300;
-    border-color: var(--color-club-border);
-    color: var(--color-club-muted);
-    background: var(--color-club-surface);
-  }
-
-  .arcade-chip:hover {
-    transform: translateY(-2px);
-    color: var(--color-club-ink);
-    border-color: rgb(196 30 58 / 0.4);
-    box-shadow: 0 8px 20px -6px rgb(196 30 58 / 0.3);
-  }
-
-  /* Apple-style page hero — big display type, accent rule, soft color washes */
-  .page-hero {
-    @apply relative overflow-hidden rounded-[2rem] border px-6 py-12 sm:px-12 sm:py-16;
-    border-color: var(--color-club-border);
-    background: var(--color-club-surface);
-    background-image:
-      radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-club-red-muted) 55%, transparent) 0%, transparent 60%);
-    box-shadow:
-      0 24px 60px -28px rgb(28 25 23 / 0.28),
-      0 0 0 1px rgb(255 255 255 / 0.4) inset;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .page-hero {
-      background-image:
-        radial-gradient(120% 90% at 50% 0%, rgb(196 30 58 / 0.18) 0%, transparent 60%);
-      box-shadow:
-        0 24px 60px -28px rgb(0 0 0 / 0.5),
-        0 0 0 1px rgb(255 255 255 / 0.05) inset;
-    }
-  }
-
-  .page-hero-wash {
-    @apply pointer-events-none absolute rounded-full blur-3xl;
-  }
-
-  .page-hero-wash-red {
-    top: -5rem;
-    right: -4rem;
-    width: 18rem;
-    height: 18rem;
-    background: radial-gradient(circle, rgb(196 30 58 / 0.22), transparent 65%);
-  }
-
-  .page-hero-wash-jade {
-    bottom: -6rem;
-    left: -5rem;
-    width: 16rem;
-    height: 16rem;
-    background: radial-gradient(circle, rgb(15 118 110 / 0.18), transparent 65%);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    .page-hero-wash-red {
-      background: radial-gradient(circle, rgb(196 30 58 / 0.32), transparent 65%);
-    }
-    .page-hero-wash-jade {
-      background: radial-gradient(circle, rgb(15 118 110 / 0.26), transparent 65%);
-    }
-  }
-
-  .page-hero-rule {
-    @apply absolute left-1/2 top-6 h-1 w-12 -translate-x-1/2 rounded-full;
-    background: linear-gradient(90deg, var(--color-club-red), var(--color-club-gold), var(--color-club-jade));
-    box-shadow: 0 0 18px -2px rgb(196 30 58 / 0.5);
-  }
-
-  .page-hero-title {
-    @apply font-bold tracking-tight;
-    background: linear-gradient(
-      100deg,
-      var(--color-club-red) 0%,
-      #e0506a 22%,
-      var(--color-club-gold) 52%,
-      var(--color-club-jade) 82%,
-      #16a394 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-size: clamp(2.25rem, 6vw, 4rem);
-    line-height: 1.04;
-    letter-spacing: -0.02em;
-  }
-
-  .page-hero-desc {
-    @apply text-base leading-7 sm:text-lg;
-    color: var(--color-club-muted);
-    max-width: 42rem;
-    margin-inline: auto;
-  }
-
-  .page-hero-action {
-    @apply flex flex-wrap items-center justify-center gap-3 pt-1;
-  }
+.page-hero-action {
+  @apply flex flex-wrap items-center gap-3;
+}
 
   /* Leaderboard top-3 podium — big display numbers, medal accents */
   .podium {
@@ -1115,9 +805,8 @@ body {
   .podium-card {
     @apply relative flex flex-col items-center gap-1.5 overflow-hidden rounded-2xl border px-5 py-6 text-center sm:py-7;
     border-color: var(--podium-edge, var(--color-club-border));
-    background:
-      radial-gradient(120% 120% at 50% 0%, color-mix(in srgb, var(--podium-glow, transparent) 20%, var(--color-club-surface)) 0%, var(--color-club-surface) 60%);
-    box-shadow: 0 14px 34px -18px var(--podium-glow, rgb(28 25 23 / 0.25));
+    background: color-mix(in srgb, var(--podium-glow, transparent) 12%, var(--color-club-surface));
+    box-shadow: 0 12px 28px -16px var(--podium-glow, rgb(28 25 23 / 0.2));
   }
 
   .podium-1 {
@@ -1245,56 +934,23 @@ body {
 
   .bottom-nav-active {
     background: color-mix(in srgb, var(--color-club-red-muted) 80%, transparent);
-    box-shadow:
-      0 0 0 1px rgb(196 30 58 / 0.25),
-      0 6px 16px -6px rgb(196 30 58 / 0.45);
+    box-shadow: 0 0 0 1px rgb(196 30 58 / 0.18);
   }
 
-  /* Glowing rank-1 badge for the leaderboard */
+  /* Rank-1 badge emphasis */
   .rank-badge-1 {
-    box-shadow:
-      0 0 0 1px rgb(217 119 6 / 0.4),
-      0 4px 14px -3px rgb(217 119 6 / 0.5);
+    box-shadow: 0 0 0 1px rgb(217 119 6 / 0.35);
   }
-
-@keyframes arcade-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.55;
-    transform: scale(0.78);
-  }
-}
-
-@keyframes tile-bob {
-  0%,
-  100% {
-    transform: translateY(0) rotate(-1deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(1deg);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .page-enter,
   .page-enter > *,
-  .score-pop,
-  .ambient-orb,
-  .arcade-badge-dot,
-  .wind-tile-arcade {
+  .score-pop {
     animation: none !important;
   }
 
   .card-interactive:hover,
-  .btn-primary:hover,
-  .btn-secondary:hover,
-  .wind-tile:hover,
-  .wind-tile-arcade:hover,
-  .arcade-tile:hover {
+  .wind-tile:hover {
     transform: none;
   }
 }

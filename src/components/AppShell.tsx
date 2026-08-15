@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { BrandMark } from "@/components/BrandMark";
 import { PageTransition } from "@/components/PageTransition";
 import { SiteFooter } from "@/components/SiteFooter";
-import { SITE_HEADER, SITE_NAME } from "@/lib/site";
+import { SITE_HEADER } from "@/lib/site";
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -15,10 +15,10 @@ function NavLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`rounded-full px-3.5 py-1.5 text-sm transition-all duration-200 ${
+      className={`rounded-full px-3.5 py-1.5 text-sm transition-colors duration-200 ${
         active
-          ? "nav-link-active bg-club-red-muted/85 shadow-sm dark:bg-club-red-muted"
-          : "text-club-muted hover:-translate-y-px hover:bg-club-red-muted/70 hover:text-club-ink dark:hover:bg-club-red-muted/80"
+          ? "nav-link-active bg-club-red-muted shadow-sm dark:bg-club-red-muted"
+          : "text-club-muted hover:bg-club-red-muted/60 hover:text-club-ink dark:hover:bg-club-red-muted/70"
       }`}
     >
       {label}
@@ -33,7 +33,7 @@ function BottomNavItem({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
-      className={`relative mx-0.5 my-1 flex flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-medium transition-all duration-300 ease-fluid ${
+      className={`relative mx-0.5 my-1 flex flex-1 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-medium transition-colors duration-200 ${
         active ? "bottom-nav-active font-semibold text-club-red dark:text-red-300" : "text-muted"
       }`}
     >
@@ -45,19 +45,14 @@ function BottomNavItem({ href, label }: { href: string; label: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell-bg flex min-h-full flex-col">
-      <div className="ambient-orb ambient-orb-red" aria-hidden />
-      <div className="ambient-orb ambient-orb-jade" aria-hidden />
       <header className="shell-bar sticky top-0 z-40 border-b">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3.5">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3">
           <Link
             href="/"
-            className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight transition-opacity duration-300 hover:opacity-90"
+            className="group flex shrink-0 items-center gap-2.5 font-semibold tracking-tight text-club-ink transition-opacity duration-200 hover:opacity-85"
           >
-            <BrandMark className="h-16 w-16" priority />
-            <span className="arcade-title">
-              <span className="sm:hidden">{SITE_HEADER}</span>
-              <span className="hidden sm:inline">{SITE_HEADER}</span>
-            </span>
+            <BrandMark className="h-14 w-14" priority />
+            <span className="site-title text-lg">{SITE_HEADER}</span>
           </Link>
           <nav className="hidden items-center gap-1 sm:flex">
             <NavLink href="/players" label="Players" />

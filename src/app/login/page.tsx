@@ -98,7 +98,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto max-w-md space-y-6">
       <div>
-        <h1 className="arcade-title text-2xl leading-[1.1]">Account</h1>
+        <h1 className="text-2xl font-semibold leading-[1.1] tracking-tight text-club-ink">Account</h1>
         <p className="mt-1 text-sm text-muted">
           Optional — save imported games and live sessions to your account. Import and scoring work without
           signing in.

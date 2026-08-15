@@ -99,7 +99,7 @@ export default function MySessionsPage() {
     <main className="space-y-7">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <h1 className="arcade-title text-2xl leading-[1.1] sm:text-3xl">My games</h1>
+          <h1 className="text-2xl font-semibold leading-[1.1] tracking-tight text-club-ink sm:text-3xl">My games</h1>
           <p className="text-muted max-w-2xl text-sm leading-6">
             Imported matches tied to your account. Most club nights end with a quick score import.
           </p>

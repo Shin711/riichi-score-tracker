@@ -153,7 +153,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: e.message }, { status: 404 });
       }
       // Credential/account problems are ours to fix, not the caller's.
-      const isCredentialProblem = [109, 110, 503, 1002, 1005, 1006].includes(e.code);
+      const isCredentialProblem = [109, 110, 151, 503, 1002, 1005, 1006].includes(e.code);
       return NextResponse.json({ error: e.message }, { status: isCredentialProblem ? 503 : 502 });
     }
     if (e instanceof MajsoulRecordShapeError) {

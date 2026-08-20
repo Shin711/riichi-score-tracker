@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import WebSocket from "ws";
 
 import { liqiType, type MajsoulRecordGame } from "@/lib/majsoul/proto";
+import { getMajsoulVersionCandidates, type MajsoulVersionCandidate } from "@/lib/majsoul/version";
 
 const MSG_TYPE_NOTIFY = 1;
 const MSG_TYPE_REQUEST = 2;
@@ -10,7 +11,6 @@ const MSG_TYPE_RESPONSE = 3;
 const MAX_MSG_INDEX = 2 ** 16;
 
 const EN_GATEWAY = "wss://engs.mahjongsoul.com:443/gateway";
-const DEFAULT_CLIENT_VERSION = "0.16.213";
 const CONNECT_TIMEOUT_MS = 10_000;
 const CALL_TIMEOUT_MS = 15_000;
 
@@ -19,6 +19,7 @@ const ERROR_MESSAGES: Record<number, string> = {
   // The usual failure once the stored token rotates.
   109: "The Mahjong Soul import token has expired — refresh MAJSOUL_TOKEN.",
   110: "Mahjong Soul rejected the import credentials — check MAJSOUL_UID and MAJSOUL_TOKEN.",
+  151: "Mahjong Soul rejected the importer's client version. Try again in a minute; if it keeps failing the server needs a version bump.",
   503: "The Mahjong Soul account used for imports is banned.",
   1002: "The Mahjong Soul import account is not signed up.",
   1004: "The Mahjong Soul import account is not logged in.",
@@ -53,7 +54,7 @@ type PendingCall = {
 type MajsoulCredentials = {
   uid: string;
   token: string;
-  clientVersion: string;
+  clientVersion?: string;
 };
 
 export function getMajsoulCredentials(): MajsoulCredentials | null {
@@ -63,7 +64,7 @@ export function getMajsoulCredentials(): MajsoulCredentials | null {
   return {
     uid,
     token,
-    clientVersion: process.env.MAJSOUL_CLIENT_VERSION?.trim() || DEFAULT_CLIENT_VERSION,
+    clientVersion: process.env.MAJSOUL_CLIENT_VERSION?.trim() || undefined,
   };
 }
 
@@ -83,11 +84,13 @@ class MajsoulSession {
   private ws: WebSocket | null = null;
   private index = 0;
   private readonly pending = new Map<number, PendingCall>();
-  private readonly clientVersionString: string;
+  private clientVersion: MajsoulVersionCandidate = {
+    string: "WebGL_2022-4.0.10",
+    resource: "0.11.252.w",
+    package: "4.0.10",
+  };
 
-  constructor(private readonly credentials: MajsoulCredentials) {
-    this.clientVersionString = `WebGL_2022-${credentials.clientVersion}`;
-  }
+  constructor(private readonly credentials: MajsoulCredentials) {}
 
   async connect(): Promise<void> {
     await new Promise<void>((resolve, reject) => {
@@ -224,22 +227,60 @@ class MajsoulSession {
       timestamp: Math.floor(Date.now() / 1000),
       platform: "Web",
     });
-    await this.call("Route", "heartbeat", "ReqHeartbeat", "ResHeartbeat", {});
+    try {
+      await this.call("Route", "heartbeat", "ReqHeartbeat", "ResHeartbeat", {
+        delay: 0,
+        no_operation_counter: 0,
+        platform: 11,
+        network_quality: 0,
+      });
+    } catch {
+      // Heartbeat is best-effort; oauth2Auth is what matters.
+    }
 
-    const auth = await this.call<{ access_token: string }>(
-      "Lobby",
-      "oauth2Auth",
-      "ReqOauth2Auth",
-      "ResOauth2Auth",
-      {
-        type: 22,
-        code: this.credentials.token,
-        uid: this.credentials.uid,
-        client_version_string: this.clientVersionString,
+    const candidates = await getMajsoulVersionCandidates(this.credentials.clientVersion);
+    let auth: { access_token: string } | null = null;
+    let lastVersionError: MajsoulError | null = null;
+
+    for (const candidate of candidates) {
+      this.clientVersion = candidate;
+      try {
+        auth = await this.call<{ access_token: string }>(
+          "Lobby",
+          "oauth2Auth",
+          "ReqOauth2Auth",
+          "ResOauth2Auth",
+          {
+            type: 22,
+            code: this.credentials.token,
+            uid: this.credentials.uid,
+            client_version_string: candidate.string,
+          }
+        );
+        break;
+      } catch (err) {
+        if (err instanceof MajsoulError && err.code === 151) {
+          lastVersionError = err;
+          continue;
+        }
+        throw err;
       }
-    );
+    }
 
-    await this.call("Route", "heartbeat", "ReqHeartbeat", "ResHeartbeat", {});
+    if (!auth) {
+      throw lastVersionError ?? new MajsoulError(151, ERROR_MESSAGES[151]);
+    }
+
+    try {
+      await this.call("Route", "heartbeat", "ReqHeartbeat", "ResHeartbeat", {
+        delay: 0,
+        no_operation_counter: 0,
+        platform: 11,
+        network_quality: 0,
+      });
+    } catch {
+      // ignore
+    }
 
     const check = await this.call<{ has_account: boolean }>(
       "Lobby",
@@ -267,9 +308,12 @@ class MajsoulSession {
         sale_platform: "web",
       },
       random_key: randomUUID(),
-      client_version: { resource: `${this.credentials.clientVersion}.w` },
+      client_version: {
+        resource: this.clientVersion.resource,
+        package: this.clientVersion.package,
+      },
       currency_platforms: [],
-      client_version_string: this.clientVersionString,
+      client_version_string: this.clientVersion.string,
       tag: "en",
     });
   }
@@ -280,7 +324,7 @@ class MajsoulSession {
       "fetchGameRecord",
       "ReqGameRecord",
       "ResGameRecord",
-      { game_uuid: gameUuid, client_version_string: this.clientVersionString }
+      { game_uuid: gameUuid, client_version_string: this.clientVersion.string }
     );
     if (!res.head) {
       throw new MajsoulError(1203, ERROR_MESSAGES[1203]);

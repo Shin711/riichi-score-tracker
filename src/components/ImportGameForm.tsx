@@ -1000,7 +1000,7 @@ export function ImportGameForm() {
             <input
               value={mjsPaipuUrl}
               onChange={(e) => setMjsPaipuUrl(e.target.value)}
-              placeholder="250728-abc12345-… or https://mahjongsoul.game.yo-star.com/?paipu=…"
+              placeholder="Mahjong Soul Game Log:https://… or a game ID"
               className="field mt-1.5 h-11 w-full min-w-0 max-w-full px-3 text-sm"
             />
             {mjsPaipuUrl.trim() && !paipuValid ? (

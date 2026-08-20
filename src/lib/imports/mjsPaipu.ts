@@ -13,6 +13,9 @@ const RECORD_UUID_RE = /^[0-9]{6}-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 /** Trailing `_a<accountId>` and optional `_<seat>` that share links append. */
 const PAIPU_SUFFIX_RE = /_a\d+(?:_\d)?$/;
 
+/** In-game copy: `Mahjong Soul Game Log:https://…?paipu=…` */
+const CLIPBOARD_LABEL_RE = /^(?:mahjong\s*soul\s*(?:game\s*)?log)\s*:\s*/i;
+
 const OBFUSCATION_CODEX = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 export type ParsedPaipu = {
@@ -55,15 +58,26 @@ function canonicalPaipuUrl(recordUuid: string): string {
   return `${CANONICAL_PAIPU_BASE}${recordUuid}`;
 }
 
+/** Pull a URL or id out of the in-game clipboard label (and similar prefixes). */
+function extractPaipuCandidate(input: string): string {
+  let trimmed = input.trim().replace(CLIPBOARD_LABEL_RE, "").trim();
+  const urlMatch = trimmed.match(/https?:\/\/\S+/i);
+  if (urlMatch) {
+    return urlMatch[0].replace(/[),.;"'>\]]+$/, "");
+  }
+  return trimmed;
+}
+
 /**
  * Parse a Mahjong Soul game reference into a stable record id.
  *
- * Accepts a full/partial share link on any known host, or a bare game id
- * (plain or obfuscated). Always returns the canonical yo-star log URL so
- * dedupe on `mjs_record_uuid` stays consistent regardless of input shape.
+ * Accepts a full/partial share link on any known host, a bare game id
+ * (plain or obfuscated), or the in-game clipboard string
+ * `Mahjong Soul Game Log:https://…?paipu=…`. Always returns the canonical
+ * yo-star log URL so dedupe on `mjs_record_uuid` stays consistent.
  */
 export function parseMjsPaipuUrl(input: string): ParsedPaipu | null {
-  const trimmed = input.trim();
+  const trimmed = extractPaipuCandidate(input);
   if (!trimmed) return null;
 
   // Bare game id (no scheme, no query) — the common copy/paste from chat.

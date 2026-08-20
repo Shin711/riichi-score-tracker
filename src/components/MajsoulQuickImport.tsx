@@ -87,7 +87,8 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
         <div>
           <h2 className="text-sm font-semibold">Add from Mahjong Soul</h2>
           <p className="mt-1 text-xs leading-5 text-subtle">
-            Paste a finished game&apos;s ID or share link and it is imported straight away —
+            Paste a Game Log Link from the client (including the
+            &quot;Mahjong Soul Game Log:&quot; prefix) and it is imported straight away —
             players, scores, and end time are read from the log.
           </p>
         </div>
@@ -96,7 +97,7 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="250728-abc12345-… or https://mahjongsoul.game.yo-star.com/?paipu=…"
+            placeholder="Mahjong Soul Game Log:https://… or a game ID"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"

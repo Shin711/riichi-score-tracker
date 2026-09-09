@@ -60,7 +60,7 @@ function canonicalPaipuUrl(recordUuid: string): string {
 
 /** Pull a URL or id out of the in-game clipboard label (and similar prefixes). */
 function extractPaipuCandidate(input: string): string {
-  let trimmed = input.trim().replace(CLIPBOARD_LABEL_RE, "").trim();
+  const trimmed = input.trim().replace(CLIPBOARD_LABEL_RE, "").trim();
   const urlMatch = trimmed.match(/https?:\/\/\S+/i);
   if (urlMatch) {
     return urlMatch[0].replace(/[),.;"'>\]]+$/, "");

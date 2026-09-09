@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --import tsx --test src/lib/quiz/tiles.test.ts src/lib/quiz/solve.test.ts src/lib/quiz/answer.test.ts src/lib/quiz/generate.test.ts src/lib/discord/interactions.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -15,6 +16,8 @@
     "protobufjs": "^8.7.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "riichi-rs-node": "^2.1.0",
+    "sharp": "^0.34.5",
     "ws": "^8.21.1"
   },
   "devDependencies": {
@@ -26,6 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

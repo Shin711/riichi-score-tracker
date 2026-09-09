@@ -26,6 +26,7 @@ Web app for **Flushing Riichi Mahjong Club**: player profiles, shareable session
    - `SUPABASE_SERVICE_ROLE_KEY` (recommended for API writes)
    - `CRON_SECRET` (optional; secures the monthly archive cron on Vercel)
    - `STORAGE_ALERT_WEBHOOK_URL` (optional; Discord/Slack webhook when DB ≥ 400 MB)
+   - `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `DISCORD_QUIZ_CHANNEL_ID` (optional; daily scoring quiz — see [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md))
 4. Enable **Email** auth in Supabase (Authentication → Providers) for magic-link sign-in.
 5. **Google sign-in (recommended):** follow [`docs/google-sign-in-setup.md`](docs/google-sign-in-setup.md) — no email SMTP needed.
 6. **Email magic links (optional):** configure **[Resend](https://resend.com)** SMTP — see [`docs/auth-email-setup.md`](docs/auth-email-setup.md).
@@ -45,6 +46,7 @@ Open [http://localhost:3000](http://localhost:3000).
 3. Set the Vercel **project name** to `flushing-riichi-mahjong-club` (Settings → General → Project Name) so the default URL matches the club.
 4. Add the same environment variables in Vercel project settings.
 5. Deploy. For scheduled jobs on Vercel, also follow [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md) (`CRON_SECRET` + production redeploy). The daily **maintenance** cron deletes empty sessions older than 7 days and checks database size (alerts at 400 MB).
+6. **Daily scoring quiz (optional):** follow [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md) to create the Discord app and point it at `/api/discord/interactions`.
 
 After renaming an existing deployment, update **Google OAuth** authorized origins and any Supabase **Site URL** / redirect URLs to the new hostname.
 
@@ -58,6 +60,7 @@ After renaming an existing deployment, update **Google OAuth** authorized origin
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).
 - **Safety**: use **Undo last event** in session history to quickly revert the latest mistaken entry.
+- **Daily scoring quiz**: the bot posts a generated winning hand to Discord each morning (10am ET) and asks for **han**, **fu**, and the **score**. Answers are private, one attempt each; the answer and a recap go up at 10pm ET. Setup: [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md).
 
 ## Event types (MVP)
 

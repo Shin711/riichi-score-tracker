@@ -12,6 +12,7 @@ import { formatScoreAnswer } from "@/lib/quiz/answer";
 import type { Meld, QuizHand } from "@/lib/quiz/hand";
 import { quizDateLabel } from "@/lib/quiz/schedule";
 import type { SolvedHand } from "@/lib/quiz/solve";
+import { renderTiles, type TileEmojiMap } from "@/lib/discord/tileEmoji";
 import { describeTile, formatTiles, windKanji, windLabel } from "@/lib/quiz/tiles";
 
 /** Club gold, matching the site header and the leaderboard embed. */
@@ -46,32 +47,79 @@ const MELD_LABELS: Record<Meld["kind"], string> = {
   minkan: "open kan",
 };
 
-function describeMelds(melds: Meld[]): string {
+function describeMelds(melds: Meld[], emoji: TileEmojiMap): string {
   if (melds.length === 0) return "—";
-  return melds.map((meld) => `${MELD_LABELS[meld.kind]} ${formatTiles(meld.tiles)}`).join("   ");
+  return melds
+    .map((meld) => `${MELD_LABELS[meld.kind]} ${renderTiles(meld.tiles, emoji)}`)
+    .join(" ");
 }
 
 /**
- * The hand as a monospace block. Alignment matters here — people read the wait
- * off the shape, so the concealed tiles need to sit on their own line.
+ * How the tiles are shown.
+ *
+ * The rendered image is the real presentation — inline emoji cap out around 22px
+ * and are hard to read at a glance. Emoji remain as a fallback so a rendering
+ * failure in production degrades the post rather than losing the day's quiz.
  */
-function renderHand(hand: QuizHand): string {
-  const rows: Array<[string, string]> = [
-    ["Hand", formatTiles(hand.concealed)],
-    ["Called", describeMelds(hand.melds)],
-    [
-      hand.winType === "ron" ? "Ron on" : "Tsumo",
-      `${formatTiles([hand.winningTile])}  (${describeTile(hand.winningTile)})`,
-    ],
-    [
-      "Dora ind.",
-      `${formatTiles([hand.doraIndicator])}  (${describeTile(hand.doraIndicator)})`,
-    ],
+export type HandVisual =
+  | { kind: "image"; filename: string }
+  | { kind: "emoji"; emoji: TileEmojiMap };
+
+export const HAND_IMAGE_FILENAME = "hand.png";
+
+type EmbedField = { name: string; value: string; inline?: boolean };
+
+/** Fields for the emoji fallback; the image carries all of this on its own. */
+function emojiHandFields(hand: QuizHand, emoji: TileEmojiMap): EmbedField[] {
+  const fields: EmbedField[] = [
+    { name: "Hand", value: renderTiles(hand.concealed, emoji), inline: false },
   ];
 
-  const width = Math.max(...rows.map(([label]) => label.length));
-  const body = rows.map(([label, value]) => `${label.padEnd(width)}  ${value}`).join("\n");
-  return `\`\`\`\n${body}\n\`\`\``;
+  if (hand.melds.length > 0) {
+    fields.push({ name: "Called", value: describeMelds(hand.melds, emoji), inline: false });
+  }
+
+  fields.push({
+    name: hand.winType === "ron" ? "Ron on" : "Tsumo",
+    value: `${renderTiles([hand.winningTile], emoji)} ${describeTile(hand.winningTile)}`,
+    inline: true,
+  });
+
+  return fields;
+}
+
+function handFields(hand: QuizHand, visual: HandVisual): EmbedField[] {
+  const fields =
+    visual.kind === "emoji" ? emojiHandFields(hand, visual.emoji) : ([] as EmbedField[]);
+
+  // The image already draws meld type using table convention, but fu and
+  // whether the hand is closed both hinge on reading it right, so it is spelled
+  // out too rather than resting on the reader knowing the convention.
+  if (visual.kind === "image" && hand.melds.length > 0) {
+    fields.push({
+      name: "Called",
+      value: hand.melds
+        .map((meld) => `${MELD_LABELS[meld.kind]} ${formatTiles(meld.tiles)}`)
+        .join("\n"),
+      inline: true,
+    });
+  }
+
+  // Named explicitly either way: the image shows the indicator as the flipped
+  // tile in the wall, which is obvious to a regular but not to a newer player.
+  fields.push({
+    name: "Dora indicator",
+    value: `${formatTiles([hand.doraIndicator])} — ${describeTile(hand.doraIndicator)}`,
+    inline: true,
+  });
+
+  return fields;
+}
+
+function handImage(visual: HandVisual) {
+  return visual.kind === "image"
+    ? { image: { url: `attachment://${visual.filename}` } }
+    : {};
 }
 
 function renderConditions(hand: QuizHand): string {
@@ -85,17 +133,24 @@ function renderConditions(hand: QuizHand): string {
   return bits.join(" · ");
 }
 
-export function buildQuestionMessage(quizId: string, hand: QuizHand, isoDate: string) {
+export function buildQuestionMessage(
+  quizId: string,
+  hand: QuizHand,
+  isoDate: string,
+  visual: HandVisual = { kind: "emoji", emoji: null }
+) {
   return {
     embeds: [
       {
         title: `Daily scoring quiz — ${quizDateLabel(isoDate)}`,
         description: [
           renderConditions(hand),
-          renderHand(hand),
+          "",
           "How much is this hand worth? Answer with **han**, **fu**, and the **score**.",
         ].join("\n"),
         color: EMBED_COLOR,
+        ...handImage(visual),
+        fields: handFields(hand, visual),
         footer: {
           text: "Answers are private · one attempt each · revealed at 10pm ET",
         },
@@ -190,18 +245,12 @@ export function buildRevealMessage(
   hand: QuizHand,
   solved: SolvedHand,
   recap: QuizRecap,
-  isoDate: string
+  isoDate: string,
+  visual: HandVisual = { kind: "emoji", emoji: null }
 ) {
   const yakuList = solved.yaku
     .map((yaku) => `${yaku.name} — ${yaku.han} han`)
     .join("\n");
-
-  const fields = [
-    { name: "Han", value: `**${solved.han}**`, inline: true },
-    { name: "Fu", value: `**${solved.fu}**`, inline: true },
-    { name: "Score", value: `**${describeCorrectScore(solved)}**`, inline: true },
-    { name: "Yaku", value: yakuList || "—", inline: false },
-  ];
 
   const accuracy =
     recap.answers > 0 ? Math.round((recap.correct / recap.answers) * 100) : 0;
@@ -210,12 +259,21 @@ export function buildRevealMessage(
       ? "Nobody answered today."
       : `**${recap.correct}** of **${recap.answers}** got it exactly right (${accuracy}%).`;
 
+  const fields = [
+    ...handFields(hand, visual),
+    { name: "Han", value: `**${solved.han}**`, inline: true },
+    { name: "Fu", value: `**${solved.fu}**`, inline: true },
+    { name: "Score", value: `**${describeCorrectScore(solved)}**`, inline: true },
+    { name: "Yaku", value: yakuList || "—", inline: false },
+  ];
+
   return {
     embeds: [
       {
         title: `Answer — ${quizDateLabel(isoDate)}`,
-        description: [renderConditions(hand), renderHand(hand), recapLine].join("\n"),
+        description: [renderConditions(hand), "", recapLine].join("\n"),
         color: CORRECT_COLOR,
+        ...handImage(visual),
         fields,
         footer: { text: "New hand tomorrow at 10am ET" },
       },

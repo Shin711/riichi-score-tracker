@@ -43,7 +43,10 @@ async function botFetch(path: string, init: RequestInit): Promise<Response> {
       ...init,
       headers: {
         authorization: `Bot ${token}`,
-        "content-type": "application/json",
+        // Multipart bodies carry a generated boundary in their content-type, so
+        // fetch has to set that header itself — forcing JSON here would corrupt
+        // every attachment upload.
+        ...(init.body instanceof FormData ? {} : { "content-type": "application/json" }),
         ...init.headers,
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -76,14 +79,50 @@ export type DiscordMessagePayload = {
 
 export type PostedMessage = { id: string; channelId: string };
 
+export type MessageAttachment = { filename: string; data: Buffer };
+
+/**
+ * Builds the multipart body Discord wants for attachments: the message goes in
+ * a `payload_json` part, each file in a `files[n]` part. An embed refers to a
+ * file as `attachment://<filename>`.
+ */
+function attachmentBody(
+  payload: DiscordMessagePayload,
+  files: MessageAttachment[]
+): FormData {
+  const form = new FormData();
+  form.append(
+    "payload_json",
+    JSON.stringify({
+      allowed_mentions: { parse: [] },
+      ...payload,
+      attachments: files.map((file, index) => ({ id: index, filename: file.filename })),
+    })
+  );
+  files.forEach((file, index) => {
+    form.append(
+      `files[${index}]`,
+      new Blob([new Uint8Array(file.data)], { type: "image/png" }),
+      file.filename
+    );
+  });
+  return form;
+}
+
 export async function postChannelMessage(
   channelId: string,
-  payload: DiscordMessagePayload
+  payload: DiscordMessagePayload,
+  files: MessageAttachment[] = []
 ): Promise<PostedMessage> {
-  const response = await botFetch(`/channels/${channelId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ allowed_mentions: { parse: [] }, ...payload }),
-  });
+  const init: RequestInit =
+    files.length > 0
+      ? { method: "POST", body: attachmentBody(payload, files) }
+      : {
+          method: "POST",
+          body: JSON.stringify({ allowed_mentions: { parse: [] }, ...payload }),
+        };
+
+  const response = await botFetch(`/channels/${channelId}/messages`, init);
 
   if (!response.ok) {
     throw new DiscordBotError(
@@ -97,6 +136,44 @@ export async function postChannelMessage(
     throw new DiscordBotError("Discord returned a message without an id.", response.status);
   }
   return { id: data.id, channelId: data.channel_id ?? channelId };
+}
+
+/** The guild a channel belongs to, or null if the bot cannot see the channel. */
+export async function getChannelGuildId(channelId: string): Promise<string | null> {
+  const response = await botFetch(`/channels/${channelId}`, { method: "GET" });
+  if (!response.ok) return null;
+  const data = (await response.json()) as { guild_id?: string };
+  return data.guild_id ?? null;
+}
+
+export type GuildEmoji = { id: string; name: string };
+
+/** Custom emoji uploaded to a guild. Used for the tile art. */
+export async function getGuildEmojis(guildId: string): Promise<GuildEmoji[]> {
+  const response = await botFetch(`/guilds/${guildId}/emojis`, { method: "GET" });
+  if (!response.ok) return [];
+  const data = (await response.json()) as Array<{ id?: string; name?: string }>;
+  return data.flatMap((entry) =>
+    entry.id && entry.name ? [{ id: entry.id, name: entry.name }] : []
+  );
+}
+
+/** Removes a message we posted. */
+export async function deleteChannelMessage(
+  channelId: string,
+  messageId: string
+): Promise<boolean> {
+  const response = await botFetch(`/channels/${channelId}/messages/${messageId}`, {
+    method: "DELETE",
+  });
+  if (response.status === 404) return false;
+  if (!response.ok) {
+    throw new DiscordBotError(
+      await errorMessage(response, "Discord rejected the delete"),
+      response.status
+    );
+  }
+  return true;
 }
 
 /**

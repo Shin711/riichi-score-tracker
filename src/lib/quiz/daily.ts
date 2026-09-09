@@ -7,17 +7,45 @@ import {
   getQuizChannelId,
   isQuizConfigured,
   postChannelMessage,
+  type MessageAttachment,
 } from "@/lib/discord/bot";
 import {
   buildQuestionMessage,
   buildRevealMessage,
+  HAND_IMAGE_FILENAME,
+  type HandVisual,
 } from "@/lib/discord/quizMessage";
+import { loadTileEmoji } from "@/lib/discord/tileEmoji";
+import { renderHandImage } from "@/lib/quiz/handImage";
 import { gradeAnswer, type QuizAnswer } from "@/lib/quiz/answer";
 import { generateQuizHand } from "@/lib/quiz/generate";
 import type { QuizHand } from "@/lib/quiz/hand";
 import { createRandom, hashSeed } from "@/lib/quiz/random";
 import { quizDate } from "@/lib/quiz/schedule";
 import type { SolvedHand } from "@/lib/quiz/solve";
+
+/**
+ * Draws the hand, falling back to inline emoji if rendering fails.
+ *
+ * Image rendering is the one part of a post that depends on native code and the
+ * bundled tile assets, so it is the part most likely to behave differently in
+ * production. A failure should cost us the picture, not the day's quiz.
+ */
+async function buildHandVisual(
+  hand: QuizHand,
+  channelId: string
+): Promise<{ visual: HandVisual; files: MessageAttachment[] }> {
+  try {
+    const image = await renderHandImage(hand);
+    return {
+      visual: { kind: "image", filename: HAND_IMAGE_FILENAME },
+      files: [{ filename: HAND_IMAGE_FILENAME, data: image }],
+    };
+  } catch (e) {
+    console.error("[quiz] hand image failed, falling back to emoji:", e);
+    return { visual: { kind: "emoji", emoji: await loadTileEmoji(channelId) }, files: [] };
+  }
+}
 
 const QUIZZES_TABLE = "discord_quizzes";
 const ANSWERS_TABLE = "discord_quiz_answers";
@@ -104,9 +132,11 @@ export async function postDailyQuiz(supabase: SupabaseClient): Promise<PostResul
     quizId = data.id as string;
   }
 
+  const { visual, files } = await buildHandVisual(hand, channelId);
   const posted = await postChannelMessage(
     channelId,
-    buildQuestionMessage(quizId, hand, today)
+    buildQuestionMessage(quizId, hand, today, visual),
+    files
   );
 
   const { error: updateError } = await supabase
@@ -157,9 +187,11 @@ export async function revealDailyQuiz(supabase: SupabaseClient): Promise<RevealR
     .is("revealed_at", null);
   if (closeError) throw new Error(closeError.message);
 
+  const { visual, files } = await buildHandVisual(quiz.hand_json, quiz.channel_id);
   await postChannelMessage(
     quiz.channel_id,
-    buildRevealMessage(quiz.hand_json, quiz.answer_json, recap, quiz.quiz_date)
+    buildRevealMessage(quiz.hand_json, quiz.answer_json, recap, quiz.quiz_date, visual),
+    files
   );
 
   // Drop the Answer button from the original post so it stops inviting clicks.

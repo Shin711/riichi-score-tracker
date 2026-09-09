@@ -98,6 +98,40 @@ Add `--date 2026-09-14` to see exactly the hand that day will post — the gener
 
 ---
 
+## The hand image
+
+Each hand is drawn server-side as a PNG and attached to the post. Tiles come from
+[FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles),
+released under CC0 (public domain), and are committed under `src/assets/tiles`.
+Regenerate them with:
+
+```bash
+npx tsx scripts/fetch-tile-assets.ts
+```
+
+Meld type is drawn using table convention, because both the fu and whether the
+hand counts as closed depend on it:
+
+| Meld | Drawn as |
+| --- | --- |
+| Chi, pon, open kan | the called tile lying on its side |
+| Closed kan | the two outer tiles face-down |
+
+The melds are also written out in a **Called** field, so nobody loses a point to
+an unfamiliar convention rather than to the scoring.
+
+The image carries no text. Drawing text would mean SVG text through `sharp`,
+which needs fonts installed in the runtime — round, seat and win type live in the
+embed instead, where Discord renders them. If image rendering ever fails the post
+falls back to inline tile emoji rather than dropping the quiz.
+
+> Discord scales an embed image to fit roughly 550x300, so tiles appear at about
+> `550 / tiles-across` no matter how large the source PNG is. The hand is kept on
+> one line by choice; splitting it over two rows would roughly double the
+> on-screen tile size (see `layoutRows` in `src/lib/quiz/handImage.ts`).
+
+---
+
 ## How answering works
 
 1. Someone clicks **Answer** on the daily post.

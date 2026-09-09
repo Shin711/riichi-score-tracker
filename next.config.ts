@@ -12,13 +12,20 @@ const nextConfig: NextConfig = {
   //
   // `riichi-rs-node` reads its .wasm off disk relative to __dirname at import
   // time, which only works if the package stays unbundled in node_modules.
-  serverExternalPackages: ["ws", "riichi-rs-node"],
-  // Keeping the package external is not enough on its own: the wasm file is
-  // loaded through a computed path, so file tracing does not always see it and
-  // the function would deploy without it.
+  // `sharp` is a native module and must not be bundled either.
+  serverExternalPackages: ["ws", "riichi-rs-node", "sharp"],
+  // Keeping the packages external is not enough on its own. The wasm file and
+  // the tile PNGs are both loaded through computed paths, which file tracing
+  // does not always see, so the functions would deploy without them.
   outputFileTracingIncludes: {
-    "/api/cron/quiz-post": ["./node_modules/riichi-rs-node/**"],
-    "/api/cron/quiz-reveal": ["./node_modules/riichi-rs-node/**"],
+    "/api/cron/quiz-post": [
+      "./node_modules/riichi-rs-node/**",
+      "./src/assets/tiles/**",
+    ],
+    "/api/cron/quiz-reveal": [
+      "./node_modules/riichi-rs-node/**",
+      "./src/assets/tiles/**",
+    ],
     "/api/discord/interactions": ["./node_modules/riichi-rs-node/**"],
   },
 };

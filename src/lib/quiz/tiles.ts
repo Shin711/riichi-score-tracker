@@ -29,6 +29,22 @@ export function tileRank(tile: Tile): number {
   return Number(tile[0]);
 }
 
+/**
+ * Red fives are written `0m`/`0p`/`0s` but are mechanically ordinary fives —
+ * they wait, form sets and score exactly like a 5, and only differ by carrying a
+ * dora. Anything that reasons about the tile's value must use this rather than
+ * the literal `0`, or a red five sorts to the front of its suit and maps to
+ * solver id 0, which is outside the valid 1–34 range.
+ */
+export function effectiveRank(tile: Tile): number {
+  const rank = tileRank(tile);
+  return rank === 0 ? 5 : rank;
+}
+
+export function isRedFive(tile: Tile): boolean {
+  return tileRank(tile) === 0;
+}
+
 export function tileSuit(tile: Tile): Suit {
   return tile[1] as Suit;
 }
@@ -38,7 +54,7 @@ export function isHonor(tile: Tile): boolean {
 }
 
 export function isTerminal(tile: Tile): boolean {
-  const rank = tileRank(tile);
+  const rank = effectiveRank(tile);
   return !isHonor(tile) && (rank === 1 || rank === 9);
 }
 
@@ -61,7 +77,11 @@ const SUIT_ORDER: Record<Suit, number> = { m: 0, p: 1, s: 2, z: 3 };
 
 export function compareTiles(a: Tile, b: Tile): number {
   const suitDelta = SUIT_ORDER[tileSuit(a)] - SUIT_ORDER[tileSuit(b)];
-  return suitDelta !== 0 ? suitDelta : tileRank(a) - tileRank(b);
+  if (suitDelta !== 0) return suitDelta;
+  const rankDelta = effectiveRank(a) - effectiveRank(b);
+  // A red five and a normal five tie on rank; show the red one first so a hand
+  // holding both reads consistently.
+  return rankDelta !== 0 ? rankDelta : tileRank(a) - tileRank(b);
 }
 
 export function sortTiles(tiles: Tile[]): Tile[] {
@@ -107,7 +127,7 @@ export function describeTile(tile: Tile): string {
     return rank <= 4 ? `${name} wind` : `${name} dragon`;
   }
   const suitName = { m: "man", p: "pin", s: "sou" }[tileSuit(tile) as "m" | "p" | "s"];
-  return `${rank} ${suitName}`;
+  return isRedFive(tile) ? `red 5 ${suitName}` : `${rank} ${suitName}`;
 }
 
 /**
@@ -118,7 +138,8 @@ export function describeTile(tile: Tile): string {
  * straight through silently scores zero dora, so always route through here.
  */
 export function doraFromIndicator(indicator: Tile): Tile {
-  const rank = tileRank(indicator);
+  // effectiveRank, so a red five indicator points at 6 rather than wrapping to 1.
+  const rank = effectiveRank(indicator);
   const suit = tileSuit(indicator);
 
   if (suit !== "z") return makeTile(rank === 9 ? 1 : rank + 1, suit);
@@ -126,11 +147,15 @@ export function doraFromIndicator(indicator: Tile): Tile {
   return makeTile(rank === 7 ? 5 : rank + 1, "z"); // dragons cycle haku→hatsu→chun→haku
 }
 
-/** riichi-rs tile id (1–34) for a notation tile. */
+/**
+ * riichi-rs tile id (1–34) for a notation tile.
+ *
+ * A red five maps to the ordinary five; the solver tracks aka separately via its
+ * `aka_count` option rather than as a distinct tile.
+ */
 export function toSolverTile(tile: Tile): number {
-  const rank = tileRank(tile);
   const base = { m: 0, p: 9, s: 18, z: 27 }[tileSuit(tile)];
-  return base + rank;
+  return base + effectiveRank(tile);
 }
 
 export function toSolverTiles(tiles: Tile[]): number[] {

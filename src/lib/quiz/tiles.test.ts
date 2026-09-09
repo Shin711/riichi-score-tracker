@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   allTiles,
+  describeTile,
   doraFromIndicator,
   formatTiles,
   fromSolverTile,
@@ -94,5 +95,34 @@ describe("sortTiles", () => {
     const input = ["5p", "1m"];
     sortTiles(input);
     assert.deepEqual(input, ["5p", "1m"]);
+  });
+});
+
+describe("red fives (aka dora)", () => {
+  it("sorts with the fives, not at the front of the suit", () => {
+    // The literal rank is 0, so a naive sort puts a red five before the 1s.
+    assert.deepEqual(sortTiles(["4m", "0m", "5m", "6m"]), ["4m", "0m", "5m", "6m"]);
+    assert.deepEqual(sortTiles(["9p", "0p", "1p"]), ["1p", "0p", "9p"]);
+  });
+
+  it("maps to the ordinary five's solver id, inside the valid range", () => {
+    // Solver ids run 1-34; a literal rank 0 would map to 0 and be rejected.
+    assert.equal(toSolverTile("0m"), toSolverTile("5m"));
+    assert.equal(toSolverTile("0p"), toSolverTile("5p"));
+    assert.equal(toSolverTile("0s"), toSolverTile("5s"));
+    for (const tile of ["0m", "0p", "0s"]) {
+      const id = toSolverTile(tile);
+      assert.ok(id >= 1 && id <= 34, `${tile} -> ${id} out of range`);
+    }
+  });
+
+  it("points at six as a dora indicator, rather than wrapping to one", () => {
+    assert.equal(doraFromIndicator("0m"), "6m");
+    assert.equal(doraFromIndicator("0s"), "6s");
+  });
+
+  it("is described as a red five", () => {
+    assert.equal(describeTile("0s"), "red 5 sou");
+    assert.equal(describeTile("5s"), "5 sou");
   });
 });

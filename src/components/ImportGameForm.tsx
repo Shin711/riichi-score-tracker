@@ -1,20 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  ImportPlayerNameInput,
+  type ImportPlayerOption,
+} from "@/components/ImportPlayerNameInput";
 import { MajsoulQuickImport } from "@/components/MajsoulQuickImport";
 import { importSeatWindLabel, type ImportedGameEntry, type ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
 import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
-import { findPlayerByDisplayName } from "@/lib/players/names";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 const IMPORT_SEAT_COUNT = 4;
 const IMPORT_HISTORY_PAGE_SIZE = 10;
 
-type PlayerOption = { id: string; display_name: string };
+type PlayerOption = ImportPlayerOption;
 
 type SeatForm = {
   playerId: string;
@@ -172,243 +175,6 @@ function toggleIntegerSign(raw: string): string {
 
 function isNegativeIntegerDraft(raw: string): boolean {
   return raw.trim().startsWith("-");
-}
-
-function seatPlayerName(seat: SeatForm, players: PlayerOption[]) {
-  if (seat.playerId) {
-    return players.find((p) => p.id === seat.playerId)?.display_name ?? seat.displayName;
-  }
-  return seat.displayName;
-}
-
-function resolveSeatPlayerName(
-  value: string,
-  players: PlayerOption[]
-): Pick<SeatForm, "playerId" | "displayName"> {
-  const match = findPlayerByDisplayName(players, value);
-  if (match) {
-    return { playerId: match.id, displayName: match.display_name };
-  }
-  return { playerId: "", displayName: value };
-}
-
-function ImportPlayerNameInput({
-  players,
-  playerId,
-  displayName,
-  onChange,
-  onOpenChange,
-  inputClassName = "field field-combobox h-11 w-full px-3 text-sm",
-}: {
-  players: PlayerOption[];
-  playerId: string;
-  displayName: string;
-  onChange: (patch: Pick<SeatForm, "playerId" | "displayName">) => void;
-  onOpenChange?: (open: boolean) => void;
-  inputClassName?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [placement, setPlacement] = useState<"below" | "above">("below");
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const blurTimer = useRef<number | null>(null);
-  const skipBlurResolveRef = useRef(false);
-  const lastSelectedAtRef = useRef(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
-  const value = seatPlayerName({ playerId, displayName, finalScore: "", isAi: false }, players);
-
-  function setDropdownOpen(next: boolean) {
-    setOpen(next);
-    onOpenChange?.(next);
-  }
-
-  function clearBlurTimer() {
-    if (blurTimer.current !== null) {
-      window.clearTimeout(blurTimer.current);
-      blurTimer.current = null;
-    }
-  }
-
-  const suggestions = useMemo(() => {
-    const query = value.trim().toLowerCase();
-    const matches = query
-      ? players.filter((p) => p.display_name.toLowerCase().includes(query))
-      : players;
-    return (matches.length > 0 ? matches : players).slice(0, 12);
-  }, [players, value]);
-
-  function updatePlacement() {
-    const input = inputRef.current;
-    if (!input) return;
-    const rect = input.getBoundingClientRect();
-    const viewport = window.visualViewport;
-    const viewportHeight = viewport?.height ?? window.innerHeight;
-    const viewportOffsetTop = viewport?.offsetTop ?? 0;
-    const inputTop = rect.top - viewportOffsetTop;
-    const inputBottom = rect.bottom - viewportOffsetTop;
-    const spaceBelow = viewportHeight - inputBottom - 8;
-    const spaceAbove = inputTop - 8;
-    const minSpace = 120;
-    setPlacement(spaceBelow < minSpace && spaceAbove > spaceBelow ? "above" : "below");
-  }
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    updatePlacement();
-    const viewport = window.visualViewport;
-    viewport?.addEventListener("resize", updatePlacement);
-    viewport?.addEventListener("scroll", updatePlacement);
-    return () => {
-      viewport?.removeEventListener("resize", updatePlacement);
-      viewport?.removeEventListener("scroll", updatePlacement);
-    };
-  }, [open, suggestions.length]);
-
-  function handleFocus() {
-    clearBlurTimer();
-    setDropdownOpen(true);
-  }
-
-  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
-    const related = e.relatedTarget as HTMLElement | null;
-    if (related?.closest('[role="listbox"]')) return;
-
-    if (skipBlurResolveRef.current) {
-      skipBlurResolveRef.current = false;
-      setDropdownOpen(false);
-      return;
-    }
-
-    const current = e.target.value;
-    blurTimer.current = window.setTimeout(() => {
-      setDropdownOpen(false);
-      if (skipBlurResolveRef.current || Date.now() - lastSelectedAtRef.current < 500) {
-        skipBlurResolveRef.current = false;
-        return;
-      }
-      onChange(resolveSeatPlayerName(current, players));
-    }, 200);
-  }
-
-  function selectPlayer(player: PlayerOption) {
-    clearBlurTimer();
-    skipBlurResolveRef.current = true;
-    lastSelectedAtRef.current = Date.now();
-    onChange({ playerId: player.id, displayName: player.display_name });
-    setDropdownOpen(false);
-    setHighlightedIndex(-1);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (players.length === 0) return;
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (!open) {
-        setDropdownOpen(true);
-        return;
-      }
-      setHighlightedIndex((i) => (suggestions.length === 0 ? -1 : (i + 1) % suggestions.length));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (!open) {
-        setDropdownOpen(true);
-        return;
-      }
-      setHighlightedIndex((i) =>
-        suggestions.length === 0 ? -1 : i <= 0 ? suggestions.length - 1 : i - 1
-      );
-    } else if (e.key === "Enter") {
-      if (open && highlightedIndex >= 0 && highlightedIndex < suggestions.length) {
-        e.preventDefault();
-        selectPlayer(suggestions[highlightedIndex]);
-      }
-    } else if (e.key === "Escape") {
-      if (open) {
-        e.preventDefault();
-        setDropdownOpen(false);
-        setHighlightedIndex(-1);
-      }
-    }
-  }
-
-  useEffect(() => {
-    if (highlightedIndex < 0 || !listRef.current) return;
-    const el = listRef.current.children[highlightedIndex] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: "nearest" });
-  }, [highlightedIndex]);
-
-  return (
-    <div className="relative min-w-0">
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => {
-          onChange(resolveSeatPlayerName(e.target.value, players));
-          setDropdownOpen(true);
-          setHighlightedIndex(-1);
-        }}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        onKeyDown={handleKeyDown}
-        role="combobox"
-        aria-expanded={open}
-        aria-controls="import-player-listbox"
-        aria-activedescendant={
-          highlightedIndex >= 0 && highlightedIndex < suggestions.length
-            ? `import-player-option-${suggestions[highlightedIndex].id}`
-            : undefined
-        }
-        placeholder="Player name"
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="off"
-        spellCheck={false}
-        enterKeyHint="done"
-        className={inputClassName}
-      />
-      {open && players.length > 0 ? (
-        <ul
-          ref={listRef}
-          id="import-player-listbox"
-          role="listbox"
-          className={`combobox-dropdown absolute left-0 z-[100] max-h-52 w-full touch-manipulation overflow-y-auto overscroll-contain rounded-xl border border-club-border py-1 shadow-xl ${
-            placement === "above" ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          }`}
-        >
-          {suggestions.map((player, index) => {
-            const isHighlighted = index === highlightedIndex;
-            const isSelected = player.id === playerId;
-            return (
-              <li
-                key={player.id}
-                id={`import-player-option-${player.id}`}
-                role="option"
-                aria-selected={isHighlighted || isSelected}
-              >
-                <button
-                  type="button"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    selectPlayer(player);
-                  }}
-                  onMouseEnter={() => setHighlightedIndex(index)}
-                  className={`block w-full px-3 py-2.5 text-left text-sm ${
-                    isHighlighted
-                      ? "bg-club-red-muted text-club-ink"
-                      : isSelected
-                        ? "bg-club-red-muted font-medium text-club-ink"
-                        : "text-club-ink"
-                  }`}
-                >
-                  {player.display_name}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
 }
 
 function ImportHistoryCard({

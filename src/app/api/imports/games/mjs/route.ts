@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
@@ -12,7 +13,12 @@ import {
   MajsoulError,
   MajsoulNotConfiguredError,
 } from "@/lib/majsoul/client";
-import { MajsoulRecordShapeError, summarizeMajsoulRecord } from "@/lib/majsoul/record";
+import {
+  MajsoulRecordShapeError,
+  summarizeMajsoulRecord,
+  type MajsoulGameSummary,
+} from "@/lib/majsoul/record";
+import { findPlayerByDisplayName } from "@/lib/players/names";
 import { checkMajsoulImportRateLimit, rateLimitRetryAfterSeconds } from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/requestIp";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -24,7 +30,35 @@ export const maxDuration = 30;
 const IMPORT_SELECT =
   "id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id";
 
-type MjsImportBody = { input?: string };
+type SeatOverride = {
+  seat?: number;
+  displayName?: string;
+  playerId?: string;
+};
+
+type MjsImportBody = {
+  input?: string;
+  preview?: boolean;
+  seats?: SeatOverride[];
+};
+
+export type MjsPreviewSeat = {
+  seat: number;
+  windLabel: string;
+  nickname: string;
+  finalScore: number;
+  isAi: boolean;
+  suggestedPlayerId: string | null;
+  suggestedDisplayName: string | null;
+};
+
+export type MjsPreviewPayload = {
+  recordUuid: string;
+  paipuUrl: string;
+  playedAt: string;
+  startingPoints: number;
+  seats: MjsPreviewSeat[];
+};
 
 /** Reports whether server-side Mahjong Soul lookup is available. */
 export async function GET() {
@@ -32,10 +66,13 @@ export async function GET() {
 }
 
 /**
- * Import a finished Mahjong Soul game straight from its id or share link.
+ * Import a finished Mahjong Soul game from its id or share link.
  *
- * Players are matched to existing club players by nickname (and created when
- * missing) via the same path the manual importer uses.
+ * - `{ input, preview: true }` — fetch the log and return seats/scores with
+ *   club-name suggestions. No DB write.
+ * - `{ input, seats: [...] }` — re-fetch the log (scores cannot be forged),
+ *   apply the caller's club names, then insert.
+ * - `{ input }` alone — auto-import (nickname → club match/create) for bots.
  */
 export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
@@ -92,15 +129,23 @@ export async function POST(req: Request) {
     const record = await fetchMajsoulGameRecord(parsed.recordUuid);
     const summary = summarizeMajsoulRecord(record);
 
-    const entries = await resolveImportPlayers(
-      supabase,
-      summary.seats.map((seat) => ({
-        displayName: seat.nickname,
-        finalScore: seat.finalScore,
-        isAi: seat.isAi,
-        windLabel: importSeatWindLabel(seat.seat),
-      }))
-    );
+    if (body.preview === true) {
+      const preview = await buildPreview(supabase, summary, parsed.paipuUrl);
+      return NextResponse.json({ preview });
+    }
+
+    const entries =
+      body.seats && body.seats.length > 0
+        ? await resolveConfirmedSeats(supabase, summary, body.seats)
+        : await resolveImportPlayers(
+            supabase,
+            summary.seats.map((seat) => ({
+              displayName: seat.nickname,
+              finalScore: seat.finalScore,
+              isAi: seat.isAi,
+              windLabel: importSeatWindLabel(seat.seat),
+            }))
+          );
 
     if (humanImportEntries({ entries_json: entries }).length < 2) {
       return NextResponse.json(
@@ -159,9 +204,116 @@ export async function POST(req: Request) {
     if (e instanceof MajsoulRecordShapeError) {
       return NextResponse.json({ error: e.message }, { status: 422 });
     }
+    if (e instanceof SeatOverrideError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to import from Mahjong Soul." },
       { status: 500 }
     );
   }
+}
+
+class SeatOverrideError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SeatOverrideError";
+  }
+}
+
+async function buildPreview(
+  supabase: SupabaseClient,
+  summary: MajsoulGameSummary,
+  paipuUrl: string
+): Promise<MjsPreviewPayload> {
+  const { data: players, error } = await supabase.from("players").select("id, display_name");
+  if (error) throw new Error(error.message);
+
+  const seats: MjsPreviewSeat[] = summary.seats.map((seat) => {
+    if (seat.isAi) {
+      return {
+        seat: seat.seat,
+        windLabel: importSeatWindLabel(seat.seat),
+        nickname: "",
+        finalScore: seat.finalScore,
+        isAi: true,
+        suggestedPlayerId: null,
+        suggestedDisplayName: null,
+      };
+    }
+
+    const match = findPlayerByDisplayName(players ?? [], seat.nickname);
+    return {
+      seat: seat.seat,
+      windLabel: importSeatWindLabel(seat.seat),
+      nickname: seat.nickname,
+      finalScore: seat.finalScore,
+      isAi: false,
+      suggestedPlayerId: match?.id ?? null,
+      suggestedDisplayName: match?.display_name ?? null,
+    };
+  });
+
+  return {
+    recordUuid: summary.recordUuid,
+    paipuUrl,
+    playedAt: summary.playedAt.toISOString(),
+    startingPoints: summary.startingPoints,
+    seats,
+  };
+}
+
+async function resolveConfirmedSeats(
+  supabase: SupabaseClient,
+  summary: MajsoulGameSummary,
+  overrides: SeatOverride[]
+) {
+  const bySeat = new Map<number, SeatOverride>();
+  for (const override of overrides) {
+    if (typeof override.seat !== "number" || !Number.isInteger(override.seat)) {
+      throw new SeatOverrideError("Each seat override needs a seat number (0–3).");
+    }
+    if (bySeat.has(override.seat)) {
+      throw new SeatOverrideError("Duplicate seat in the confirm payload.");
+    }
+    bySeat.set(override.seat, override);
+  }
+
+  for (const seat of summary.seats) {
+    if (seat.isAi) continue;
+    if (!bySeat.has(seat.seat)) {
+      throw new SeatOverrideError(
+        `Missing club name for ${importSeatWindLabel(seat.seat)}.`
+      );
+    }
+  }
+
+  return resolveImportPlayers(
+    supabase,
+    summary.seats.map((seat) => {
+      if (seat.isAi) {
+        return {
+          finalScore: seat.finalScore,
+          isAi: true,
+          windLabel: importSeatWindLabel(seat.seat),
+        };
+      }
+
+      const override = bySeat.get(seat.seat)!;
+      const displayName = override.displayName?.trim();
+      if (!displayName) {
+        throw new SeatOverrideError(
+          `Each human seat needs a club name (${importSeatWindLabel(seat.seat)}).`
+        );
+      }
+
+      return {
+        playerId: override.playerId?.trim() || undefined,
+        displayName,
+        finalScore: seat.finalScore,
+        isAi: false,
+        windLabel: importSeatWindLabel(seat.seat),
+      };
+    })
+  );
 }

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test src/lib/quiz/tiles.test.ts src/lib/quiz/solve.test.ts src/lib/quiz/answer.test.ts src/lib/quiz/generate.test.ts src/lib/discord/interactions.test.ts"
+    "test": "node --import tsx --test src/lib/quiz/tiles.test.ts src/lib/quiz/solve.test.ts src/lib/quiz/answer.test.ts src/lib/quiz/generate.test.ts src/lib/discord/interactions.test.ts src/lib/discord/quizForm.test.ts src/app/api/discord/interactions/route.imports.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",

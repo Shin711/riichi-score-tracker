@@ -8,7 +8,7 @@ import {
   FIELD_HAN,
   FIELD_SCORE,
   quizIdFromCustomId,
-} from "@/lib/discord/quizMessage";
+} from "@/lib/discord/quizForm";
 import {
   ephemeralReply,
   getApplicationPublicKey,
@@ -20,25 +20,32 @@ import {
   type Interaction,
 } from "@/lib/discord/interactions";
 import { parseCount, parseScore } from "@/lib/quiz/answer";
-import { loadQuiz, recordAnswer } from "@/lib/quiz/daily";
+import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 /**
  * Discord interactions endpoint (buttons and modals for the daily quiz).
  *
- * Discord requires a reply within three seconds and verifies the endpoint by
- * sending deliberately invalid signatures, so every request is checked before
- * it is parsed. Everything this route does is a couple of indexed queries, well
- * inside the budget.
+ * Discord requires a reply within three seconds and cannot defer a modal, so
+ * this module must stay small. Do not import `@/lib/quiz/daily` (or anything
+ * else that pulls in `riichi-rs-node` / `sharp`): a cold start that loads the
+ * wasm solver is enough to miss the deadline and show "This interaction failed"
+ * on the first click of the day.
+ *
+ * Discord also verifies the endpoint by sending deliberately invalid
+ * signatures, so every request is checked before it is parsed.
  */
 export async function POST(req: Request) {
+  const started = Date.now();
   if (!getApplicationPublicKey()) {
+    console.error("[quiz] DISCORD_PUBLIC_KEY is not set");
     return NextResponse.json({ error: "DISCORD_PUBLIC_KEY is not set." }, { status: 503 });
   }
 
   // The signature covers the exact bytes Discord sent, so verify before parsing.
   const rawBody = await req.text();
   if (!(await verifyInteractionSignature(req, rawBody))) {
+    console.warn("[quiz] invalid request signature", { ms: Date.now() - started });
     return new NextResponse("invalid request signature", { status: 401 });
   }
 
@@ -53,12 +60,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ type: InteractionResponseType.Pong });
   }
 
-  if (interaction.type === InteractionType.MessageComponent) {
-    return NextResponse.json(await handleButton(interaction));
-  }
+  try {
+    if (interaction.type === InteractionType.MessageComponent) {
+      const response = await handleButton(interaction);
+      console.log("[quiz] button", {
+        customId: interaction.data?.custom_id,
+        user: interactionUser(interaction)?.id,
+        region: process.env.VERCEL_REGION ?? "local",
+        ms: Date.now() - started,
+      });
+      return NextResponse.json(response);
+    }
 
-  if (interaction.type === InteractionType.ModalSubmit) {
-    return NextResponse.json(await handleModalSubmit(interaction));
+    if (interaction.type === InteractionType.ModalSubmit) {
+      const response = await handleModalSubmit(interaction);
+      console.log("[quiz] modal", {
+        customId: interaction.data?.custom_id,
+        user: interactionUser(interaction)?.id,
+        region: process.env.VERCEL_REGION ?? "local",
+        ms: Date.now() - started,
+      });
+      return NextResponse.json(response);
+    }
+  } catch (e) {
+    console.error("[quiz] interaction handler failed", {
+      type: interaction.type,
+      customId: interaction.data?.custom_id,
+      user: interactionUser(interaction)?.id,
+      region: process.env.VERCEL_REGION ?? "local",
+      ms: Date.now() - started,
+      error: e instanceof Error ? e.message : e,
+    });
+    return NextResponse.json(
+      ephemeralReply("Something went wrong with that request. Press **Answer** again.")
+    );
   }
 
   return NextResponse.json(ephemeralReply("Unsupported interaction."));

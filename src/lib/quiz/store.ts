@@ -26,13 +26,36 @@ export type QuizRow = {
   revealed_at: string | null;
 };
 
+export type StoredAnswer = {
+  han: number;
+  fu: number;
+  score_text: string;
+  correct: boolean;
+};
+
 export type AnswerResult =
   | { status: "recorded"; grade: ReturnType<typeof gradeAnswer> }
-  | { status: "already_answered" }
+  | { status: "already_answered"; existing: StoredAnswer | null }
   | { status: "closed" };
 
 const QUIZ_COLUMNS =
   "id, quiz_date, channel_id, message_id, hand_json, answer_json, revealed_at";
+
+export async function loadAnswer(
+  supabase: SupabaseClient,
+  quizId: string,
+  discordUserId: string
+): Promise<StoredAnswer | null> {
+  const { data, error } = await supabase
+    .from(ANSWERS_TABLE)
+    .select("han, fu, score_text, correct")
+    .eq("quiz_id", quizId)
+    .eq("discord_user_id", discordUserId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as StoredAnswer | null) ?? null;
+}
 
 export async function loadQuiz(
   supabase: SupabaseClient,
@@ -106,7 +129,12 @@ export async function recordAnswer(
   });
 
   if (error) {
-    if (error.code === "23505") return { status: "already_answered" };
+    if (error.code === "23505") {
+      // Discord retries timed-out submits, and people retry after the client
+      // shows "This interaction failed". The first insert already counted.
+      const existing = await loadAnswer(supabase, quiz.id, user.id);
+      return { status: "already_answered", existing };
+    }
     throw new Error(error.message);
   }
 

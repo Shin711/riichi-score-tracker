@@ -12,11 +12,14 @@ import {
   TextInputStyle,
 } from "@/lib/discord/interactions";
 import {
+  gradeAnswer,
+  parseScore,
   formatScoreAnswer,
   type AnswerGrade,
   type QuizAnswer,
 } from "@/lib/quiz/answer";
 import type { QuizHand } from "@/lib/quiz/hand";
+import type { SolvedHand } from "@/lib/quiz/solve";
 
 export const ANSWER_BUTTON_PREFIX = "quiz:answer";
 export const ANSWER_MODAL_PREFIX = "quiz:modal";
@@ -101,6 +104,17 @@ export function buildAnswerReceipt(answer: QuizAnswer, grade: AnswerGrade): stri
     : "Not quite — the full breakdown goes up at 10pm ET.";
 
   return [`Answer recorded.`, "", ...lines, "", verdict].join("\n");
+}
+
+/** Rebuilds the receipt from the row we stored — used when Discord retries. */
+export function buildStoredAnswerReceipt(
+  solved: SolvedHand,
+  stored: { han: number; fu: number; score_text: string }
+): string | null {
+  const score = parseScore(stored.score_text);
+  if (score === null) return null;
+  const answer = { han: stored.han, fu: stored.fu, score };
+  return buildAnswerReceipt(answer, gradeAnswer(solved, answer));
 }
 
 /** Reply used when the quiz is closed, already answered, or otherwise unavailable. */

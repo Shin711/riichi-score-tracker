@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   buildAnswerModal,
   buildAnswerReceipt,
+  buildStoredAnswerReceipt,
   buildUnavailableReply,
   FIELD_FU,
   FIELD_HAN,
@@ -20,7 +21,13 @@ import {
   type Interaction,
 } from "@/lib/discord/interactions";
 import { parseCount, parseScore } from "@/lib/quiz/answer";
-import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
+import {
+  loadAnswer,
+  loadQuiz,
+  recordAnswer,
+  type QuizRow,
+  type StoredAnswer,
+} from "@/lib/quiz/store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 /**
@@ -62,10 +69,11 @@ export async function POST(req: Request) {
 
   try {
     if (interaction.type === InteractionType.MessageComponent) {
-      const response = await handleButton(interaction);
+      const { response, status } = await handleButton(interaction);
       console.log("[quiz] button", {
         customId: interaction.data?.custom_id,
         user: interactionUser(interaction)?.id,
+        status,
         region: process.env.VERCEL_REGION ?? "local",
         ms: Date.now() - started,
       });
@@ -73,10 +81,11 @@ export async function POST(req: Request) {
     }
 
     if (interaction.type === InteractionType.ModalSubmit) {
-      const response = await handleModalSubmit(interaction);
+      const { response, status } = await handleModalSubmit(interaction);
       console.log("[quiz] modal", {
         customId: interaction.data?.custom_id,
         user: interactionUser(interaction)?.id,
+        status,
         region: process.env.VERCEL_REGION ?? "local",
         ms: Date.now() - started,
       });
@@ -101,26 +110,56 @@ export async function POST(req: Request) {
 
 async function handleButton(interaction: Interaction) {
   const quizId = quizIdFromCustomId(interaction.data?.custom_id ?? "");
-  if (!quizId) return ephemeralReply("That button is no longer valid.");
-
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return ephemeralReply("The quiz database is not configured.");
-
-  const quiz = await loadQuiz(supabase, quizId);
-  if (!quiz) return buildUnavailableReply("That quiz is no longer available.");
-  if (quiz.revealed_at) {
-    return buildUnavailableReply("This hand has already been revealed — answering is closed.");
+  if (!quizId) {
+    return { status: "invalid_button", response: ephemeralReply("That button is no longer valid.") };
   }
 
-  return buildAnswerModal(quizId, quiz.hand_json);
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return {
+      status: "unconfigured",
+      response: ephemeralReply("The quiz database is not configured."),
+    };
+  }
+
+  const quiz = await loadQuiz(supabase, quizId);
+  if (!quiz) {
+    return {
+      status: "missing_quiz",
+      response: buildUnavailableReply("That quiz is no longer available."),
+    };
+  }
+  if (quiz.revealed_at) {
+    return {
+      status: "closed",
+      response: buildUnavailableReply("This hand has already been revealed — answering is closed."),
+    };
+  }
+
+  const user = interactionUser(interaction);
+  if (user) {
+    const existing = await loadAnswer(supabase, quizId, user.id);
+    if (existing) {
+      return { status: "already_answered", response: existingAnswerReply(quiz, existing) };
+    }
+  }
+
+  return { status: "modal", response: buildAnswerModal(quizId, quiz.hand_json) };
 }
 
 async function handleModalSubmit(interaction: Interaction) {
   const quizId = quizIdFromCustomId(interaction.data?.custom_id ?? "");
-  if (!quizId) return ephemeralReply("That form is no longer valid.");
+  if (!quizId) {
+    return { status: "invalid_modal", response: ephemeralReply("That form is no longer valid.") };
+  }
 
   const user = interactionUser(interaction);
-  if (!user) return ephemeralReply("Could not identify who submitted that answer.");
+  if (!user) {
+    return {
+      status: "unknown_user",
+      response: ephemeralReply("Could not identify who submitted that answer."),
+    };
+  }
 
   const values = modalValues(interaction);
   const han = parseCount(values[FIELD_HAN] ?? "");
@@ -131,21 +170,34 @@ async function handleModalSubmit(interaction: Interaction) {
   if (han === null || fu === null || score === null) {
     // Nothing is stored, so they can reopen the modal and try again — a typo
     // should not burn someone's single attempt.
-    return ephemeralReply(
-      [
-        "Could not read that answer, so nothing was recorded — press **Answer** again.",
-        "",
-        "Han and fu should be plain numbers (`3`, `30`).",
-        "Score can be a total (`3900`) or a tsumo split (`1300/2600`, `2000 all`).",
-      ].join("\n")
-    );
+    return {
+      status: "unparsed",
+      response: ephemeralReply(
+        [
+          "Could not read that answer, so nothing was recorded — press **Answer** again.",
+          "",
+          "Han and fu should be plain numbers (`3`, `30`).",
+          "Score can be a total (`3900`) or a tsumo split (`1300/2600`, `2000 all`).",
+        ].join("\n")
+      ),
+    };
   }
 
   const supabase = getSupabaseAdmin();
-  if (!supabase) return ephemeralReply("The quiz database is not configured.");
+  if (!supabase) {
+    return {
+      status: "unconfigured",
+      response: ephemeralReply("The quiz database is not configured."),
+    };
+  }
 
   const quiz = await loadQuiz(supabase, quizId);
-  if (!quiz) return ephemeralReply("That quiz is no longer available.");
+  if (!quiz) {
+    return {
+      status: "missing_quiz",
+      response: ephemeralReply("That quiz is no longer available."),
+    };
+  }
 
   const result = await recordAnswer(
     supabase,
@@ -156,11 +208,29 @@ async function handleModalSubmit(interaction: Interaction) {
   );
 
   if (result.status === "closed") {
-    return ephemeralReply("This hand has already been revealed — answering is closed.");
+    return {
+      status: "closed",
+      response: ephemeralReply("This hand has already been revealed — answering is closed."),
+    };
   }
   if (result.status === "already_answered") {
-    return ephemeralReply("You have already answered today's hand. Check back at 10pm ET.");
+    return {
+      status: "already_answered",
+      response: result.existing
+        ? existingAnswerReply(quiz, result.existing)
+        : ephemeralReply("You have already answered today's hand. Check back at 10pm ET."),
+    };
   }
 
-  return ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade));
+  return {
+    status: "recorded",
+    response: ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade)),
+  };
+}
+
+function existingAnswerReply(quiz: QuizRow, stored: StoredAnswer) {
+  const receipt = buildStoredAnswerReceipt(quiz.answer_json, stored);
+  return ephemeralReply(
+    receipt ?? "You have already answered today's hand. Check back at 10pm ET."
+  );
 }

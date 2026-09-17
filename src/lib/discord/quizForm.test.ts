@@ -9,10 +9,12 @@ import {
   answerButtonId,
   answerModalId,
   buildAnswerModal,
+  buildStoredAnswerReceipt,
   buildUnavailableReply,
   quizIdFromCustomId,
 } from "@/lib/discord/quizForm";
 import type { QuizHand } from "@/lib/quiz/hand";
+import type { SolvedHand } from "@/lib/quiz/solve";
 
 const HAND: QuizHand = {
   concealed: ["2m", "3m", "4m"],
@@ -43,5 +45,25 @@ describe("quizForm", () => {
     const reply = buildUnavailableReply("closed");
     assert.equal(reply.type, InteractionResponseType.ChannelMessageWithSource);
     assert.equal(reply.data.flags, MessageFlags.Ephemeral);
+  });
+
+  it("rebuilds the original receipt when Discord retries a counted submit", () => {
+    const solved: SolvedHand = {
+      han: 3,
+      fu: 30,
+      ten: 3900,
+      tsumoPayment: null,
+      yaku: [{ name: "Riichi", han: 1 }],
+      yakumanCount: 0,
+      isDealer: false,
+    };
+    const receipt = buildStoredAnswerReceipt(solved, {
+      han: 3,
+      fu: 30,
+      score_text: "3900",
+    });
+    assert.ok(receipt);
+    assert.match(receipt, /Answer recorded/);
+    assert.match(receipt, /All correct/);
   });
 });

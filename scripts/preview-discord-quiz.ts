@@ -5,7 +5,8 @@
  * Passing a date shows exactly the hand that day's cron would post, since the
  * generator is seeded from the date.
  */
-import { describeCorrectScore } from "../src/lib/quiz/answer";
+import { describeCorrectScore, gradeAnswer, type QuizAnswer } from "../src/lib/quiz/answer";
+import { buildAnswerReceipt } from "../src/lib/discord/quizForm";
 import { buildQuestionMessage, buildRevealMessage } from "../src/lib/discord/quizMessage";
 import { generateQuizHand } from "../src/lib/quiz/generate";
 import { createRandom, hashSeed } from "../src/lib/quiz/random";
@@ -42,6 +43,17 @@ function main() {
 
     console.log("\n" + "=".repeat(64));
     printEmbed(buildQuestionMessage("preview", hand, date).embeds[0]);
+
+    // What one member sees privately on submitting. The guess gets the han and
+    // score right and says 30 fu, so it shows a tick and, usually, a cross.
+    const guess: QuizAnswer = {
+      han: solved.han,
+      fu: 30,
+      score: { kind: "total", value: solved.ten },
+    };
+    console.log("\n" + "-".repeat(64));
+    console.log("\x1b[1mPrivate receipt\x1b[0m");
+    console.log(buildAnswerReceipt(guess, gradeAnswer(solved, guess), solved));
 
     console.log("\n" + "-".repeat(64));
     printEmbed(

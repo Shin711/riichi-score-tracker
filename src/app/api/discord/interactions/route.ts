@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import {
+  buildAlreadyAnsweredReply,
   buildAnswerModal,
   buildAnswerReceipt,
   buildUnavailableReply,
@@ -158,9 +159,11 @@ async function handleModalSubmit(interaction: Interaction) {
   if (result.status === "closed") {
     return ephemeralReply("This hand has already been revealed — answering is closed.");
   }
+  // The answer comes from the row, stored when the hand was posted — never from
+  // re-solving here, which would load the wasm solver (see the note above).
   if (result.status === "already_answered") {
-    return ephemeralReply("You have already answered today's hand. Check back at 10pm ET.");
+    return ephemeralReply(buildAlreadyAnsweredReply(quiz.answer_json));
   }
 
-  return ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade));
+  return ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade, quiz.answer_json));
 }

@@ -12,11 +12,15 @@ import {
   TextInputStyle,
 } from "@/lib/discord/interactions";
 import {
+  describeCorrectScore,
   formatScoreAnswer,
   type AnswerGrade,
   type QuizAnswer,
 } from "@/lib/quiz/answer";
 import type { QuizHand } from "@/lib/quiz/hand";
+// Type only, and it has to stay that way: a value import would pull the wasm
+// solver into the interactions route and blow its three-second reply budget.
+import type { SolvedHand } from "@/lib/quiz/solve";
 
 export const ANSWER_BUTTON_PREFIX = "quiz:answer";
 export const ANSWER_MODAL_PREFIX = "quiz:modal";
@@ -81,13 +85,29 @@ const TICK = "✅";
 const CROSS = "❌";
 
 /**
- * Private confirmation after someone answers.
+ * The correct answer with its yaku, as shown privately to someone who has
+ * answered. Right or wrong gets the same thing: the point of the quiz is to
+ * learn the hand, and a bare cross teaches nothing until the evening.
  *
- * Deliberately shows which parts were right without showing the right values —
- * otherwise the first answer of the day leaks the answer to whoever asks a
- * friend, and the 10pm reveal has nothing left to reveal.
+ * Only ever built for someone whose answer is already stored. Attempts are one
+ * per person, so seeing this cannot help them — the remaining risk is a member
+ * passing it on, which the closing line asks them not to do.
  */
-export function buildAnswerReceipt(answer: QuizAnswer, grade: AnswerGrade): string {
+function describeAnswer(solved: SolvedHand): string {
+  return [
+    `**Correct answer: ${solved.han} han ${solved.fu} fu · ${describeCorrectScore(solved)}**`,
+    ...solved.yaku.map((yaku) => `- ${yaku.name} — ${yaku.han} han`),
+    "",
+    "_Please keep it to yourself — the hand is revealed for everyone at 10pm ET._",
+  ].join("\n");
+}
+
+/** Private confirmation after someone answers: how they did, then the answer. */
+export function buildAnswerReceipt(
+  answer: QuizAnswer,
+  grade: AnswerGrade,
+  solved: SolvedHand
+): string {
   const lines = [
     `${grade.han ? TICK : CROSS}  Han — you said **${answer.han}**`,
     grade.fuScored
@@ -96,11 +116,22 @@ export function buildAnswerReceipt(answer: QuizAnswer, grade: AnswerGrade): stri
     `${grade.score ? TICK : CROSS}  Score — you said **${formatScoreAnswer(answer.score)}**`,
   ];
 
-  const verdict = grade.correct
-    ? "**All correct.** Nicely done."
-    : "Not quite — the full breakdown goes up at 10pm ET.";
+  const verdict = grade.correct ? "**All correct.** Nicely done." : "Not quite.";
 
-  return [`Answer recorded.`, "", ...lines, "", verdict].join("\n");
+  return [`Answer recorded.`, "", ...lines, "", verdict, "", describeAnswer(solved)].join("\n");
+}
+
+/**
+ * Reply to a second submission. Their first answer stands, but they have
+ * already been shown the answer once, so there is nothing to hold back — and the
+ * original receipt is ephemeral, so this is how they get it back.
+ */
+export function buildAlreadyAnsweredReply(solved: SolvedHand): string {
+  return [
+    "You have already answered today's hand — only your first answer counts.",
+    "",
+    describeAnswer(solved),
+  ].join("\n");
 }
 
 /** Reply used when the quiz is closed, already answered, or otherwise unavailable. */

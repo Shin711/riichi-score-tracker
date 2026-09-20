@@ -17,6 +17,7 @@ export {
   FIELD_SCORE,
   answerButtonId,
   answerModalId,
+  buildAlreadyAnsweredReply,
   buildAnswerModal,
   buildAnswerReceipt,
   buildUnavailableReply,
@@ -150,7 +151,12 @@ export function buildQuestionMessage(
         ...handImage(visual),
         fields: handFields(hand, visual),
         footer: {
-          text: "Answers are private · one attempt each · revealed at 10pm ET",
+          text: [
+            "Answers are private",
+            "one attempt each",
+            "answer shown when you submit",
+            "public reveal at 10pm ET",
+          ].join(" · "),
         },
       },
     ],

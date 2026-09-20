@@ -96,6 +96,91 @@ describe("solveHand — dora", () => {
   });
 });
 
+describe("solveHand — ura dora", () => {
+  const yakuHan = (result: ReturnType<typeof solveHand>, name: string) =>
+    result.yaku.find((y) => y.name === name)?.han ?? 0;
+
+  it("adds ura dora to a riichi hand and lists it apart from dora", () => {
+    // Ura indicator 4s points at 5s and the hand holds two: riichi + pinfu +
+    // tanyao + 2 ura = 5 han, a non-dealer mangan ron.
+    const result = solveHand(hand({ uraDoraIndicator: "4s" }));
+    assert.equal(result.han, 5);
+    assert.equal(result.ten, 8000);
+    assert.equal(yakuHan(result, "Ura dora"), 2);
+    assert.equal(yakuHan(result, "Dora"), 0);
+  });
+
+  it("scores a tile twice when both indicators point at it", () => {
+    // Two separate copies of 4s, one on each row of the wall. Each of the two
+    // 5s is then worth a dora and an ura dora: 3 + 2 + 2 = 7 han, haneman.
+    const result = solveHand(hand({ doraIndicator: "4s", uraDoraIndicator: "4s" }));
+    assert.equal(result.han, 7);
+    assert.equal(result.ten, 12000);
+    assert.equal(yakuHan(result, "Dora"), 2);
+    assert.equal(yakuHan(result, "Ura dora"), 2);
+  });
+
+  it("counts all four tiles of a kan", () => {
+    // Ura indicator 8m points at 9m, held as a closed kan: riichi + menzen tsumo
+    // + 4 ura = 6 han, haneman. Non-dealer tsumo pays 3000/6000.
+    const result = solveHand({
+      concealed: ["2m", "3m", "4m", "5m", "6m", "7m", "3p", "4p", "5p", "5s"],
+      melds: [{ kind: "ankan", tiles: ["9m", "9m", "9m", "9m"] }],
+      winningTile: "5s",
+      winType: "tsumo",
+      seatWind: "south",
+      roundWind: "east",
+      doraIndicator: "1z",
+      uraDoraIndicator: "8m",
+      riichi: true,
+    });
+    assert.equal(result.han, 6);
+    assert.equal(result.ten, 12000);
+    assert.equal(yakuHan(result, "Ura dora"), 4);
+  });
+
+  it("ignores the ura dora indicator without riichi", () => {
+    // Pinfu + tanyao only: 2 han 30 fu = 2000. The two 5s must not count.
+    const result = solveHand(hand({ riichi: false, uraDoraIndicator: "4s" }));
+    assert.equal(result.han, 2);
+    assert.equal(result.ten, 2000);
+    assert.equal(yakuHan(result, "Ura dora"), 0);
+  });
+
+  it("ignores the ura dora indicator when a riichi flag sits on an open hand", () => {
+    // Open tanyao, 1 han. Riichi cannot stand here, so neither can its ura dora.
+    const result = solveHand(
+      hand({
+        concealed: ["2m", "3m", "4m", "5m", "6m", "7m", "3p", "4p", "5p", "5s"],
+        melds: [{ kind: "chi", tiles: ["6p", "7p", "8p"] }],
+        winningTile: "5s",
+        riichi: true,
+        uraDoraIndicator: "4s",
+      })
+    );
+    assert.equal(result.han, 1);
+    assert.equal(yakuHan(result, "Ura dora"), 0);
+  });
+
+  it("scores a riichi hand stored before ura dora existed", () => {
+    // Older quiz rows have no uraDoraIndicator key at all; they must still score
+    // exactly as they did when they were posted.
+    const result = solveHand(hand());
+    assert.equal(result.han, 3);
+    assert.equal(result.ten, 3900);
+  });
+
+  it("lists yaku that add up to the han", () => {
+    const result = solveHand(hand({ doraIndicator: "4s", uraDoraIndicator: "6p" }));
+    // 3 + 2 dora (5s 5s) + 1 ura (7p) = 6.
+    assert.equal(result.han, 6);
+    assert.equal(
+      result.yaku.reduce((sum, y) => sum + y.han, 0),
+      result.han
+    );
+  });
+});
+
 describe("solveHand — tsumo payments", () => {
   /** 234m 567m 345p 678p 55s, tanki on 5s: tanyao + tsumo, 30 fu. */
   const tankiTsumo = (seatWind: QuizHand["seatWind"]): QuizHand => ({

@@ -8,7 +8,15 @@
 
 import { calc, Yaku as SolverYaku, type RiichiInput } from "riichi-rs-node";
 
-import { isClosedHand, isDealer, type Meld, type QuizHand } from "@/lib/quiz/hand";
+import {
+  allHandTiles,
+  indicatorTiles,
+  isDealer,
+  isRiichi,
+  uraDoraIndicator,
+  type Meld,
+  type QuizHand,
+} from "@/lib/quiz/hand";
 import { doraFromIndicator, toSolverTile, windTile, type Tile } from "@/lib/quiz/tiles";
 
 /**
@@ -127,6 +135,44 @@ function doraTiles(indicators: Tile[]): SolverTile[] {
   return indicators.map((indicator) => asSolverTile(doraFromIndicator(indicator)));
 }
 
+/** How many han one indicator is worth: one per matching tile in the hand. */
+function countDora(hand: QuizHand, indicator: Tile): number {
+  // Compared as solver ids so a red five still counts as the five it is.
+  const dora = toSolverTile(doraFromIndicator(indicator));
+  return allHandTiles(hand).filter((tile) => toSolverTile(tile) === dora).length;
+}
+
+type YakuEntry = { name: string; han: number };
+
+/**
+ * Splits the solver's single dora figure into dora and ura dora.
+ *
+ * The solver has one `dora` input and no ura dora input at all — its `Uradora`
+ * yaku id is never emitted — so both kinds go in together and come back as one
+ * lump. People score them as separate lines, and the reveal should read the way
+ * they would say it, so the lump is divided back up here by counting tiles.
+ *
+ * The two counts have to add back up to what the solver reported. If they ever
+ * do not, our idea of dora has drifted from the solver's and the han we publish
+ * could not be trusted, so this refuses to score the hand rather than guess.
+ */
+function splitDora(hand: QuizHand, solverDoraHan: number): YakuEntry[] {
+  const ura = uraDoraIndicator(hand);
+  const doraHan = countDora(hand, hand.doraIndicator);
+  const uraHan = ura ? countDora(hand, ura) : 0;
+
+  if (doraHan + uraHan !== solverDoraHan) {
+    throw new Error(
+      `Dora count mismatch: solver says ${solverDoraHan}, we count ${doraHan} + ${uraHan} ura.`
+    );
+  }
+
+  const entries: YakuEntry[] = [];
+  if (doraHan > 0) entries.push({ name: YAKU_NAMES[SolverYaku.Dora], han: doraHan });
+  if (uraHan > 0) entries.push({ name: YAKU_NAMES[SolverYaku.Uradora], han: uraHan });
+  return entries;
+}
+
 export function solveHand(hand: QuizHand): SolvedHand {
   // Ron wants 13 concealed tiles with the winning tile named separately; tsumo
   // wants it appended to the concealed part. Getting this backwards makes the
@@ -142,8 +188,10 @@ export function solveHand(hand: QuizHand): SolvedHand {
     options: {
       bakaze: asSolverTile(windTile(hand.roundWind)),
       jikaze: asSolverTile(windTile(hand.seatWind)),
-      riichi: hand.riichi && isClosedHand(hand.melds),
-      dora: doraTiles([hand.doraIndicator]),
+      riichi: isRiichi(hand),
+      // Dora and ura dora together: the solver counts each entry separately, so
+      // two indicators pointing at the same tile correctly score it twice.
+      dora: doraTiles(indicatorTiles(hand)),
       tile_discarded_by_someone:
         hand.winType === "ron" ? asSolverTile(hand.winningTile) : -1,
     },
@@ -156,9 +204,21 @@ export function solveHand(hand: QuizHand): SolvedHand {
     throw new UnscorableHandError("Hand has no yaku.");
   }
 
-  const yaku = Object.entries(result.yaku)
-    .map(([id, han]) => ({ name: YAKU_NAMES[Number(id)] ?? `Yaku ${id}`, han: Number(han) }))
-    .sort((a, b) => b.han - a.han || a.name.localeCompare(b.name));
+  const solverYaku = Object.entries(result.yaku).map(([id, han]) => ({
+    id: Number(id),
+    han: Number(han),
+  }));
+  const solverDoraHan = solverYaku.find((entry) => entry.id === SolverYaku.Dora)?.han ?? 0;
+
+  // Yaku first, biggest first; then dora and ura dora, the order they are called
+  // at the table.
+  const yaku = [
+    ...solverYaku
+      .filter((entry) => entry.id !== SolverYaku.Dora)
+      .map((entry) => ({ name: YAKU_NAMES[entry.id] ?? `Yaku ${entry.id}`, han: entry.han }))
+      .sort((a, b) => b.han - a.han || a.name.localeCompare(b.name)),
+    ...splitDora(hand, solverDoraHan),
+  ];
 
   return {
     han: result.han,

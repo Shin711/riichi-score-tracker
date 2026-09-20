@@ -8,6 +8,8 @@
  *
  * Layout:
  *   - a dora wall on top, face-down except the indicator
+ *   - on a riichi hand, the wall's lower row, with the ura dora indicator
+ *     flipped directly beneath the dora indicator
  *   - the hand on one line: concealed tiles, winning tile, then called melds
  *
  * Meld type is drawn, not just implied: a called tile lies on its side and a
@@ -19,7 +21,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-import type { Meld, QuizHand } from "@/lib/quiz/hand";
+import { indicatorTiles, type Meld, type QuizHand } from "@/lib/quiz/hand";
 import { sortTiles } from "@/lib/quiz/tiles";
 
 const ASSET_DIR = path.join(process.cwd(), "src", "assets", "tiles");
@@ -168,29 +170,38 @@ function layoutRows(hand: QuizHand): Row[] {
   ];
 }
 
+/** A row of the dead wall: face-down except for the one flipped indicator. */
+function wallRow(indicator: string): TileSpec[] {
+  return upright(
+    Array.from({ length: WALL_LENGTH }, (_, slot) =>
+      slot === INDICATOR_SLOT ? indicator : BACK_TILE
+    )
+  );
+}
+
 export async function renderHandImage(hand: QuizHand): Promise<Buffer> {
   const layers: Layer[] = [];
 
   // --- dora wall -----------------------------------------------------------
-  const wallTop = PADDING;
-  const wall = upright(
-    Array.from({ length: WALL_LENGTH }, (_, slot) =>
-      slot === INDICATOR_SLOT ? hand.doraIndicator : BACK_TILE
-    )
-  );
-  const wallRight = await placeRow(
-    wall,
-    PADDING,
-    wallTop,
-    WALL_W,
-    WALL_H,
-    WALL_TILE_GAP,
-    layers
-  );
+  // The dead wall is two tiles high, and the ura dora indicator is the tile
+  // lying under the dora indicator. It is drawn that way — a lower row with the
+  // same slot flipped — because the picture carries no text and position is the
+  // only thing that can say which indicator is which. The lower row appears only
+  // once there is an ura dora to show, so a hand without riichi looks as it
+  // always did.
+  const wallRows = indicatorTiles(hand).map(wallRow);
+
+  let wallRight = PADDING;
+  let top = PADDING;
+  for (const row of wallRows) {
+    wallRight = await placeRow(row, PADDING, top, WALL_W, WALL_H, WALL_TILE_GAP, layers);
+    // Tight, matching the gap between wall tiles, so the rows read as one wall.
+    top += WALL_H + WALL_TILE_GAP;
+  }
 
   // --- hand ----------------------------------------------------------------
   let widest = wallRight;
-  let top = wallTop + WALL_H + ROW_GAP;
+  top += ROW_GAP - WALL_TILE_GAP;
 
   for (const row of layoutRows(hand)) {
     let cursor = PADDING;

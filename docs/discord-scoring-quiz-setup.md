@@ -136,9 +136,12 @@ falls back to inline tile emoji rather than dropping the quiz.
 
 1. Someone clicks **Answer** on the daily post.
 2. A private form asks for han, fu, and the score.
-3. The bot replies, only to them, with a tick or cross against each of the three — but **not** the correct values, so the evening reveal still has something to reveal.
+3. The bot replies, only to them, with a tick or cross against each of the three, followed by the **correct answer and its yaku** — whether they got it right or not. A bare cross teaches nothing until the evening; the point is to learn the hand while it is still in front of you.
+4. At 10pm ET the answer and a recap go up in the channel for everyone, as before.
 
-**One attempt per person per day.** A second submission is refused rather than replacing the first. If the form can't be read (a typo like `three` instead of `3`), nothing is recorded and they can press **Answer** again — a typo shouldn't burn someone's attempt.
+The private answer is only ever shown to someone whose own answer is already recorded, so it cannot help them. The one thing it does allow is a member passing the answer on before the evening, so the reply ends by asking them not to.
+
+**One attempt per person per day.** A second submission is refused rather than replacing the first — the reply says so, and shows the answer again, since the first receipt is a private message that disappears when dismissed. If the form can't be read (a typo like `three` instead of `3`), nothing is recorded and they can press **Answer** again — a typo shouldn't burn someone's attempt.
 
 ### What counts as a correct score
 

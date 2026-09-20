@@ -11,12 +11,12 @@
  * answer we publish, because it *is* the answer we publish.
  */
 
-import { allHandTiles, type Meld, type QuizHand, type WinType } from "@/lib/quiz/hand";
+import { allShownTiles, type Meld, type QuizHand, type WinType } from "@/lib/quiz/hand";
 import { chance, pick } from "@/lib/quiz/random";
 import { trySolveHand, type SolvedHand } from "@/lib/quiz/solve";
 import {
   allTiles,
-  isTerminalOrHonor,
+  doraFromIndicator,
   makeTile,
   maxRank,
   sortTiles,
@@ -63,6 +63,17 @@ const RIICHI_CHANCE = 0.65;
 const TSUMO_CHANCE = 0.4;
 /** Kans are memorable but rare; they matter most for fu practice. */
 const KAN_CHANCE = 0.08;
+/**
+ * How often an indicator is steered onto the hand. A blind flip already scores
+ * about one time in five, so these sit on top of that: dora ends up scoring in
+ * roughly 38% of hands, and ura dora in roughly 30% of riichi hands — about what
+ * a single ura indicator manages at a real table.
+ *
+ * Kept modest on purpose. Every dora is a han with no fu attached, so generous
+ * values push hands up toward mangan, where fu stops being part of the answer.
+ */
+const DORA_HIT_CHANCE = 0.2;
+const URA_DORA_HIT_CHANCE = 0.1;
 
 const NUMBER_SUITS: Suit[] = ["m", "p", "s"];
 
@@ -93,10 +104,15 @@ class TileSupply {
   }
 }
 
-/** Final gate: no tile may appear more than four times across the whole hand. */
+/**
+ * Final gate: no tile may appear more than four times across everything the
+ * puzzle shows. That includes the flipped indicators — they are real tiles from
+ * the same wall, so an indicator matching a tile the hand already holds four of
+ * is just as impossible as a five-tile kan.
+ */
 export function hasLegalTileCounts(hand: QuizHand): boolean {
   const counts = new Map<Tile, number>();
-  for (const tile of allHandTiles(hand)) {
+  for (const tile of allShownTiles(hand)) {
     const next = (counts.get(tile) ?? 0) + 1;
     if (next > 4) return false;
     counts.set(tile, next);
@@ -238,9 +254,14 @@ function buildCandidate(random: () => number): QuizHand | null {
 
   const isClosed = melds.every((meld) => meld.kind === "ankan");
   const winType: WinType = chance(TSUMO_CHANCE, random) ? "tsumo" : "ron";
+  const riichi = isClosed && chance(RIICHI_CHANCE, random);
 
   const inHand = new Set([...concealedTiles, ...melds.flatMap((m) => m.tiles)]);
-  const doraIndicator = pickDoraIndicator(inHand, random);
+  const doraIndicator = flipIndicator(inHand, shape.supply, DORA_HIT_CHANCE, random);
+  // The ura dora is only ever turned over for a riichi winner.
+  const uraDoraIndicator = riichi
+    ? flipIndicator(inHand, shape.supply, URA_DORA_HIT_CHANCE, random)
+    : null;
 
   return {
     concealed: sortTiles(concealed),
@@ -250,22 +271,42 @@ function buildCandidate(random: () => number): QuizHand | null {
     seatWind: pick(WINDS, random) as Wind,
     roundWind: chance(0.75, random) ? "east" : "south",
     doraIndicator,
-    riichi: isClosed && chance(RIICHI_CHANCE, random),
+    // Left off entirely when there is none, so the hand matches its own JSON
+    // round trip through the database.
+    ...(uraDoraIndicator ? { uraDoraIndicator } : {}),
+    riichi,
   };
 }
 
 /**
- * Picks a dora indicator. Mostly unrelated to the hand so dora stays a bonus
- * rather than the whole answer, but sometimes deliberately relevant.
+ * Flips an indicator off the wall. Mostly unrelated to the hand so dora stays a
+ * bonus rather than the whole answer, but sometimes deliberately relevant.
+ *
+ * An indicator is a physical tile, so it is drawn from the same supply as the
+ * hand: a tile the hand already holds four of cannot also be lying face-up on
+ * the wall, and two indicators cannot both be the last copy of something.
  */
-function pickDoraIndicator(inHand: Set<Tile>, random: () => number): Tile {
-  const every = allTiles();
-  if (chance(0.35, random)) {
-    // Bias toward an indicator that actually hits, so dora counting gets practised.
-    const hitting = every.filter((tile) => !isTerminalOrHonor(tile) && inHand.has(tile));
-    if (hitting.length > 0) return pick(hitting, random);
+function flipIndicator(
+  inHand: Set<Tile>,
+  supply: TileSupply,
+  hitChance: number,
+  random: () => number
+): Tile {
+  // Never empty: the hand and indicators use at most 17 of the 136 tiles.
+  const candidates = allTiles().filter((tile) => supply.available(tile));
+  let pool = candidates;
+
+  if (chance(hitChance, random)) {
+    // Bias toward an indicator that actually hits, so dora counting gets
+    // practised. "Hits" means the tile it *points at* is in the hand — the
+    // indicator itself being in the hand earns nothing.
+    const hitting = candidates.filter((tile) => inHand.has(doraFromIndicator(tile)));
+    if (hitting.length > 0) pool = hitting;
   }
-  return pick(every, random);
+
+  const indicator = pick(pool, random);
+  supply.take([indicator]);
+  return indicator;
 }
 
 /**

@@ -3,7 +3,7 @@
 import { ButtonStyle, ComponentType } from "@/lib/discord/interactions";
 import { describeCorrectScore } from "@/lib/quiz/answer";
 import { answerButtonId } from "@/lib/discord/quizForm";
-import type { Meld, QuizHand } from "@/lib/quiz/hand";
+import { uraDoraIndicator, type Meld, type QuizHand } from "@/lib/quiz/hand";
 import { quizDateLabel } from "@/lib/quiz/schedule";
 import type { SolvedHand } from "@/lib/quiz/solve";
 import { renderTiles, type TileEmojiMap } from "@/lib/discord/tileEmoji";
@@ -99,6 +99,17 @@ function handFields(hand: QuizHand, visual: HandVisual): EmbedField[] {
     value: `${formatTiles([hand.doraIndicator])} — ${describeTile(hand.doraIndicator)}`,
     inline: true,
   });
+
+  // The image tells the two indicators apart by position alone — the ura dora
+  // is the flipped tile in the wall's lower row — so it is named here as well.
+  const ura = uraDoraIndicator(hand);
+  if (ura) {
+    fields.push({
+      name: "Ura dora indicator",
+      value: `${formatTiles([ura])} — ${describeTile(ura)}`,
+      inline: true,
+    });
+  }
 
   return fields;
 }

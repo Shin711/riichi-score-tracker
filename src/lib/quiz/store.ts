@@ -9,7 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { gradeAnswer, type QuizAnswer } from "@/lib/quiz/answer";
+import { gradeAnswer, type AnswerMode, type QuizAnswer } from "@/lib/quiz/answer";
 import type { QuizHand } from "@/lib/quiz/hand";
 import type { SolvedHand } from "@/lib/quiz/solve";
 
@@ -62,21 +62,24 @@ export async function findQuizByDate(
   return (data as QuizRow | null) ?? null;
 }
 
-export async function countAnswers(
-  supabase: SupabaseClient,
-  quizId: string
-): Promise<{ answers: number; correct: number }> {
+export type AnswerCounts = { answers: number; correct: number };
+
+/** How the day went: everyone, and the multiple-choice answers on their own. */
+export type QuizRecap = AnswerCounts & { beginner: AnswerCounts };
+
+export async function countAnswers(supabase: SupabaseClient, quizId: string): Promise<QuizRecap> {
   const { data, error } = await supabase
     .from(ANSWERS_TABLE)
-    .select("correct")
+    .select("correct, mode")
     .eq("quiz_id", quizId);
 
   if (error) throw new Error(error.message);
-  const rows = (data ?? []) as Array<{ correct: boolean }>;
-  return {
-    answers: rows.length,
-    correct: rows.filter((row) => row.correct).length,
-  };
+  const rows = (data ?? []) as Array<{ correct: boolean; mode: AnswerMode }>;
+  const count = (subset: typeof rows): AnswerCounts => ({
+    answers: subset.length,
+    correct: subset.filter((row) => row.correct).length,
+  });
+  return { ...count(rows), beginner: count(rows.filter((row) => row.mode === "beginner")) };
 }
 
 /**
@@ -89,7 +92,8 @@ export async function recordAnswer(
   quiz: QuizRow,
   user: { id: string; username: string },
   answer: QuizAnswer,
-  scoreText: string
+  scoreText: string,
+  mode: AnswerMode
 ): Promise<AnswerResult> {
   if (quiz.revealed_at) return { status: "closed" };
 
@@ -103,6 +107,7 @@ export async function recordAnswer(
     fu: answer.fu,
     score_text: scoreText,
     correct: grade.correct,
+    mode,
   });
 
   if (error) {

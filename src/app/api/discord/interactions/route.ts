@@ -4,11 +4,12 @@ import {
   buildAlreadyAnsweredReply,
   buildAnswerModal,
   buildAnswerReceipt,
+  buildBeginnerModal,
   buildUnavailableReply,
   FIELD_FU,
   FIELD_HAN,
   FIELD_SCORE,
-  quizIdFromCustomId,
+  parseCustomId,
 } from "@/lib/discord/quizForm";
 import {
   ephemeralReply,
@@ -20,7 +21,8 @@ import {
   verifyInteractionSignature,
   type Interaction,
 } from "@/lib/discord/interactions";
-import { parseCount, parseScore } from "@/lib/quiz/answer";
+import { parseCount, parseScore, type AnswerMode } from "@/lib/quiz/answer";
+import { withFuBreakdown } from "@/lib/quiz/fu";
 import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
       error: e instanceof Error ? e.message : e,
     });
     return NextResponse.json(
-      ephemeralReply("Something went wrong with that request. Press **Answer** again.")
+      ephemeralReply("Something went wrong with that request. Press the button again.")
     );
   }
 
@@ -101,24 +103,29 @@ export async function POST(req: Request) {
 }
 
 async function handleButton(interaction: Interaction) {
-  const quizId = quizIdFromCustomId(interaction.data?.custom_id ?? "");
-  if (!quizId) return ephemeralReply("That button is no longer valid.");
+  const control = parseCustomId(interaction.data?.custom_id ?? "");
+  if (!control) return ephemeralReply("That button is no longer valid.");
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return ephemeralReply("The quiz database is not configured.");
 
-  const quiz = await loadQuiz(supabase, quizId);
+  const quiz = await loadQuiz(supabase, control.quizId);
   if (!quiz) return buildUnavailableReply("That quiz is no longer available.");
   if (quiz.revealed_at) {
     return buildUnavailableReply("This hand has already been revealed — answering is closed.");
   }
 
-  return buildAnswerModal(quizId, quiz.hand_json);
+  // The beginner form builds its options around the answer stored at post
+  // time. It must not re-solve the hand here (see the note above).
+  return control.kind === "beginner"
+    ? buildBeginnerModal(control.quizId, quiz.hand_json, quiz.answer_json)
+    : buildAnswerModal(control.quizId, quiz.hand_json);
 }
 
 async function handleModalSubmit(interaction: Interaction) {
-  const quizId = quizIdFromCustomId(interaction.data?.custom_id ?? "");
-  if (!quizId) return ephemeralReply("That form is no longer valid.");
+  const control = parseCustomId(interaction.data?.custom_id ?? "");
+  if (!control) return ephemeralReply("That form is no longer valid.");
+  const mode: AnswerMode = control.kind === "beginner-modal" ? "beginner" : "typed";
 
   const user = interactionUser(interaction);
   if (!user) return ephemeralReply("Could not identify who submitted that answer.");
@@ -134,7 +141,7 @@ async function handleModalSubmit(interaction: Interaction) {
     // should not burn someone's single attempt.
     return ephemeralReply(
       [
-        "Could not read that answer, so nothing was recorded — press **Answer** again.",
+        "Could not read that answer, so nothing was recorded — press **Answer** (or **Beginner**) again.",
         "",
         "Han and fu should be plain numbers (`3`, `30`).",
         "Score can be a total (`3900`) or a tsumo split (`1300/2600`, `2000 all`).",
@@ -145,7 +152,7 @@ async function handleModalSubmit(interaction: Interaction) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return ephemeralReply("The quiz database is not configured.");
 
-  const quiz = await loadQuiz(supabase, quizId);
+  const quiz = await loadQuiz(supabase, control.quizId);
   if (!quiz) return ephemeralReply("That quiz is no longer available.");
 
   const result = await recordAnswer(
@@ -153,17 +160,21 @@ async function handleModalSubmit(interaction: Interaction) {
     quiz,
     { id: user.id, username: user.username },
     { han, fu, score },
-    scoreText
+    scoreText,
+    mode
   );
 
   if (result.status === "closed") {
     return ephemeralReply("This hand has already been revealed — answering is closed.");
   }
+
   // The answer comes from the row, stored when the hand was posted — never from
   // re-solving here, which would load the wasm solver (see the note above).
+  // Rows from before the fu lines existed get them worked out on the spot.
+  const solved = withFuBreakdown(quiz.hand_json, quiz.answer_json);
   if (result.status === "already_answered") {
-    return ephemeralReply(buildAlreadyAnsweredReply(quiz.answer_json));
+    return ephemeralReply(buildAlreadyAnsweredReply(solved));
   }
 
-  return ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade, quiz.answer_json));
+  return ephemeralReply(buildAnswerReceipt({ han, fu, score }, result.grade, solved, mode));
 }

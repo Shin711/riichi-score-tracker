@@ -31,7 +31,12 @@ export const MessageFlags = {
 export const ComponentType = {
   ActionRow: 1,
   Button: 2,
+  StringSelect: 3,
   TextInput: 4,
+  /** A line of markdown; allowed inside a modal. */
+  TextDisplay: 10,
+  /** Wraps one modal field with its caption; how select menus get into a modal. */
+  Label: 18,
 } as const;
 
 export const ButtonStyle = {
@@ -102,13 +107,26 @@ export async function verifyInteractionSignature(
 
 export type InteractionUser = { id: string; username: string };
 
+/**
+ * A submitted modal field, or a wrapper around one. Text inputs carry `value`
+ * and select menus carry `values`. An action row nests its fields under
+ * `components`; the newer label wrapper nests its single field under
+ * `component`.
+ */
+export type SubmittedComponent = {
+  type?: number;
+  custom_id?: string;
+  value?: string;
+  values?: string[];
+  components?: SubmittedComponent[];
+  component?: SubmittedComponent;
+};
+
 export type Interaction = {
   type: number;
   data?: {
     custom_id?: string;
-    components?: Array<{
-      components?: Array<{ custom_id?: string; value?: string }>;
-    }>;
+    components?: SubmittedComponent[];
   };
   message?: { id?: string };
   member?: { user?: InteractionUser };
@@ -120,14 +138,18 @@ export function interactionUser(interaction: Interaction): InteractionUser | nul
   return interaction.member?.user ?? interaction.user ?? null;
 }
 
-/** Flattens a modal submission into `custom_id -> value`. */
+/**
+ * Flattens a modal submission into `custom_id -> value`, however the fields
+ * were nested. A select menu's first selection is its value.
+ */
 export function modalValues(interaction: Interaction): Record<string, string> {
   const values: Record<string, string> = {};
-  for (const row of interaction.data?.components ?? []) {
-    for (const field of row.components ?? []) {
-      if (field.custom_id) values[field.custom_id] = field.value ?? "";
-    }
-  }
+  const visit = (node: SubmittedComponent) => {
+    if (node.custom_id) values[node.custom_id] = node.value ?? node.values?.[0] ?? "";
+    node.components?.forEach(visit);
+    if (node.component) visit(node.component);
+  };
+  interaction.data?.components?.forEach(visit);
   return values;
 }
 

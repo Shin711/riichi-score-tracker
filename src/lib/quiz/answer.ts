@@ -18,6 +18,12 @@ export type QuizAnswer = {
   score: ScoreAnswer;
 };
 
+/**
+ * Which form an answer came through. Stored alongside it, so the recap can
+ * tell the easier multiple-choice answers from the typed ones.
+ */
+export type AnswerMode = "typed" | "beginner";
+
 export type AnswerGrade = {
   han: boolean;
   fu: boolean;

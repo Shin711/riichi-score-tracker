@@ -50,9 +50,11 @@ You also need `CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY`, which the leaderboa
 
 > To get a different channel's id: in Discord, enable **Settings → Advanced → Developer Mode**, then right-click the channel and choose **Copy Channel ID**.
 
-### Step 5: Run the database migration
+### Step 5: Run the database migrations
 
-Run `supabase/migrations/010_discord_quiz.sql` against the Supabase project, the same way as the earlier migrations (Supabase dashboard → **SQL Editor** → paste → **Run**).
+Run `supabase/migrations/010_discord_quiz.sql` and then `supabase/migrations/011_discord_quiz_answer_mode.sql` against the Supabase project, the same way as the earlier migrations (Supabase dashboard → **SQL Editor** → paste → **Run**).
+
+> If the quiz is already live, migration 011 has to run **before** the build that adds the Beginner button is deployed. Until the `mode` column exists, every submission — typed or beginner — fails with "Something went wrong".
 
 ### Step 6: Deploy, then point Discord at the endpoint
 
@@ -134,10 +136,18 @@ falls back to inline tile emoji rather than dropping the quiz.
 
 ## How answering works
 
-1. Someone clicks **Answer** on the daily post.
+1. Someone clicks **Answer** on the daily post — or **Beginner**, which asks the same three questions as multiple choice (see below).
 2. A private form asks for han, fu, and the score.
-3. The bot replies, only to them, with a tick or cross against each of the three, followed by the **correct answer and its yaku** — whether they got it right or not. A bare cross teaches nothing until the evening; the point is to learn the hand while it is still in front of you.
+3. The bot replies, only to them, with a tick or cross against each of the three, followed by the **correct answer, its yaku, and where the fu came from** — whether they got it right or not. A bare cross teaches nothing until the evening; the point is to learn the hand while it is still in front of you.
 4. At 10pm ET the answer and a recap go up in the channel for everyone, as before.
+
+The fu lines are worked out by reading the hand back into its sets, pair and wait and pricing each one (base 20, closed ron 10, a closed triplet of terminals 8, a kanchan wait 2, and so on, then the rounding). They are only shown when they add up to exactly the fu the solver scored, so the odd hand may arrive without them — the answer itself is unaffected.
+
+### The beginner form
+
+**Beginner** opens the same three questions as drop-downs with five options each. The options are built from the stored answer when the button is pressed and seeded from the quiz id, so reopening the form shows the same list — opening it twice reveals nothing the first opening did not. Han is always 1–5. Fu is a run of neighbouring values around what the hand can be read as; 20 and 25 only appear when the hand really can be a pinfu tsumo or seven pairs. Score is a run of neighbouring entries from the payment table for the offered han and fu, so a 1 han hand is never offered a mangan.
+
+A beginner answer spends the person's one attempt for the day and is graded exactly like a typed one. Each answer records which form it came through (the `mode` column), and because the beginner form is the easier of the two, the evening recap reports them separately whenever both were used: "**3** of **7** got it exactly right (43%). Typed: **2** of **5** · Beginner form: **1** of **2**."
 
 The private answer is only ever shown to someone whose own answer is already recorded, so it cannot help them. The one thing it does allow is a member passing the answer on before the evening, so the reply ends by asking them not to.
 

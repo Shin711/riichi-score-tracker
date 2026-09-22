@@ -6,6 +6,7 @@
  * generator is seeded from the date.
  */
 import { describeCorrectScore, gradeAnswer, type QuizAnswer } from "../src/lib/quiz/answer";
+import { beginnerChoices } from "../src/lib/quiz/beginner";
 import { buildAnswerReceipt } from "../src/lib/discord/quizForm";
 import { buildQuestionMessage, buildRevealMessage } from "../src/lib/discord/quizMessage";
 import { generateQuizHand } from "../src/lib/quiz/generate";
@@ -55,9 +56,23 @@ function main() {
     console.log("\x1b[1mPrivate receipt\x1b[0m");
     console.log(buildAnswerReceipt(guess, gradeAnswer(solved, guess), solved));
 
+    // What the Beginner button offers. In production the seed is the quiz id;
+    // here the date stands in for it.
+    const choices = beginnerChoices(hand, solved, `beginner:${date}-${i}`);
+    console.log("\n" + "-".repeat(64));
+    console.log("\x1b[1mBeginner options\x1b[0m");
+    console.log(`Han: ${choices.han.join(" · ")}`);
+    console.log(`Fu: ${choices.fu.join(" · ")}`);
+    console.log(`Score: ${choices.scores.map((score) => score.value).join(" · ")}`);
+
     console.log("\n" + "-".repeat(64));
     printEmbed(
-      buildRevealMessage(hand, solved, { answers: 7, correct: 3 }, date).embeds[0] as Embed
+      buildRevealMessage(
+        hand,
+        solved,
+        { answers: 7, correct: 3, beginner: { answers: 2, correct: 1 } },
+        date
+      ).embeds[0] as Embed
     );
 
     console.log(

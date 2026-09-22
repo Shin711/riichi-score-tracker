@@ -177,4 +177,20 @@ describe("modalValues", () => {
   it("returns an empty object when there are no components", () => {
     assert.deepEqual(modalValues({ type: 5 }), {});
   });
+
+  it("reads select menus and text inputs wrapped in labels", () => {
+    // The beginner form: each field sits under a label, and a select menu
+    // reports its choice as `values`, not `value`.
+    const interaction: Interaction = {
+      type: 5,
+      data: {
+        components: [
+          { type: 18, component: { type: 3, custom_id: "han", values: ["3"] } },
+          { type: 18, component: { type: 3, custom_id: "fu", values: ["30"] } },
+          { type: 18, component: { type: 4, custom_id: "score", value: "3900" } },
+        ],
+      },
+    };
+    assert.deepEqual(modalValues(interaction), { han: "3", fu: "30", score: "3900" });
+  });
 });

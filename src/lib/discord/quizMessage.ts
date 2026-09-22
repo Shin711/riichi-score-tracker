@@ -2,25 +2,34 @@
 
 import { ButtonStyle, ComponentType } from "@/lib/discord/interactions";
 import { describeCorrectScore } from "@/lib/quiz/answer";
-import { answerButtonId } from "@/lib/discord/quizForm";
+import { answerButtonId, beginnerButtonId } from "@/lib/discord/quizForm";
 import { uraDoraIndicator, type Meld, type QuizHand } from "@/lib/quiz/hand";
 import { quizDateLabel } from "@/lib/quiz/schedule";
 import type { SolvedHand } from "@/lib/quiz/solve";
+import type { QuizRecap } from "@/lib/quiz/store";
+
+export type { QuizRecap } from "@/lib/quiz/store";
 import { renderTiles, type TileEmojiMap } from "@/lib/discord/tileEmoji";
 import { describeTile, formatTiles, windKanji, windLabel } from "@/lib/quiz/tiles";
 
 export {
   ANSWER_BUTTON_PREFIX,
   ANSWER_MODAL_PREFIX,
+  BEGINNER_BUTTON_PREFIX,
+  BEGINNER_MODAL_PREFIX,
   FIELD_FU,
   FIELD_HAN,
   FIELD_SCORE,
   answerButtonId,
   answerModalId,
+  beginnerButtonId,
+  beginnerModalId,
   buildAlreadyAnsweredReply,
   buildAnswerModal,
   buildAnswerReceipt,
+  buildBeginnerModal,
   buildUnavailableReply,
+  parseCustomId,
   quizIdFromCustomId,
 } from "@/lib/discord/quizForm";
 
@@ -145,7 +154,7 @@ export function buildQuestionMessage(
         description: [
           renderConditions(hand),
           "",
-          "How much is this hand worth? Answer with **han**, **fu**, and the **score**.",
+          "How much is this hand worth? Answer with **han**, **fu**, and the **score** — or press **Beginner** for multiple choice.",
         ].join("\n"),
         color: EMBED_COLOR,
         ...handImage(visual),
@@ -170,16 +179,45 @@ export function buildQuestionMessage(
             label: "Answer",
             custom_id: answerButtonId(quizId),
           },
+          // Same three questions as drop-downs. It spends the same single
+          // attempt, so it sits beside Answer rather than replacing it.
+          {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: "Beginner",
+            custom_id: beginnerButtonId(quizId),
+          },
         ],
       },
     ],
   };
 }
 
-export type QuizRecap = {
-  answers: number;
-  correct: number;
-};
+/**
+ * How the day went. The beginner form is the easier of the two, so when both
+ * were used the line says how each did rather than blending them.
+ */
+function recapLine(recap: QuizRecap): string {
+  if (recap.answers === 0) return "Nobody answered today.";
+
+  const accuracy = Math.round((recap.correct / recap.answers) * 100);
+  const overall = `**${recap.correct}** of **${recap.answers}** got it exactly right (${accuracy}%).`;
+
+  const beginner = recap.beginner;
+  if (beginner.answers === 0) return overall;
+  if (beginner.answers === recap.answers) {
+    return `${overall} All of them used the beginner form.`;
+  }
+
+  const typed = {
+    answers: recap.answers - beginner.answers,
+    correct: recap.correct - beginner.correct,
+  };
+  return [
+    overall,
+    `Typed: **${typed.correct}** of **${typed.answers}** · Beginner form: **${beginner.correct}** of **${beginner.answers}**.`,
+  ].join("\n");
+}
 
 export function buildRevealMessage(
   hand: QuizHand,
@@ -192,13 +230,6 @@ export function buildRevealMessage(
     .map((yaku) => `${yaku.name} — ${yaku.han} han`)
     .join("\n");
 
-  const accuracy =
-    recap.answers > 0 ? Math.round((recap.correct / recap.answers) * 100) : 0;
-  const recapLine =
-    recap.answers === 0
-      ? "Nobody answered today."
-      : `**${recap.correct}** of **${recap.answers}** got it exactly right (${accuracy}%).`;
-
   const fields = [
     ...handFields(hand, visual),
     { name: "Han", value: `**${solved.han}**`, inline: true },
@@ -207,11 +238,21 @@ export function buildRevealMessage(
     { name: "Yaku", value: yakuList || "—", inline: false },
   ];
 
+  // Itemised like the yaku. Answers stored before this existed have none, and
+  // an empty field would only draw attention to that.
+  if (solved.fuBreakdown && solved.fuBreakdown.length > 0) {
+    fields.push({
+      name: "Fu breakdown",
+      value: solved.fuBreakdown.map((line) => `${line.name} — ${line.fu} fu`).join("\n"),
+      inline: false,
+    });
+  }
+
   return {
     embeds: [
       {
         title: `Answer — ${quizDateLabel(isoDate)}`,
-        description: [renderConditions(hand), "", recapLine].join("\n"),
+        description: [renderConditions(hand), "", recapLine(recap)].join("\n"),
         color: CORRECT_COLOR,
         ...handImage(visual),
         fields,

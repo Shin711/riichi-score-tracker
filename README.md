@@ -60,7 +60,7 @@ After renaming an existing deployment, update **Google OAuth** authorized origin
 - **Share**: send `/s/<shareId>` for view-only access. Use the in-page editor link (`?editKey=...`) or paste an edit key into the session page to enable edits on another device.
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).
 - **Safety**: use **Undo last event** in session history to quickly revert the latest mistaken entry.
-- **Daily scoring quiz**: the bot posts a generated winning hand to Discord each morning (10am ET) and asks for **han**, **fu**, and the **score**. Answers are private, one attempt each; you see the correct answer as soon as you submit, and the answer and a recap go up for everyone at 10pm ET. Setup: [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md).
+- **Daily scoring quiz**: the bot posts a generated winning hand to Discord each morning (10am ET) and asks for **han**, **fu**, and the **score** — typed, or as multiple choice via the **Beginner** button. Answers are private, one attempt each; you see the correct answer, its yaku, and where the fu came from as soon as you submit, and the answer and a recap go up for everyone at 10pm ET. Setup: [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md).
 
 ## Event types (MVP)
 

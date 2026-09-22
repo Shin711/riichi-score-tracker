@@ -8,6 +8,7 @@
 
 import { calc, Yaku as SolverYaku, type RiichiInput } from "riichi-rs-node";
 
+import { explainFu, SHAPE_YAKU, type FuLine } from "@/lib/quiz/fu";
 import {
   allHandTiles,
   indicatorTiles,
@@ -47,6 +48,14 @@ export type SolvedHand = {
   /** Tsumo only: what each seat hands over. */
   tsumoPayment: TsumoPayment | null;
   yaku: Array<{ name: string; han: number }>;
+  /**
+   * Where the fu came from, in the same shape as `yaku`.
+   *
+   * Absent rather than `null` when it could not be worked out (see
+   * {@link explainFu}), and on answers stored before it existed — the row is
+   * JSON, so "missing" has to mean "none" either way.
+   */
+  fuBreakdown?: FuLine[];
   yakumanCount: number;
   isDealer: boolean;
 };
@@ -79,22 +88,22 @@ const YAKU_NAMES: Record<number, string> = {
   [SolverYaku.Daisharin]: "Daisharin",
   [SolverYaku.Chinitsu]: "Chinitsu",
   [SolverYaku.Honitsu]: "Honitsu",
-  [SolverYaku.Ryanpeikou]: "Ryanpeikou",
-  [SolverYaku.Junchan]: "Junchan",
-  [SolverYaku.Chanta]: "Chanta",
-  [SolverYaku.Toitoi]: "Toitoi",
+  [SolverYaku.Ryanpeikou]: SHAPE_YAKU.ryanpeikou,
+  [SolverYaku.Junchan]: SHAPE_YAKU.junchan,
+  [SolverYaku.Chanta]: SHAPE_YAKU.chanta,
+  [SolverYaku.Toitoi]: SHAPE_YAKU.toitoi,
   [SolverYaku.Honroutou]: "Honroutou",
   [SolverYaku.Sankantsu]: "Sankantsu",
   [SolverYaku.Shosangen]: "Shousangen",
-  [SolverYaku.SanshokuDoukou]: "Sanshoku doukou",
-  [SolverYaku.Sanankou]: "Sanankou",
-  [SolverYaku.Chiitoitsu]: "Chiitoitsu",
+  [SolverYaku.SanshokuDoukou]: SHAPE_YAKU.sanshokuDoukou,
+  [SolverYaku.Sanankou]: SHAPE_YAKU.sanankou,
+  [SolverYaku.Chiitoitsu]: SHAPE_YAKU.chiitoitsu,
   [SolverYaku.DaburuRiichi]: "Daburu riichi",
-  [SolverYaku.Ittsu]: "Ittsuu",
-  [SolverYaku.Sanshoku]: "Sanshoku",
+  [SolverYaku.Ittsu]: SHAPE_YAKU.ittsuu,
+  [SolverYaku.Sanshoku]: SHAPE_YAKU.sanshoku,
   [SolverYaku.Tanyao]: "Tanyao",
-  [SolverYaku.Pinfu]: "Pinfu",
-  [SolverYaku.Iipeikou]: "Iipeikou",
+  [SolverYaku.Pinfu]: SHAPE_YAKU.pinfu,
+  [SolverYaku.Iipeikou]: SHAPE_YAKU.iipeikou,
   [SolverYaku.Menzentsumo]: "Menzen tsumo",
   [SolverYaku.Riichi]: "Riichi",
   [SolverYaku.Ippatsu]: "Ippatsu",
@@ -220,6 +229,11 @@ export function solveHand(hand: QuizHand): SolvedHand {
     ...splitDora(hand, solverDoraHan),
   ];
 
+  // The fu is the solver's; this only itemises it, and stays silent if it
+  // cannot. Left off entirely when there is none, so the stored answer matches
+  // its own JSON round trip.
+  const fuBreakdown = explainFu(hand, { fu: result.fu, yaku });
+
   return {
     han: result.han,
     fu: result.fu,
@@ -229,6 +243,7 @@ export function solveHand(hand: QuizHand): SolvedHand {
         ? readTsumoPayment(result.outgoing_ten, isDealer(hand))
         : null,
     yaku,
+    ...(fuBreakdown ? { fuBreakdown } : {}),
     yakumanCount: result.yakuman,
     isDealer: isDealer(hand),
   };

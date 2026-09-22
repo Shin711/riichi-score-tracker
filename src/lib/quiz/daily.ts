@@ -16,6 +16,7 @@ import {
   type HandVisual,
 } from "@/lib/discord/quizMessage";
 import { loadTileEmoji } from "@/lib/discord/tileEmoji";
+import { withFuBreakdown } from "@/lib/quiz/fu";
 import { renderHandImage } from "@/lib/quiz/handImage";
 import { generateQuizHand } from "@/lib/quiz/generate";
 import type { QuizHand } from "@/lib/quiz/hand";
@@ -25,6 +26,7 @@ import {
   QUIZZES_TABLE,
   countAnswers,
   findQuizByDate,
+  type AnswerCounts,
   type QuizRow,
 } from "@/lib/quiz/store";
 
@@ -58,7 +60,14 @@ export type PostResult =
   | { status: "skipped"; reason: string };
 
 export type RevealResult =
-  | { status: "revealed"; quizId: string; answers: number; correct: number }
+  | {
+      status: "revealed";
+      quizId: string;
+      answers: number;
+      correct: number;
+      /** The subset that came through the multiple-choice form. */
+      beginner: AnswerCounts;
+    }
   | { status: "skipped"; reason: string };
 
 /**
@@ -96,6 +105,12 @@ export async function postDailyQuiz(supabase: SupabaseClient): Promise<PostResul
   } else {
     const generated = generateQuizHand(createRandom(hashSeed(`quiz-${today}`)));
     hand = generated.hand;
+
+    // Not a reason to hold the post — the answer is still right — but worth
+    // knowing: it means a shape the fu explainer could not read back.
+    if (!generated.solved.fuBreakdown) {
+      console.warn("[quiz] no fu breakdown for today's hand", { today });
+    }
 
     // Insert before posting: if two cron invocations race, the unique index on
     // quiz_date decides the winner and the loser never reaches Discord.
@@ -178,7 +193,14 @@ export async function revealDailyQuiz(supabase: SupabaseClient): Promise<RevealR
   const { visual, files } = await buildHandVisual(quiz.hand_json, quiz.channel_id);
   await postChannelMessage(
     quiz.channel_id,
-    buildRevealMessage(quiz.hand_json, quiz.answer_json, recap, quiz.quiz_date, visual),
+    buildRevealMessage(
+      quiz.hand_json,
+      // A hand posted before the fu lines existed gets them worked out now.
+      withFuBreakdown(quiz.hand_json, quiz.answer_json),
+      recap,
+      quiz.quiz_date,
+      visual
+    ),
     files
   );
 
@@ -196,5 +218,6 @@ export async function revealDailyQuiz(supabase: SupabaseClient): Promise<RevealR
     quizId: quiz.id,
     answers: recap.answers,
     correct: recap.correct,
+    beginner: recap.beginner,
   };
 }

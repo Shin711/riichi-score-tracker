@@ -8,6 +8,7 @@ import {
 } from "@/lib/scoring/ledger";
 
 import { compareLeaderboardEntries } from "@/lib/leaderboard/qualification";
+import { umaAdjustments } from "@/lib/leaderboard/placement";
 import { gameScoreDelta, LEADERBOARD_POINTS_DIVISOR } from "@/lib/leaderboard/points";
 
 const seats: Seat[] = ["E", "S", "W", "N"];
@@ -18,9 +19,41 @@ export type LeaderboardEntry = {
   gamesPlayed: number;
   /** Sum of (ending score − starting stack) across finished games. */
   totalDelta: number;
-  /** totalDelta ÷ 1,000 — same units as Riichi Leaderboard.xlsx. */
+  /**
+   * Sum of uma (+15 / +5 / −5 / −15), in points (see placement.ts). Zero before the
+   * October 2026 season; missing on older archived rows.
+   */
+  placementBonus?: number;
+  /** totalDelta ÷ 1,000, plus uma (placementBonus) — same units as Riichi Leaderboard.xlsx. */
   points: number;
 };
+
+export type LeaderboardComputeOptions = {
+  useRating?: boolean;
+  confidenceWeighted?: boolean;
+  usePlacementBonus?: boolean;
+};
+
+/** Net points for an entry: score delta in thousands plus any placement bonus. */
+export function leaderboardEntryPoints(
+  entry: Pick<LeaderboardEntry, "totalDelta" | "placementBonus">
+): number {
+  return entry.totalDelta / LEADERBOARD_POINTS_DIVISOR + (entry.placementBonus ?? 0);
+}
+
+export function sortLeaderboardEntries(
+  entries: LeaderboardEntry[],
+  options?: LeaderboardComputeOptions
+): LeaderboardEntry[] {
+  return entries
+    .map((entry) => ({ ...entry, points: leaderboardEntryPoints(entry) }))
+    .sort((a, b) =>
+      compareLeaderboardEntries(a, b, {
+        useRating: options?.useRating ?? false,
+        confidenceWeighted: options?.confidenceWeighted,
+      })
+    );
+}
 
 export type SessionSnapshot = {
   sessionId: string;
@@ -61,12 +94,9 @@ export function parseRules(rulesJson: unknown): Rules {
 export function computeLeaderboard(
   sessionSnapshots: SessionSnapshot[],
   allPlayers: Array<{ id: string; display_name: string }> = [],
-  options?: { useRating?: boolean }
+  options?: LeaderboardComputeOptions
 ): LeaderboardEntry[] {
-  const byPlayer = new Map<
-    string,
-    { playerId: string; displayName: string; gamesPlayed: number; totalDelta: number }
-  >();
+  const byPlayer = new Map<string, LeaderboardEntry>();
 
   for (const { id, display_name } of allPlayers) {
     byPlayer.set(id, {
@@ -74,6 +104,8 @@ export function computeLeaderboard(
       displayName: display_name,
       gamesPlayed: 0,
       totalDelta: 0,
+      placementBonus: 0,
+      points: 0,
     });
   }
 
@@ -90,6 +122,9 @@ export function computeLeaderboard(
       })
     );
     const totals = computeTotals(seats, session.rules, mappedEvents);
+    const bonuses = options?.usePlacementBonus
+      ? umaAdjustments(seats.map((seat) => totals[seat]))
+      : null;
 
     for (const { seat, playerId, displayName } of session.assignments) {
       const delta = gameScoreDelta(totals[seat], session.rules.startingPoints);
@@ -100,21 +135,21 @@ export function computeLeaderboard(
           displayName,
           gamesPlayed: 0,
           totalDelta: 0,
+          placementBonus: 0,
+          points: 0,
         };
         byPlayer.set(playerId, entry);
       }
       entry.displayName = displayName;
       entry.gamesPlayed += 1;
       entry.totalDelta += delta;
+      if (bonuses) {
+        entry.placementBonus = (entry.placementBonus ?? 0) + bonuses[seats.indexOf(seat)];
+      }
     }
   }
 
-  return Array.from(byPlayer.values())
-    .map((entry) => ({
-      ...entry,
-      points: entry.totalDelta / LEADERBOARD_POINTS_DIVISOR,
-    }))
-    .sort((a, b) => compareLeaderboardEntries(a, b, { useRating: options?.useRating ?? false }));
+  return sortLeaderboardEntries(Array.from(byPlayer.values()), options);
 }
 
 export function groupSessionSnapshots(input: {

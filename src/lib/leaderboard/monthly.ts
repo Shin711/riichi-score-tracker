@@ -1,7 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
-import { formatLeaderboardPoints, formatLeaderboardAverage, formatLeaderboardRating } from "@/lib/leaderboard/points";
+import {
+  formatLeaderboardPoints,
+  formatLeaderboardAverage,
+  formatLeaderboardRating,
+  formatPlacementBonus,
+} from "@/lib/leaderboard/points";
 import {
   getLeaderboardScoringOptions,
   minGamesForLeaderboardRank,
@@ -158,15 +163,34 @@ function csvName(displayName: string) {
 
 export function archiveToCsv(archive: MonthlyArchive) {
   const period = { year: archive.year, month: archive.month };
-  const { useRating } = getLeaderboardScoringOptions(period);
+  const { useRating, confidenceWeighted, usePlacementBonus } = getLeaderboardScoringOptions(period);
   const minGamesForRank = minGamesForLeaderboardRank(archive.year, archive.month);
   const { ranked, unranked } = splitLeaderboardEntries(archive.entries, period);
+
+  if (usePlacementBonus) {
+    const header = "Rating,Avg,Score,Uma,Games";
+    const cells = (entry: LeaderboardEntry) =>
+      `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed, false)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${formatPlacementBonus(entry.placementBonus ?? 0)},${entry.gamesPlayed}`;
+    const lines = [`Rank,Name,${header}`];
+    for (const [index, entry] of ranked.entries()) {
+      lines.push(`${index + 1},${cells(entry)}`);
+    }
+    if (unranked.length > 0) {
+      lines.push("");
+      lines.push(`Unranked (under ${minGamesForRank} games)`);
+      lines.push(`Name,${header},Games needed`);
+      for (const entry of unranked) {
+        lines.push(`${cells(entry)},${minGamesForRank - entry.gamesPlayed}`);
+      }
+    }
+    return lines.join("\n");
+  }
 
   if (useRating) {
     const lines = ["Rank,Name,Rating,Avg,Net,Games"];
     for (const [index, entry] of ranked.entries()) {
       lines.push(
-        `${index + 1},${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
+        `${index + 1},${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed, confidenceWeighted)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed}`
       );
     }
     if (unranked.length > 0) {
@@ -176,7 +200,7 @@ export function archiveToCsv(archive: MonthlyArchive) {
       for (const entry of unranked) {
         const needed = minGamesForRank - entry.gamesPlayed;
         lines.push(
-          `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
+          `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed, confidenceWeighted)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${entry.gamesPlayed},${needed}`
         );
       }
     }

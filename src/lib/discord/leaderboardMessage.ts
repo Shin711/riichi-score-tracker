@@ -4,9 +4,11 @@ import {
   formatLeaderboardAverage,
   formatLeaderboardPoints,
   formatLeaderboardRating,
+  formatPointsValue,
 } from "@/lib/leaderboard/points";
 import {
   gamesUntilLeaderboardRank,
+  getLeaderboardScoringOptions,
   splitLeaderboardEntries,
   type LeaderboardScoringPeriod,
 } from "@/lib/leaderboard/qualification";
@@ -55,11 +57,17 @@ function renderTable(
   return [renderRow(headers), ...rows.map(renderRow)].join("\n");
 }
 
-function rankedTable(entries: LeaderboardEntry[], useRating: boolean): string {
+function rankedTable(
+  entries: LeaderboardEntry[],
+  scoring: { useRating: boolean; confidenceWeighted: boolean; usePlacementBonus: boolean }
+): string {
+  const { useRating, confidenceWeighted, usePlacementBonus } = scoring;
   const shown = entries.slice(0, MAX_RANKED_ROWS);
 
+  // From the October 2026 season, rating already is the net total, so the extra
+  // column shows the score-only part (rating − score = uma).
   const headers = useRating
-    ? ["#", "Player", "Rating", "Avg", "Net", "G"]
+    ? ["#", "Player", "Rating", "Avg", usePlacementBonus ? "Score" : "Net", "G"]
     : ["#", "Player", "Points", "G"];
   const alignRight = useRating
     ? [true, false, true, true, true, true]
@@ -72,7 +80,7 @@ function rankedTable(entries: LeaderboardEntry[], useRating: boolean): string {
       ? [
           rank,
           name,
-          formatLeaderboardRating(entry.points, entry.gamesPlayed),
+          formatLeaderboardRating(entry.points, entry.gamesPlayed, confidenceWeighted),
           formatLeaderboardAverage(entry.points, entry.gamesPlayed),
           formatLeaderboardPoints(entry.totalDelta),
           String(entry.gamesPlayed),
@@ -94,7 +102,7 @@ function unrankedValue(
   const lines = shown.map((entry) => {
     const needed = gamesUntilLeaderboardRank(entry.gamesPlayed, minGamesForRank);
     const games = `${entry.gamesPlayed} game${entry.gamesPlayed === 1 ? "" : "s"}`;
-    return `**${entry.displayName}** — net ${formatLeaderboardPoints(entry.totalDelta)} · ${games} · ${needed} to rank`;
+    return `**${entry.displayName}** — net ${formatPointsValue(entry.points)} · ${games} · ${needed} to rank`;
   });
 
   const hidden = entries.length - shown.length;
@@ -112,7 +120,8 @@ export function buildLeaderboardEmbedDescription(input: LeaderboardMessageInput)
     return `No one has hit ${input.minGamesForRank} games yet this month.`;
   }
 
-  const description = `\`\`\`\n${rankedTable(ranked, input.useRating)}\n\`\`\``;
+  const scoring = { ...getLeaderboardScoringOptions(input.period), useRating: input.useRating };
+  const description = `\`\`\`\n${rankedTable(ranked, scoring)}\n\`\`\``;
   return description.length > MAX_DESCRIPTION
     ? `${description.slice(0, MAX_DESCRIPTION - 4)}\n\`\`\``
     : description;
@@ -124,9 +133,12 @@ export function buildLeaderboardWebhookPayload(
 ): DiscordWebhookPayload {
   const { ranked, unranked } = splitLeaderboardEntries(input.entries, input.period);
   const games = `${input.gamesWithPlayers} game${input.gamesWithPlayers === 1 ? "" : "s"}`;
-  const scoring = input.useRating
-    ? "rating = confidence-weighted net"
-    : "points = (ending − start) ÷ 1,000";
+  const { usePlacementBonus } = getLeaderboardScoringOptions(input.period);
+  const scoring = usePlacementBonus
+    ? "rating = net + uma (+15/+5/−5/−15)"
+    : input.useRating
+      ? "rating = confidence-weighted net"
+      : "points = (ending − start) ÷ 1,000";
 
   const fields = [];
   if (unranked.length > 0) {

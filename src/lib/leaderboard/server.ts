@@ -63,7 +63,7 @@ export async function buildLeaderboardForPeriod(
     events: eventsRes.data ?? [],
   });
 
-  const { useRating } = getLeaderboardScoringOptions(period);
+  const scoring = getLeaderboardScoringOptions(period);
 
   const sessionEntries = computeLeaderboard(
     snapshots,
@@ -71,11 +71,11 @@ export async function buildLeaderboardForPeriod(
       id: p.id,
       display_name: p.display_name,
     })),
-    { useRating }
+    scoring
   );
 
   const imports = (importsRes.data ?? []) as ImportedGameRow[];
-  const entries = mergeImportedGamesIntoLeaderboard(sessionEntries, imports, { useRating });
+  const entries = mergeImportedGamesIntoLeaderboard(sessionEntries, imports, scoring);
 
   const sessionGames = snapshots.filter((s) => s.assignments.length > 0).length;
 

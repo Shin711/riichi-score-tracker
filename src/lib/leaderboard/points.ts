@@ -34,6 +34,18 @@ export function adjustedLeaderboardPoints(points: number, gamesPlayed: number): 
   return points * leaderboardConfidenceWeight(gamesPlayed);
 }
 
+/**
+ * Rating used for ranking. Confidence-weighted months shrink the total toward 0;
+ * from the October 2026 season on, rating is simply the net total (score + uma).
+ */
+export function leaderboardRating(
+  points: number,
+  gamesPlayed: number,
+  confidenceWeighted = true
+): number {
+  return confidenceWeighted ? adjustedLeaderboardPoints(points, gamesPlayed) : points;
+}
+
 /** Per-game average net points (net ÷ games). One outlier matters less as games grow. */
 export function leaderboardAveragePoints(points: number, gamesPlayed: number): number {
   if (gamesPlayed <= 0) return 0;
@@ -55,9 +67,18 @@ export function formatLeaderboardPoints(totalDelta: number): string {
   return formatPointsValue(leaderboardPoints(totalDelta));
 }
 
-/** Format the confidence-weighted rating used for ranking. */
-export function formatLeaderboardRating(points: number, gamesPlayed: number): string {
-  return formatPointsValue(adjustedLeaderboardPoints(points, gamesPlayed));
+/** Format the rating used for ranking. */
+export function formatLeaderboardRating(
+  points: number,
+  gamesPlayed: number,
+  confidenceWeighted = true
+): string {
+  return formatPointsValue(leaderboardRating(points, gamesPlayed, confidenceWeighted));
+}
+
+/** Format a player's total uma. */
+export function formatPlacementBonus(placementBonus: number): string {
+  return formatPointsValue(placementBonus);
 }
 
 /** Format per-game average net points. */

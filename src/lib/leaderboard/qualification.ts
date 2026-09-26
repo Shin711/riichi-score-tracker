@@ -1,9 +1,16 @@
 import type { LeaderboardEntry } from "@/lib/leaderboard/computeLeaderboard";
-import { adjustedLeaderboardPoints } from "@/lib/leaderboard/points";
+import { leaderboardRating } from "@/lib/leaderboard/points";
 
 /** Rating-based ranking begins with this calendar month (US Eastern). */
 export const LEADERBOARD_RATING_START_YEAR = 2026;
 export const LEADERBOARD_RATING_START_MONTH = 7;
+
+/**
+ * The season scoring (uma, rating = plain net total) begins with this
+ * calendar month (US Eastern) and applies to every month after it.
+ */
+export const LEADERBOARD_SEASON_START_YEAR = 2026;
+export const LEADERBOARD_SEASON_START_MONTH = 10;
 
 /** Minimum games before appearing on the board (legacy net-points months). */
 export const LEADERBOARD_MIN_GAMES_FOR_RANK_LEGACY = 3;
@@ -24,6 +31,12 @@ export function usesLeaderboardRating(year: number, month: number): boolean {
   return false;
 }
 
+/** Months that add uma and rank by plain net. */
+export function usesLeaderboardSeasonScoring(year: number, month: number): boolean {
+  if (year > LEADERBOARD_SEASON_START_YEAR) return true;
+  return year === LEADERBOARD_SEASON_START_YEAR && month >= LEADERBOARD_SEASON_START_MONTH;
+}
+
 export function minGamesForLeaderboardRank(year: number, month: number): number {
   return usesLeaderboardRating(year, month)
     ? LEADERBOARD_MIN_GAMES_FOR_RANK
@@ -32,8 +45,12 @@ export function minGamesForLeaderboardRank(year: number, month: number): number 
 
 export function getLeaderboardScoringOptions(period: LeaderboardScoringPeriod) {
   const useRating = usesLeaderboardRating(period.year, period.month);
+  const usePlacementBonus = usesLeaderboardSeasonScoring(period.year, period.month);
   return {
     useRating,
+    /** Rating is confidence-weighted (Jul–Sep 2026) rather than the plain net total. */
+    confidenceWeighted: useRating && !usePlacementBonus,
+    usePlacementBonus,
     minGamesForRank: minGamesForLeaderboardRank(period.year, period.month),
   };
 }
@@ -55,12 +72,13 @@ export function gamesUntilLeaderboardRank(
 export function compareLeaderboardEntries(
   a: LeaderboardEntry,
   b: LeaderboardEntry,
-  options: { useRating: boolean }
+  options: { useRating: boolean; confidenceWeighted?: boolean }
 ): number {
   if (options.useRating) {
+    const weighted = options.confidenceWeighted ?? true;
     return (
-      adjustedLeaderboardPoints(b.points, b.gamesPlayed) -
-        adjustedLeaderboardPoints(a.points, a.gamesPlayed) ||
+      leaderboardRating(b.points, b.gamesPlayed, weighted) -
+        leaderboardRating(a.points, a.gamesPlayed, weighted) ||
       b.points - a.points ||
       b.gamesPlayed - a.gamesPlayed ||
       a.displayName.localeCompare(b.displayName)
@@ -82,7 +100,7 @@ export function splitLeaderboardEntries(
   unranked: LeaderboardEntry[];
   inactive: LeaderboardEntry[];
 } {
-  const { useRating, minGamesForRank } = getLeaderboardScoringOptions(period);
+  const { useRating, confidenceWeighted, minGamesForRank } = getLeaderboardScoringOptions(period);
   const ranked: LeaderboardEntry[] = [];
   const unranked: LeaderboardEntry[] = [];
   const inactive: LeaderboardEntry[] = [];
@@ -94,7 +112,7 @@ export function splitLeaderboardEntries(
   }
 
   const compare = (a: LeaderboardEntry, b: LeaderboardEntry) =>
-    compareLeaderboardEntries(a, b, { useRating });
+    compareLeaderboardEntries(a, b, { useRating, confidenceWeighted });
 
   ranked.sort(compare);
   unranked.sort(compare);

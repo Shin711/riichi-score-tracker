@@ -8,9 +8,10 @@ import {
   type ImportPlayerOption,
 } from "@/components/ImportPlayerNameInput";
 import { MajsoulQuickImport } from "@/components/MajsoulQuickImport";
-import { importSeatWindLabel, type ImportedGameEntry, type ImportedGameRow } from "@/lib/imports/types";
+import { importSeatWindLabel, type ImportedGameRow } from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
-import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
+import { importedGameResults } from "@/lib/leaderboard/gameResults";
+import { formatPointsValue } from "@/lib/leaderboard/points";
 import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
@@ -104,14 +105,6 @@ function ImportPlayedAtInput({
   );
 }
 
-type RankedImportEntry = ImportedGameEntry & { placement: number };
-
-function rankedImportEntries(entries: ImportedGameEntry[]): RankedImportEntry[] {
-  return [...entries]
-    .sort((a, b) => b.final_score - a.final_score)
-    .map((entry, index) => ({ ...entry, placement: index + 1 }));
-}
-
 function leaderboardMonthLabel(playedAt: string) {
   const { year, month } = getMonthPartsInTimezone(new Date(playedAt));
   return formatMonthLabel(year, month);
@@ -192,7 +185,7 @@ function ImportHistoryCard({
   onCancelDelete: () => void;
   onRequestDelete: (id: string) => void;
 }) {
-  const ranked = rankedImportEntries(row.entries_json ?? []);
+  const { usesUma, seats } = importedGameResults(row);
   const monthLabel = leaderboardMonthLabel(row.played_at);
   const playedLabel = formatImportPlayedAt(row.played_at);
 
@@ -233,35 +226,50 @@ function ImportHistoryCard({
               <th className="w-8 py-2 pr-3">#</th>
               <th className="py-2 pr-3">Player</th>
               <th className="w-[5.5rem] py-2 pr-3 text-right">Score</th>
-              <th className="w-[3.5rem] py-2 text-right">LB pts</th>
+              {usesUma ? (
+                <>
+                  <th className="w-[3.5rem] py-2 pr-3 text-right">Pts</th>
+                  <th className="w-[3rem] py-2 pr-3 text-right">Uma</th>
+                  <th className="w-[3.5rem] py-2 text-right">Net</th>
+                </>
+              ) : (
+                <th className="w-[3.5rem] py-2 text-right">LB pts</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-club">
-            {ranked.map((entry, entryIndex) => {
-              const delta = gameScoreDelta(entry.final_score, row.starting_points);
-              return (
-                <tr
-                  key={entry.player_id ?? `${entry.display_name}-${entryIndex}`}
-                  className={entry.is_ai ? "text-subtle" : undefined}
+            {seats.map((entry) => (
+              <tr
+                key={entry.player_id ?? `${entry.display_name}-${entry.seatIndex}`}
+                className={entry.is_ai ? "text-subtle" : undefined}
+              >
+                <td className="py-2 pr-3 tabular-nums text-subtle">{entry.placement}</td>
+                <td className="max-w-[10rem] truncate py-2 pr-3 sm:max-w-none">
+                  <span className="font-medium text-club-ink">{entry.display_name}</span>
+                  {entry.is_ai ? <span className="text-subtle"> · AI</span> : null}
+                </td>
+                <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
+                  {entry.final_score.toLocaleString()}
+                </td>
+                {usesUma ? (
+                  <>
+                    <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
+                      {entry.is_ai ? "—" : formatPointsValue(entry.score)}
+                    </td>
+                    <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
+                      {entry.is_ai || entry.uma === null ? "—" : formatPointsValue(entry.uma, 0)}
+                    </td>
+                  </>
+                ) : null}
+                <td
+                  className={`py-2 text-right font-mono font-semibold tabular-nums ${
+                    entry.is_ai ? "text-subtle" : importPointsClassName(entry.net)
+                  }`}
                 >
-                  <td className="py-2 pr-3 tabular-nums text-subtle">{entry.placement}</td>
-                  <td className="max-w-[10rem] truncate py-2 pr-3 sm:max-w-none">
-                    <span className="font-medium text-club-ink">{entry.display_name}</span>
-                    {entry.is_ai ? <span className="text-subtle"> · AI</span> : null}
-                  </td>
-                  <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
-                    {entry.final_score.toLocaleString()}
-                  </td>
-                  <td
-                    className={`py-2 text-right font-mono font-semibold tabular-nums ${
-                      entry.is_ai ? "text-subtle" : importPointsClassName(delta)
-                    }`}
-                  >
-                    {entry.is_ai ? "—" : formatLeaderboardPoints(delta)}
-                  </td>
-                </tr>
-              );
-            })}
+                  {entry.is_ai ? "—" : formatPointsValue(entry.net)}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -833,7 +841,8 @@ export function ImportGameForm() {
             <Link href="/players" className="underline">
               Players
             </Link>{" "}
-            automatically. Duplicate MJS log links are rejected. LB pts = (score − {startingPoints.toLocaleString()}) ÷ 1,000.
+            automatically. Duplicate MJS log links are rejected. Net = (score − {startingPoints.toLocaleString()}) ÷ 1,000 + uma
+            (1st +15, 2nd +5, 3rd −5, 4th −15).
           </p>
         </div>
       </form>
@@ -849,7 +858,7 @@ export function ImportGameForm() {
                     Showing {historyRangeStart}–{historyRangeEnd} of {historyTotal}
                   </div>
                   <div className="mt-0.5 text-xs text-subtle">
-                    LB pts = (score − start) ÷ 1,000
+                    Pts = (score − start) ÷ 1,000 · Net = Pts + uma (from Oct 2026)
                   </div>
                 </>
               ) : null}

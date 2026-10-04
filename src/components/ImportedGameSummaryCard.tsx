@@ -1,13 +1,7 @@
-import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
-import { formatLeaderboardPoints, gameScoreDelta } from "@/lib/leaderboard/points";
+import { isHumanImportEntry, type ImportedGameRow } from "@/lib/imports/types";
+import { importedGameResults } from "@/lib/leaderboard/gameResults";
+import { formatPointsValue } from "@/lib/leaderboard/points";
 import { formatMonthLabel, getMonthPartsInTimezone, LEADERBOARD_TIMEZONE } from "@/lib/leaderboard/timezone";
-
-function rankedImportEntries(entries: ImportedGameEntry[]) {
-  return [...entries]
-    .filter((e) => !e.is_ai && e.player_id)
-    .sort((a, b) => b.final_score - a.final_score)
-    .map((entry, index) => ({ ...entry, placement: index + 1 }));
-}
 
 function formatImportPlayedAt(playedAt: string) {
   return new Date(playedAt).toLocaleString("en-US", {
@@ -32,7 +26,8 @@ function importPointsClassName(delta: number) {
 }
 
 export function ImportedGameSummaryCard({ row }: { row: ImportedGameRow }) {
-  const ranked = rankedImportEntries(row.entries_json ?? []);
+  const { usesUma, seats } = importedGameResults(row);
+  const ranked = seats.filter(isHumanImportEntry);
   const monthLabel = leaderboardMonthLabel(row.played_at);
   const playedLabel = formatImportPlayedAt(row.played_at);
 
@@ -58,25 +53,27 @@ export function ImportedGameSummaryCard({ row }: { row: ImportedGameRow }) {
       </div>
 
       <ul className="mt-3 space-y-1.5">
-        {ranked.map((entry) => {
-          const delta = gameScoreDelta(entry.final_score, row.starting_points);
-          return (
-            <li
-              key={entry.player_id ?? entry.display_name}
-              className="flex items-center justify-between gap-3 text-sm"
-            >
-              <span className="min-w-0 truncate text-club-ink">
-                <span className="text-subtle tabular-nums">{entry.placement}.</span> {entry.display_name}
+        {ranked.map((entry) => (
+          <li
+            key={entry.player_id ?? entry.display_name}
+            className="flex items-center justify-between gap-3 text-sm"
+          >
+            <span className="min-w-0 truncate text-club-ink">
+              <span className="text-subtle tabular-nums">{entry.placement}.</span> {entry.display_name}
+            </span>
+            <span className="shrink-0 text-right font-mono tabular-nums text-muted">
+              {entry.final_score.toLocaleString()}
+              <span className={`ml-2 font-semibold ${importPointsClassName(entry.net)}`}>
+                {formatPointsValue(entry.net)}
               </span>
-              <span className="shrink-0 font-mono tabular-nums text-muted">
-                {entry.final_score.toLocaleString()}
-                <span className={`ml-2 font-semibold ${importPointsClassName(delta)}`}>
-                  {formatLeaderboardPoints(delta)}
+              {usesUma && entry.uma !== null ? (
+                <span className="block text-[11px] font-normal text-subtle">
+                  {formatPointsValue(entry.score)} pts · uma {formatPointsValue(entry.uma, 0)}
                 </span>
-              </span>
-            </li>
-          );
-        })}
+              ) : null}
+            </span>
+          </li>
+        ))}
       </ul>
     </li>
   );

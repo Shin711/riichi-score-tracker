@@ -51,6 +51,12 @@ type PendingCall = {
   timer: NodeJS.Timeout;
 };
 
+export type MajsoulGameFetch = {
+  record: MajsoulRecordGame;
+  /** Encoded replay (a Wrapper around GameDetailRecords), when Mahjong Soul sent one. */
+  detail: Uint8Array | null;
+};
+
 type MajsoulCredentials = {
   uid: string;
   token: string;
@@ -318,8 +324,8 @@ class MajsoulSession {
     });
   }
 
-  async fetchGameRecord(gameUuid: string): Promise<MajsoulRecordGame> {
-    const res = await this.call<{ head?: MajsoulRecordGame }>(
+  async fetchGameRecord(gameUuid: string): Promise<MajsoulGameFetch> {
+    const res = await this.call<{ head?: MajsoulRecordGame; data?: Uint8Array; data_url?: string }>(
       "Lobby",
       "fetchGameRecord",
       "ReqGameRecord",
@@ -329,7 +335,7 @@ class MajsoulSession {
     if (!res.head) {
       throw new MajsoulError(1203, ERROR_MESSAGES[1203]);
     }
-    return res.head;
+    return { record: res.head, detail: await readReplayDetail(res.data, res.data_url) };
   }
 
   close(): void {
@@ -344,13 +350,34 @@ class MajsoulSession {
 }
 
 /**
- * Log in, fetch one game's summary record, and disconnect.
+ * The replay rides along in the same response as the head, either inline or —
+ * for big logs — as a URL to download. It only feeds optional stats, so a
+ * failed download degrades to "no detail" rather than failing the lookup.
+ */
+async function readReplayDetail(
+  data: Uint8Array | undefined,
+  dataUrl: string | undefined
+): Promise<Uint8Array | null> {
+  if (data && data.length > 0) return data;
+  if (!dataUrl) return null;
+  try {
+    const response = await fetch(dataUrl, { signal: AbortSignal.timeout(CALL_TIMEOUT_MS) });
+    if (!response.ok) return null;
+    return new Uint8Array(await response.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Log in, run `fn` with a game-record fetcher, and disconnect.
  *
  * Serverless invocations are ephemeral, so every lookup pays a fresh login
- * (~3-6s). Only the `head` summary is fetched — we never download the full
- * replay payload, which is far larger and unnecessary for scores.
+ * (~3-6s). Batch jobs should fetch all their games inside one call.
  */
-export async function fetchMajsoulGameRecord(gameUuid: string): Promise<MajsoulRecordGame> {
+export async function withMajsoulSession<T>(
+  fn: (fetchGame: (gameUuid: string) => Promise<MajsoulGameFetch>) => Promise<T>
+): Promise<T> {
   const credentials = getMajsoulCredentials();
   if (!credentials) throw new MajsoulNotConfiguredError();
 
@@ -358,8 +385,13 @@ export async function fetchMajsoulGameRecord(gameUuid: string): Promise<MajsoulR
   try {
     await session.connect();
     await session.login();
-    return await session.fetchGameRecord(gameUuid);
+    return await fn((gameUuid) => session.fetchGameRecord(gameUuid));
   } finally {
     session.close();
   }
+}
+
+/** Log in, fetch one game's summary record plus its replay detail, and disconnect. */
+export async function fetchMajsoulGame(gameUuid: string): Promise<MajsoulGameFetch> {
+  return withMajsoulSession((fetchGame) => fetchGame(gameUuid));
 }

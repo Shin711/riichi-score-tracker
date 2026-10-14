@@ -38,7 +38,7 @@ function truncateName(name: string): string {
   return name.length > MAX_NAME_WIDTH ? `${name.slice(0, MAX_NAME_WIDTH - 1)}…` : name;
 }
 
-function renderTable(
+export function renderTable(
   headers: string[],
   rows: string[][],
   alignRight: boolean[]

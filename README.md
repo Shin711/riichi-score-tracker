@@ -26,6 +26,7 @@ Web app for **Flushing Riichi Mahjong Club**: player profiles, shareable session
    - `SUPABASE_SERVICE_ROLE_KEY` (recommended for API writes)
    - `CRON_SECRET` (optional; secures the monthly archive cron on Vercel)
    - `STORAGE_ALERT_WEBHOOK_URL` (optional; Discord/Slack webhook when DB ≥ 400 MB)
+   - `DISCORD_LOG_WEBHOOK_URL` (optional; posts each entered game — with Mahjong Soul stats when available — to a Discord log channel)
    - `DISCORD_BOT_TOKEN`, `DISCORD_PUBLIC_KEY`, `DISCORD_QUIZ_CHANNEL_ID` (optional; daily scoring quiz — see [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md))
 4. Enable **Email** auth in Supabase (Authentication → Providers) for magic-link sign-in.
 5. **Google sign-in (recommended):** follow [`docs/google-sign-in-setup.md`](docs/google-sign-in-setup.md) — no email SMTP needed.

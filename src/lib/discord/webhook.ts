@@ -60,6 +60,13 @@ export function getLeaderboardWebhook(): DiscordWebhook | null {
   return parseDiscordWebhookUrl(raw);
 }
 
+/** The per-game log webhook, or null when the deploy has none configured. */
+export function getGameLogWebhook(): DiscordWebhook | null {
+  const raw = process.env.DISCORD_LOG_WEBHOOK_URL;
+  if (!raw?.trim()) return null;
+  return parseDiscordWebhookUrl(raw);
+}
+
 async function discordFetch(url: string, init: RequestInit): Promise<Response> {
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(url, {
@@ -98,7 +105,7 @@ export async function postWebhookMessage(
 
   if (!response.ok) {
     throw new DiscordWebhookError(
-      await errorMessage(response, "Discord rejected the leaderboard post"),
+      await errorMessage(response, "Discord rejected the post"),
       response.status
     );
   }

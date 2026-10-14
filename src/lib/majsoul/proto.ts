@@ -220,6 +220,84 @@ const LIQI_DESCRIPTOR = {
             data_url: { type: "string", id: 5 },
           },
         },
+
+        // ---- Replay detail (ResGameRecord.data), partial — stats only ----
+
+        /** Newer logs fill `actions`; logs from before mid-2021 fill `records`. */
+        GameDetailRecords: {
+          fields: {
+            records: { rule: "repeated", type: "bytes", id: 1 },
+            version: { type: "uint32", id: 2 },
+            actions: { rule: "repeated", type: "GameAction", id: 3 },
+          },
+        },
+        /** `result` is a Wrapper around one of the Record* messages below. */
+        GameAction: {
+          fields: {
+            passed: { type: "uint32", id: 1 },
+            type: { type: "uint32", id: 2 },
+            result: { type: "bytes", id: 3 },
+          },
+        },
+        RecordNewRound: {
+          fields: {
+            chang: { type: "uint32", id: 1 },
+            ju: { type: "uint32", id: 2 },
+            ben: { type: "uint32", id: 3 },
+          },
+        },
+        RecordDiscardTile: {
+          fields: {
+            seat: { type: "uint32", id: 1 },
+            tile: { type: "string", id: 2 },
+            is_liqi: { type: "bool", id: 3 },
+            is_wliqi: { type: "bool", id: 9 },
+          },
+        },
+        RecordChiPengGang: {
+          fields: {
+            seat: { type: "uint32", id: 1 },
+            type: { type: "uint32", id: 2 },
+          },
+        },
+        RecordAnGangAddGang: {
+          fields: {
+            seat: { type: "uint32", id: 1 },
+            type: { type: "uint32", id: 2 },
+          },
+        },
+        HuleInfo: {
+          fields: {
+            seat: { type: "uint32", id: 4 },
+            zimo: { type: "bool", id: 5 },
+            qinjia: { type: "bool", id: 6 },
+            yiman: { type: "bool", id: 10 },
+            /** Han, or yakuman multiples when `yiman` is set. */
+            count: { type: "uint32", id: 11 },
+            fu: { type: "uint32", id: 13 },
+            point_rong: { type: "uint32", id: 15 },
+            point_zimo_qin: { type: "uint32", id: 16 },
+            point_zimo_xian: { type: "uint32", id: 17 },
+            /** Total hand value before honba and riichi sticks. */
+            dadian: { type: "uint32", id: 20 },
+          },
+        },
+        RecordHule: {
+          fields: {
+            hules: { rule: "repeated", type: "HuleInfo", id: 1 },
+            delta_scores: { rule: "repeated", type: "int32", id: 3 },
+          },
+        },
+        RecordNoTile: {
+          fields: {
+            liujumanguan: { type: "bool", id: 1 },
+          },
+        },
+        RecordLiuJu: {
+          fields: {
+            type: { type: "uint32", id: 1 },
+          },
+        },
       },
     },
   },

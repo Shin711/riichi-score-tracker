@@ -2,13 +2,14 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
+import { postGameLogAfterResponse } from "@/lib/discord/postGameLog";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
 import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 import {
-  fetchMajsoulGameRecord,
+  fetchMajsoulGame,
   isMajsoulLookupConfigured,
   MajsoulError,
   MajsoulNotConfiguredError,
@@ -18,6 +19,7 @@ import {
   summarizeMajsoulRecord,
   type MajsoulGameSummary,
 } from "@/lib/majsoul/record";
+import { computeMajsoulGameStats } from "@/lib/majsoul/stats";
 import { findPlayerByDisplayName } from "@/lib/players/names";
 import { checkMajsoulImportRateLimit, rateLimitRetryAfterSeconds } from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/requestIp";
@@ -126,7 +128,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const record = await fetchMajsoulGameRecord(parsed.recordUuid);
+    const { record, detail } = await fetchMajsoulGame(parsed.recordUuid);
     const summary = summarizeMajsoulRecord(record);
 
     if (body.preview === true) {
@@ -181,6 +183,11 @@ export async function POST(req: Request) {
     }
 
     refreshDiscordLeaderboardAfterResponse();
+    // Entries are stored in the log's seat order, so replay stats line up by index.
+    postGameLogAfterResponse(
+      data as ImportedGameRow,
+      detail ? computeMajsoulGameStats(detail) : null
+    );
 
     return NextResponse.json({ import: data as ImportedGameRow });
   } catch (e) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
+import { postGameLogAfterResponse } from "@/lib/discord/postGameLog";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
@@ -155,6 +156,7 @@ export async function POST(req: Request) {
     }
 
     refreshDiscordLeaderboardAfterResponse();
+    postGameLogAfterResponse(data as ImportedGameRow);
 
     return NextResponse.json({ import: data as ImportedGameRow });
   } catch (e) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { postGameLogAfterResponse } from "@/lib/discord/postGameLog";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
 import { ImportBodyError, parseImportBody, type ImportBody } from "@/lib/imports/parseImportBody";
 import type { ImportedGameRow } from "@/lib/imports/types";
@@ -41,6 +42,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
 
     refreshDiscordLeaderboardAfterResponse();
+    postGameLogAfterResponse(data as ImportedGameRow, null, { edited: true });
 
     return NextResponse.json({ import: data as ImportedGameRow });
   } catch (e) {

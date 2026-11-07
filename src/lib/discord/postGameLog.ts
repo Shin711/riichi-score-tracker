@@ -1,6 +1,10 @@
 import { after } from "next/server";
 
-import { buildGameLogWebhookPayload, type GameLogRow } from "@/lib/discord/gameLogMessage";
+import {
+  buildGameLogWebhookPayload,
+  type GameLogOptions,
+  type GameLogRow,
+} from "@/lib/discord/gameLogMessage";
 import { getGameLogWebhook, postWebhookMessage } from "@/lib/discord/webhook";
 import type { MajsoulGameStats } from "@/lib/majsoul/stats";
 
@@ -11,14 +15,15 @@ import type { MajsoulGameStats } from "@/lib/majsoul/stats";
  */
 export function postGameLogAfterResponse(
   row: GameLogRow,
-  stats: MajsoulGameStats | null = null
+  stats: MajsoulGameStats | null = null,
+  options: GameLogOptions = {}
 ): void {
   const webhook = getGameLogWebhook();
   if (!webhook) return;
 
   after(async () => {
     try {
-      await postWebhookMessage(webhook, buildGameLogWebhookPayload(row, stats));
+      await postWebhookMessage(webhook, buildGameLogWebhookPayload(row, stats, options));
     } catch (e) {
       console.error("[discord] game log post failed:", e);
     }

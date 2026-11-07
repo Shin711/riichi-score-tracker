@@ -3,23 +3,12 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
 import { postGameLogAfterResponse } from "@/lib/discord/postGameLog";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
-import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
-import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
-import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
+import { ImportBodyError, parseImportBody, type ImportBody } from "@/lib/imports/parseImportBody";
 import type { ImportedGameRow } from "@/lib/imports/types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
-type ImportBody = {
-  playedAt?: string;
-  startingPoints?: number;
-  mjsPaipuUrl?: string;
-  seats?: Array<{
-    playerId?: string;
-    displayName?: string;
-    finalScore?: number;
-    isAi?: boolean;
-  }>;
-};
+const IMPORTED_GAME_COLUMNS =
+  "id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id";
 
 const DEFAULT_IMPORT_PAGE_SIZE = 10;
 const MAX_IMPORT_PAGE_SIZE = 50;
@@ -50,7 +39,7 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await supabase
     .from("imported_games")
-    .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id", {
+    .select(IMPORTED_GAME_COLUMNS, {
       count: "exact",
     })
     .order("played_at", { ascending: false })
@@ -79,76 +68,15 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json().catch(() => ({}))) as ImportBody;
-  const seats = body.seats ?? [];
-
-  if (seats.length !== 4) {
-    return NextResponse.json({ error: "Provide exactly four player scores." }, { status: 400 });
-  }
-
-  const playedAt = body.playedAt ? new Date(body.playedAt) : new Date();
-  if (Number.isNaN(playedAt.getTime())) {
-    return NextResponse.json({ error: "Invalid played-at date." }, { status: 400 });
-  }
-
-  const startingPoints =
-    typeof body.startingPoints === "number" && body.startingPoints > 0
-      ? Math.round(body.startingPoints)
-      : 25000;
-
-  let mjsPaipuUrl: string | null = null;
-  let mjsRecordUuid: string | null = null;
-  if (body.mjsPaipuUrl?.trim()) {
-    const parsed = parseMjsPaipuUrl(body.mjsPaipuUrl);
-    if (!parsed) {
-      return NextResponse.json({ error: "Invalid Mahjong Soul log link." }, { status: 400 });
-    }
-    mjsPaipuUrl = parsed.paipuUrl;
-    mjsRecordUuid = parsed.recordUuid;
-  }
-
-  if (mjsRecordUuid) {
-    const { data: dupe } = await supabase
-      .from("imported_games")
-      .select("id")
-      .eq("mjs_record_uuid", mjsRecordUuid)
-      .maybeSingle();
-    if (dupe) {
-      return NextResponse.json(
-        { error: "This Mahjong Soul log was already imported." },
-        { status: 409 }
-      );
-    }
-  }
 
   try {
+    const game = await parseImportBody(supabase, body);
     const importedByUserId = await getUserIdFromRequest(req, supabase);
-
-    const entries = await resolveImportPlayers(
-      supabase,
-      seats.map((s, index) => ({
-        playerId: s.playerId,
-        displayName: s.displayName ?? "",
-        finalScore: Number(s.finalScore),
-        isAi: s.isAi === true,
-        windLabel: importSeatWindLabel(index),
-      }))
-    );
-
-    if (humanImportEntries({ entries_json: entries }).length < 2) {
-      return NextResponse.json({ error: "At least two human seats are required." }, { status: 400 });
-    }
 
     const { data, error } = await supabase
       .from("imported_games")
-      .insert({
-        played_at: playedAt.toISOString(),
-        starting_points: startingPoints,
-        entries_json: entries,
-        mjs_paipu_url: mjsPaipuUrl,
-        mjs_record_uuid: mjsRecordUuid,
-        imported_by_user_id: importedByUserId,
-      })
-      .select("id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id")
+      .insert({ ...game, imported_by_user_id: importedByUserId })
+      .select(IMPORTED_GAME_COLUMNS)
       .single();
 
     if (error) {
@@ -162,7 +90,7 @@ export async function POST(req: Request) {
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to import game" },
-      { status: 400 }
+      { status: e instanceof ImportBodyError ? e.status : 400 }
     );
   }
 }

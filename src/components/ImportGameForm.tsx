@@ -25,7 +25,10 @@ type SeatForm = {
   displayName: string;
   finalScore: string;
   isAi: boolean;
+  chombo: number;
 };
+
+const MAX_CHOMBO_PER_SEAT = 10;
 
 function defaultSeats(): SeatForm[] {
   return Array.from({ length: IMPORT_SEAT_COUNT }, () => ({
@@ -33,7 +36,24 @@ function defaultSeats(): SeatForm[] {
     displayName: "",
     finalScore: "",
     isAi: false,
+    chombo: 0,
   }));
+}
+
+function seatsFromRow(row: ImportedGameRow): SeatForm[] {
+  const seats = defaultSeats();
+  (row.entries_json ?? []).slice(0, IMPORT_SEAT_COUNT).forEach((entry, index) => {
+    seats[index] = entry.is_ai
+      ? { playerId: "", displayName: "", finalScore: String(entry.final_score), isAi: true, chombo: 0 }
+      : {
+          playerId: entry.player_id ?? "",
+          displayName: entry.display_name,
+          finalScore: String(entry.final_score),
+          isAi: false,
+          chombo: entry.chombo ?? 0,
+        };
+  });
+  return seats;
 }
 
 function toDatetimeLocalValue(date: Date) {
@@ -177,6 +197,8 @@ function ImportHistoryCard({
   onConfirmDelete,
   onCancelDelete,
   onRequestDelete,
+  isEditing,
+  onEdit,
 }: {
   row: ImportedGameRow;
   confirmDeleteId: string | null;
@@ -184,13 +206,19 @@ function ImportHistoryCard({
   onConfirmDelete: (id: string) => void;
   onCancelDelete: () => void;
   onRequestDelete: (id: string) => void;
+  isEditing: boolean;
+  onEdit: (row: ImportedGameRow) => void;
 }) {
   const { usesUma, seats } = importedGameResults(row);
+  const hasChombo = seats.some((seat) => seat.chombo > 0);
   const monthLabel = leaderboardMonthLabel(row.played_at);
   const playedLabel = formatImportPlayedAt(row.played_at);
 
   return (
-    <li className="import-history-entry">
+    <li
+      className={`import-history-entry${isEditing ? " ring-2 ring-club-red/60" : ""}`}
+      aria-current={isEditing ? "true" : undefined}
+    >
       <div className="import-history-entry-header">
         <div className="min-w-0">
           <div className="text-sm font-medium text-club-ink" suppressHydrationWarning>{playedLabel}</div>
@@ -207,7 +235,18 @@ function ImportHistoryCard({
               Log
             </a>
           ) : null}
-          {confirmDeleteId !== row.id ? (
+          {isEditing ? (
+            <span className="text-xs font-medium text-club-red dark:text-red-300">Editing…</span>
+          ) : confirmDeleteId !== row.id ? (
+            <button
+              type="button"
+              onClick={() => onEdit(row)}
+              className="text-xs font-medium underline"
+            >
+              Edit
+            </button>
+          ) : null}
+          {confirmDeleteId !== row.id && !isEditing ? (
             <button
               type="button"
               onClick={() => onRequestDelete(row.id)}
@@ -230,11 +269,10 @@ function ImportHistoryCard({
                 <>
                   <th className="w-[3.5rem] py-2 pr-3 text-right">Pts</th>
                   <th className="w-[3rem] py-2 pr-3 text-right">Uma</th>
-                  <th className="w-[3.5rem] py-2 text-right">Net</th>
                 </>
-              ) : (
-                <th className="w-[3.5rem] py-2 text-right">LB pts</th>
-              )}
+              ) : null}
+              {hasChombo ? <th className="w-[3rem] py-2 pr-3 text-right">Cho</th> : null}
+              <th className="w-[3.5rem] py-2 text-right">{usesUma ? "Net" : "LB pts"}</th>
             </tr>
           </thead>
           <tbody className="divide-club">
@@ -247,6 +285,12 @@ function ImportHistoryCard({
                 <td className="max-w-[10rem] truncate py-2 pr-3 sm:max-w-none">
                   <span className="font-medium text-club-ink">{entry.display_name}</span>
                   {entry.is_ai ? <span className="text-subtle"> · AI</span> : null}
+                  {entry.chombo > 0 ? (
+                    <span className="text-red-600 dark:text-red-400">
+                      {" "}
+                      · chombo{entry.chombo > 1 ? ` ×${entry.chombo}` : ""}
+                    </span>
+                  ) : null}
                 </td>
                 <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
                   {entry.final_score.toLocaleString()}
@@ -260,6 +304,13 @@ function ImportHistoryCard({
                       {entry.is_ai || entry.uma === null ? "—" : formatPointsValue(entry.uma, 0)}
                     </td>
                   </>
+                ) : null}
+                {hasChombo ? (
+                  <td className="py-2 pr-3 text-right font-mono tabular-nums text-muted">
+                    {entry.is_ai || entry.chomboAdjustment === 0
+                      ? "—"
+                      : formatPointsValue(entry.chomboAdjustment, 0)}
+                  </td>
                 ) : null}
                 <td
                   className={`py-2 text-right font-mono font-semibold tabular-nums ${
@@ -300,6 +351,52 @@ function ImportHistoryCard({
         </div>
       ) : null}
     </li>
+  );
+}
+
+function ChomboStepper({
+  count,
+  onChange,
+}: {
+  count: number;
+  onChange: (count: number) => void;
+}) {
+  if (count === 0) {
+    return (
+      <button
+        type="button"
+        onClick={() => onChange(1)}
+        className="rounded-full border border-club-border px-3 py-1 text-xs font-medium text-subtle transition-colors hover:border-stone-400"
+        title="Record a chombo: −15 for this player, +5 for each other seat"
+      >
+        + Chombo
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center overflow-hidden rounded-full border border-red-300 bg-red-50 text-xs font-medium text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+      <button
+        type="button"
+        onClick={() => onChange(count - 1)}
+        className="px-2.5 py-1 hover:bg-red-100 dark:hover:bg-red-900/40"
+        aria-label="Remove a chombo"
+      >
+        −
+      </button>
+      <span className="px-1 tabular-nums" aria-live="polite">
+        Chombo ×{count}
+      </span>
+      <button
+        type="button"
+        disabled={count >= MAX_CHOMBO_PER_SEAT}
+        onClick={() => onChange(Math.min(MAX_CHOMBO_PER_SEAT, count + 1))}
+        className="px-2.5 py-1 hover:bg-red-100 disabled:opacity-40 dark:hover:bg-red-900/40"
+        aria-label="Add a chombo"
+      >
+        +
+      </button>
+    </div>
   );
 }
 
@@ -359,6 +456,8 @@ export function ImportGameForm() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingRow, setEditingRow] = useState<ImportedGameRow | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     async function init() {
@@ -505,8 +604,9 @@ export function ImportGameForm() {
       const headers: HeadersInit = { "Content-Type": "application/json" };
       if (token) headers.Authorization = `Bearer ${token}`;
 
-      const res = await fetch("/api/imports/games", {
-        method: "POST",
+      const url = editingRow ? `/api/imports/games/${editingRow.id}` : "/api/imports/games";
+      const res = await fetch(url, {
+        method: editingRow ? "PATCH" : "POST",
         headers,
         body: JSON.stringify({
           playedAt: new Date(playedAt).toISOString(),
@@ -522,24 +622,54 @@ export function ImportGameForm() {
                     ? players.find((p) => p.id === s.playerId)?.display_name ?? s.displayName
                     : s.displayName.trim(),
                   finalScore: Number(s.finalScore),
+                  chombo: s.chombo,
                 }),
           })),
         }),
       });
       const json = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(json.error ?? "Import failed");
+      if (!res.ok) throw new Error(json.error ?? (editingRow ? "Update failed" : "Import failed"));
 
-      setStatus("Game imported. It will appear on the leaderboard for that month.");
-      setSeats(defaultSeats());
-      setMjsPaipuUrl("");
-      setPlayedAt(toDatetimeLocalValue(new Date()));
-      setHistoryPage(1);
+      if (editingRow) {
+        setStatus("Game updated. The leaderboard now uses the new scores.");
+        resetForm();
+      } else {
+        setStatus("Game imported. It will appear on the leaderboard for that month.");
+        resetForm();
+        setHistoryPage(1);
+      }
       setHistoryRefresh((n) => n + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(err instanceof Error ? err.message : editingRow ? "Update failed" : "Import failed");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function resetForm() {
+    setEditingRow(null);
+    setSeats(defaultSeats());
+    setMjsPaipuUrl("");
+    setStartingPoints(25000);
+    setPlayedAt(toDatetimeLocalValue(new Date()));
+  }
+
+  function startEdit(row: ImportedGameRow) {
+    setError(null);
+    setStatus(null);
+    setConfirmDeleteId(null);
+    setEditingRow(row);
+    setSeats(seatsFromRow(row));
+    setPlayedAt(toDatetimeLocalValue(new Date(row.played_at)));
+    setStartingPoints(row.starting_points);
+    setMjsPaipuUrl(row.mjs_paipu_url ?? "");
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function cancelEdit() {
+    setError(null);
+    setStatus(null);
+    resetForm();
   }
 
   async function confirmDelete(id: string) {
@@ -554,6 +684,7 @@ export function ImportGameForm() {
       }
       setConfirmDeleteId(null);
       setStatus(null);
+      if (editingRow?.id === id) resetForm();
       if (imports.length === 1 && historyPage > 1) {
         setHistoryPage(historyPage - 1);
       } else {
@@ -586,9 +717,27 @@ export function ImportGameForm() {
       />
 
       <form
+        ref={formRef}
         onSubmit={(e) => void onSubmit(e)}
-        className="card min-w-0 max-w-full divide-y divide-club-border overflow-x-clip"
+        className={`card min-w-0 max-w-full scroll-mt-24 divide-y divide-club-border overflow-x-clip${
+          editingRow ? " ring-2 ring-club-red/60" : ""
+        }`}
       >
+        {editingRow ? (
+          <div className="flex items-center justify-between gap-3 bg-red-50 px-4 py-3 text-sm text-red-900 sm:px-6 dark:bg-red-950/40 dark:text-red-200">
+            <span className="min-w-0" suppressHydrationWarning>
+              Editing game from{" "}
+              <span className="font-medium">{formatPlayedAtLabel(editingRow.played_at)}</span>
+            </span>
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="shrink-0 text-xs font-medium underline"
+            >
+              Cancel edit
+            </button>
+          </div>
+        ) : null}
         {/* Player scores */}
         <div className="min-w-0 space-y-3.5 overflow-visible p-4 sm:p-6">
           <div className="flex items-center justify-between gap-2">
@@ -631,6 +780,13 @@ export function ImportGameForm() {
                       </span>
                     ) : null}
                   </div>
+                  <div className="flex items-center gap-2">
+                  {!isAi ? (
+                    <ChomboStepper
+                      count={seats[index].chombo}
+                      onChange={(chombo) => updateSeat(index, { chombo })}
+                    />
+                  ) : null}
                   <button
                     type="button"
                     onClick={() =>
@@ -638,6 +794,7 @@ export function ImportGameForm() {
                         isAi: !isAi,
                         playerId: "",
                         displayName: "",
+                        chombo: 0,
                       })
                     }
                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
@@ -648,6 +805,7 @@ export function ImportGameForm() {
                   >
                     {isAi ? "AI bot" : "Mark as AI"}
                   </button>
+                  </div>
                 </div>
 
                 {/* Name + score — single bordered row avoids iOS double-border glitches */}
@@ -826,8 +984,24 @@ export function ImportGameForm() {
               disabled={submitting}
               className="btn-primary h-12 w-full rounded-xl text-base font-semibold disabled:opacity-40 sm:h-11 sm:flex-1"
             >
-              {submitting ? "Importing…" : "Import game"}
+              {editingRow
+                ? submitting
+                  ? "Saving…"
+                  : "Save changes"
+                : submitting
+                  ? "Importing…"
+                  : "Import game"}
             </button>
+            {editingRow ? (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={cancelEdit}
+                className="btn-secondary inline-flex h-11 w-full items-center justify-center px-4 sm:w-auto"
+              >
+                Cancel
+              </button>
+            ) : null}
             <Link
               href="/leaderboard"
               className="btn-secondary inline-flex h-11 w-full items-center justify-center px-4 sm:w-auto"
@@ -842,7 +1016,8 @@ export function ImportGameForm() {
               Players
             </Link>{" "}
             automatically. Duplicate MJS log links are rejected. Net = (score − {startingPoints.toLocaleString()}) ÷ 1,000 + uma
-            (1st +15, 2nd +5, 3rd −5, 4th −15).
+            (1st +15, 2nd +5, 3rd −5, 4th −15). Each chombo is −15 for the offender and +5 for
+            each other seat, after uma.
           </p>
         </div>
       </form>
@@ -858,7 +1033,7 @@ export function ImportGameForm() {
                     Showing {historyRangeStart}–{historyRangeEnd} of {historyTotal}
                   </div>
                   <div className="mt-0.5 text-xs text-subtle">
-                    Pts = (score − start) ÷ 1,000 · Net = Pts + uma (from Oct 2026)
+                    Pts = (score − start) ÷ 1,000 · Net = Pts + uma (from Oct 2026) + chombo
                   </div>
                 </>
               ) : null}
@@ -884,6 +1059,8 @@ export function ImportGameForm() {
                     onRequestDelete={setConfirmDeleteId}
                     onCancelDelete={() => setConfirmDeleteId(null)}
                     onConfirmDelete={(id) => void confirmDelete(id)}
+                    isEditing={editingRow?.id === row.id}
+                    onEdit={startEdit}
                   />
                 ))}
               </ul>

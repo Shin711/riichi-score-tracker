@@ -46,7 +46,10 @@ function formatHeadlineScore(entry: LeaderboardEntry, scoring: DisplayScoring) {
 
 function formatNetSecondary(entry: LeaderboardEntry, scoring: DisplayScoring) {
   if (scoring.usePlacementBonus) {
-    return `Score ${formatLeaderboardPoints(entry.totalDelta)} · Uma ${formatPlacementBonus(entry.placementBonus ?? 0)}`;
+    const chombo = entry.chomboAdjustment
+      ? ` · Chombo ${formatPlacementBonus(entry.chomboAdjustment)}`
+      : "";
+    return `Score ${formatLeaderboardPoints(entry.totalDelta)} · Uma ${formatPlacementBonus(entry.placementBonus ?? 0)}${chombo}`;
   }
   return `Net ${formatLeaderboardPoints(entry.totalDelta)}`;
 }

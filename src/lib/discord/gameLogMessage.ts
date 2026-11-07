@@ -97,17 +97,40 @@ function statsValue(row: GameLogRow, stats: MajsoulGameStats): string {
 /** Final standings of one game as a monospace table, in placement order. */
 export function buildGameLogTable(row: GameLogRow): string {
   const { usesUma, seats } = importedGameResults(row);
+  const hasChombo = seats.some((seat) => seat.chombo > 0);
 
-  const headers = usesUma ? ["#", "Player", "Score", "Uma", "Net"] : ["#", "Player", "Score", "Net"];
-  const alignRight = usesUma ? [true, false, true, true, true] : [true, false, true, true];
+  const headers = ["#", "Player", "Score"];
+  const alignRight = [true, false, true];
+  if (usesUma) {
+    headers.push("Uma");
+    alignRight.push(true);
+  }
+  if (hasChombo) {
+    headers.push("Cho");
+    alignRight.push(true);
+  }
+  headers.push("Net");
+  alignRight.push(true);
+
   const rows = seats.map((seat) => {
     const cells = [String(seat.placement), truncateName(seat.display_name), formatScore(seat.final_score)];
     if (usesUma) cells.push(formatPointsValue(seat.uma ?? 0, 0));
+    if (hasChombo) cells.push(seat.is_ai ? "—" : formatPointsValue(seat.chomboAdjustment, 0));
     cells.push(formatPointsValue(seat.net));
     return cells;
   });
 
   return renderTable(headers, rows, alignRight);
+}
+
+/** "Chombo: …" line under the table, or "" when nobody had one. */
+function chomboNote(row: GameLogRow): string {
+  const offenders = importedGameResults(row).seats.filter((seat) => seat.chombo > 0);
+  if (offenders.length === 0) return "";
+  const names = offenders
+    .map((seat) => (seat.chombo > 1 ? `${seat.display_name} ×${seat.chombo}` : seat.display_name))
+    .join(", ");
+  return `\nChombo: **${names}** (−15 each, +5 to every other seat)`;
 }
 
 export function buildGameLogWebhookPayload(
@@ -121,7 +144,7 @@ export function buildGameLogWebhookPayload(
       {
         title: `Game · ${formatPlayedAt(row.played_at)}`,
         url: row.mjs_paipu_url ?? `${SITE_URL}/import`,
-        description: `\`\`\`\n${buildGameLogTable(row)}\n\`\`\``,
+        description: `\`\`\`\n${buildGameLogTable(row)}\n\`\`\`${chomboNote(row)}`,
         color: EMBED_COLOR,
         ...(fields.length > 0 ? { fields } : {}),
         footer: {

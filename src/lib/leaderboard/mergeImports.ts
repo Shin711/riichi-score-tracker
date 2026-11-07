@@ -4,8 +4,8 @@ import {
   type LeaderboardEntry,
 } from "@/lib/leaderboard/computeLeaderboard";
 import { umaAdjustments } from "@/lib/leaderboard/placement";
-import { gameScoreDelta } from "@/lib/leaderboard/points";
-import { isHumanImportEntry } from "@/lib/imports/types";
+import { chomboAdjustments, gameScoreDelta } from "@/lib/leaderboard/points";
+import { importEntryChombo, isHumanImportEntry } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
 
 export function mergeImportedGamesIntoLeaderboard(
@@ -27,6 +27,8 @@ export function mergeImportedGamesIntoLeaderboard(
     const bonuses = options?.usePlacementBonus
       ? umaAdjustments(seats.map((seat) => seat.final_score))
       : null;
+    const chombos = seats.map(importEntryChombo);
+    const chomboDeltas = chombos.some((count) => count > 0) ? chomboAdjustments(chombos) : null;
 
     seats.forEach((row, seatIndex) => {
       if (!isHumanImportEntry(row)) return;
@@ -48,6 +50,12 @@ export function mergeImportedGamesIntoLeaderboard(
       entry.totalDelta += delta;
       if (bonuses) {
         entry.placementBonus = (entry.placementBonus ?? 0) + bonuses[seatIndex];
+      }
+      if (chomboDeltas) {
+        entry.chomboAdjustment = (entry.chomboAdjustment ?? 0) + chomboDeltas[seatIndex];
+        if (chombos[seatIndex] > 0) {
+          entry.chomboCount = (entry.chomboCount ?? 0) + chombos[seatIndex];
+        }
       }
     });
   }

@@ -24,6 +24,10 @@ export type LeaderboardEntry = {
    * October 2026 season; missing on older archived rows.
    */
   placementBonus?: number;
+  /** Sum of chombo adjustments, in points (−15 per own chombo, +5 per opponent's). Missing on older rows. */
+  chomboAdjustment?: number;
+  /** Number of chombo this player committed. Missing on older rows. */
+  chomboCount?: number;
   /** totalDelta ÷ 1,000, plus uma (placementBonus) — same units as Riichi Leaderboard.xlsx. */
   points: number;
 };
@@ -34,11 +38,15 @@ export type LeaderboardComputeOptions = {
   usePlacementBonus?: boolean;
 };
 
-/** Net points for an entry: score delta in thousands plus any placement bonus. */
+/** Net points for an entry: score delta in thousands plus placement bonus and chombo adjustment. */
 export function leaderboardEntryPoints(
-  entry: Pick<LeaderboardEntry, "totalDelta" | "placementBonus">
+  entry: Pick<LeaderboardEntry, "totalDelta" | "placementBonus" | "chomboAdjustment">
 ): number {
-  return entry.totalDelta / LEADERBOARD_POINTS_DIVISOR + (entry.placementBonus ?? 0);
+  return (
+    entry.totalDelta / LEADERBOARD_POINTS_DIVISOR +
+    (entry.placementBonus ?? 0) +
+    (entry.chomboAdjustment ?? 0)
+  );
 }
 
 export function sortLeaderboardEntries(

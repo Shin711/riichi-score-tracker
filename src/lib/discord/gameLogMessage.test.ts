@@ -67,6 +67,14 @@ describe("buildGameLogWebhookPayload", () => {
     assert.equal(embed.fields, undefined);
   });
 
+  it("marks a re-posted log as edited", () => {
+    const embed = buildGameLogWebhookPayload(game("2026-10-03T20:05:00Z"), null, {
+      edited: true,
+    }).embeds![0];
+    assert.equal(embed.title, "Game (edited) · Sat, Oct 3, 4:05 PM EDT");
+    assert.match(embed.footer!.text, /manual entry · corrected, replaces the earlier post$/);
+  });
+
   it("links the log and adds stats for Mahjong Soul games", () => {
     const embed = buildGameLogWebhookPayload(game("2026-10-03T20:05:00Z", PAIPU_URL), STATS).embeds![0];
     assert.equal(embed.url, PAIPU_URL);

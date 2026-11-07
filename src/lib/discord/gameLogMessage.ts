@@ -133,22 +133,30 @@ function chomboNote(row: GameLogRow): string {
   return `\nChombo: **${names}** (−15 each, +5 to every other seat)`;
 }
 
+export type GameLogOptions = {
+  /** True when re-posting a game whose scores were edited after it was recorded. */
+  edited?: boolean;
+};
+
 export function buildGameLogWebhookPayload(
   row: GameLogRow,
-  stats: MajsoulGameStats | null = null
+  stats: MajsoulGameStats | null = null,
+  options: GameLogOptions = {}
 ): DiscordWebhookPayload {
   const fields = stats ? [{ name: "Mahjong Soul stats", value: statsValue(row, stats) }] : [];
 
   return {
     embeds: [
       {
-        title: `Game · ${formatPlayedAt(row.played_at)}`,
+        title: `${options.edited ? "Game (edited)" : "Game"} · ${formatPlayedAt(row.played_at)}`,
         url: row.mjs_paipu_url ?? `${SITE_URL}/import`,
         description: `\`\`\`\n${buildGameLogTable(row)}\n\`\`\`${chomboNote(row)}`,
         color: EMBED_COLOR,
         ...(fields.length > 0 ? { fields } : {}),
         footer: {
-          text: `${SITE_NAME} · ${row.mjs_paipu_url ? "Mahjong Soul log" : "manual entry"}`,
+          text: `${SITE_NAME} · ${row.mjs_paipu_url ? "Mahjong Soul log" : "manual entry"}${
+            options.edited ? " · corrected, replaces the earlier post" : ""
+          }`,
         },
         timestamp: new Date(row.played_at).toISOString(),
       },

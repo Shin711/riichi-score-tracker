@@ -9,7 +9,16 @@ export type ImportedGameEntry = {
   display_name: string;
   final_score: number;
   is_ai?: boolean;
+  /** Chombo called on this player; each moves 15 pts from them, 5 to every other seat. */
+  chombo?: number;
 };
+
+/** Chombo count for a seat (0 for AI seats and rows recorded before chombo existed). */
+export function importEntryChombo(entry: Pick<ImportedGameEntry, "chombo" | "is_ai">): number {
+  if (entry.is_ai) return 0;
+  const count = entry.chombo ?? 0;
+  return Number.isInteger(count) && count > 0 ? count : 0;
+}
 
 export type ImportedGameRow = {
   id: string;

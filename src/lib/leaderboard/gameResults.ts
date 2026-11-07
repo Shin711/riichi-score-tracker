@@ -1,6 +1,6 @@
-import type { ImportedGameEntry, ImportedGameRow } from "@/lib/imports/types";
+import { importEntryChombo, type ImportedGameEntry, type ImportedGameRow } from "@/lib/imports/types";
 import { umaAdjustments } from "@/lib/leaderboard/placement";
-import { gameScoreDelta, leaderboardPoints } from "@/lib/leaderboard/points";
+import { chomboAdjustments, gameScoreDelta, leaderboardPoints } from "@/lib/leaderboard/points";
 import { usesLeaderboardSeasonScoring } from "@/lib/leaderboard/qualification";
 import { getMonthPartsInTimezone } from "@/lib/leaderboard/timezone";
 
@@ -13,7 +13,11 @@ export type ImportedGameSeatResult = ImportedGameEntry & {
   score: number;
   /** Uma in leaderboard points, or null for games before the October 2026 season. */
   uma: number | null;
-  /** What this game adds to the leaderboard: score + uma. */
+  /** Chombo this seat committed (0 for AI). */
+  chombo: number;
+  /** Chombo adjustment in leaderboard points: −15 per own chombo, +5 per anyone else's. */
+  chomboAdjustment: number;
+  /** What this game adds to the leaderboard: score + uma + chombo adjustment. */
   net: number;
 };
 
@@ -33,12 +37,24 @@ export function importedGameResults(
   const entries = row.entries_json ?? [];
   const usesUma = gameUsesUma(row.played_at);
   const umas = umaAdjustments(entries.map((e) => e.final_score));
+  const chombos = entries.map(importEntryChombo);
+  const chomboDeltas = chomboAdjustments(chombos);
 
   const seats = entries
     .map((entry, seatIndex) => {
       const score = leaderboardPoints(gameScoreDelta(entry.final_score, row.starting_points));
       const uma = usesUma ? umas[seatIndex] : null;
-      return { ...entry, seatIndex, placement: 0, score, uma, net: score + (uma ?? 0) };
+      const chomboAdjustment = chomboDeltas[seatIndex];
+      return {
+        ...entry,
+        seatIndex,
+        placement: 0,
+        score,
+        uma,
+        chombo: chombos[seatIndex],
+        chomboAdjustment,
+        net: score + (uma ?? 0) + chomboAdjustment,
+      };
     })
     .sort((a, b) => b.final_score - a.final_score || a.seatIndex - b.seatIndex);
   seats.forEach((seat, index) => {

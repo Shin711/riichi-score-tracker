@@ -168,9 +168,9 @@ export function archiveToCsv(archive: MonthlyArchive) {
   const { ranked, unranked } = splitLeaderboardEntries(archive.entries, period);
 
   if (usePlacementBonus) {
-    const header = "Rating,Avg,Score,Uma,Games";
+    const header = "Rating,Avg,Score,Uma,Chombo,Games";
     const cells = (entry: LeaderboardEntry) =>
-      `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed, false)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${formatPlacementBonus(entry.placementBonus ?? 0)},${entry.gamesPlayed}`;
+      `${csvName(entry.displayName)},${formatLeaderboardRating(entry.points, entry.gamesPlayed, false)},${formatLeaderboardAverage(entry.points, entry.gamesPlayed)},${formatLeaderboardPoints(entry.totalDelta)},${formatPlacementBonus(entry.placementBonus ?? 0)},${formatPlacementBonus(entry.chomboAdjustment ?? 0)},${entry.gamesPlayed}`;
     const lines = [`Rank,Name,${header}`];
     for (const [index, entry] of ranked.entries()) {
       lines.push(`${index + 1},${cells(entry)}`);

@@ -60,15 +60,29 @@ export function ImportedGameSummaryCard({ row }: { row: ImportedGameRow }) {
           >
             <span className="min-w-0 truncate text-club-ink">
               <span className="text-subtle tabular-nums">{entry.placement}.</span> {entry.display_name}
+              {entry.chombo > 0 ? (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {" "}
+                  · chombo{entry.chombo > 1 ? ` ×${entry.chombo}` : ""}
+                </span>
+              ) : null}
             </span>
             <span className="shrink-0 text-right font-mono tabular-nums text-muted">
               {entry.final_score.toLocaleString()}
               <span className={`ml-2 font-semibold ${importPointsClassName(entry.net)}`}>
                 {formatPointsValue(entry.net)}
               </span>
-              {usesUma && entry.uma !== null ? (
+              {(usesUma && entry.uma !== null) || entry.chomboAdjustment !== 0 ? (
                 <span className="block text-[11px] font-normal text-subtle">
-                  {formatPointsValue(entry.score)} pts · uma {formatPointsValue(entry.uma, 0)}
+                  {[
+                    `${formatPointsValue(entry.score)} pts`,
+                    usesUma && entry.uma !== null ? `uma ${formatPointsValue(entry.uma, 0)}` : null,
+                    entry.chomboAdjustment !== 0
+                      ? `chombo ${formatPointsValue(entry.chomboAdjustment, 0)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </span>
               ) : null}
             </span>

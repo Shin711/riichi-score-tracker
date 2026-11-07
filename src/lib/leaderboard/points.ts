@@ -1,6 +1,23 @@
 /** Matches Riichi Leaderboard.xlsx: net point totals are shown in thousands. */
 export const LEADERBOARD_POINTS_DIVISOR = 1000;
 
+/** Leaderboard points the offender pays per chombo. */
+export const CHOMBO_OFFENDER_POINTS = -15;
+/** Leaderboard points every other seat receives per chombo. */
+export const CHOMBO_OTHER_SEAT_POINTS = 5;
+
+/**
+ * Chombo adjustment for each seat, in leaderboard points, given chombo counts in
+ * seat order. Zero-sum: each chombo is −15 for the offender and +5 for each of
+ * the other three seats. Applied after uma, so it never changes placement.
+ */
+export function chomboAdjustments(chomboCounts: number[]): number[] {
+  const total = chomboCounts.reduce((sum, count) => sum + count, 0);
+  return chomboCounts.map(
+    (own) => own * CHOMBO_OFFENDER_POINTS + (total - own) * CHOMBO_OTHER_SEAT_POINTS
+  );
+}
+
 /** Raw score delta (ending − starting) for one game. */
 export function gameScoreDelta(endingScore: number, startingPoints: number): number {
   return endingScore - startingPoints;

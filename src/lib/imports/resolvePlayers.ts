@@ -15,7 +15,11 @@ export type ImportSeatInput = {
   finalScore: number;
   isAi?: boolean;
   windLabel?: string;
+  /** Chombo count for a human seat. */
+  chombo?: number;
 };
+
+const MAX_CHOMBO_PER_SEAT = 10;
 
 export async function resolveImportPlayers(
   supabase: SupabaseClient,
@@ -54,6 +58,11 @@ export async function resolveImportPlayers(
     const name = normalizePlayerDisplayName(seat.displayName ?? "");
     if (!name) {
       throw new Error("Each human seat needs a player name.");
+    }
+
+    const chombo = seat.chombo ?? 0;
+    if (!Number.isInteger(chombo) || chombo < 0 || chombo > MAX_CHOMBO_PER_SEAT) {
+      throw new Error(`Chombo for ${name} must be a whole number from 0 to ${MAX_CHOMBO_PER_SEAT}.`);
     }
 
     let playerId = seat.playerId?.trim();
@@ -101,6 +110,7 @@ export async function resolveImportPlayers(
       display_name: displayName,
       final_score: Math.round(seat.finalScore),
       is_ai: false,
+      ...(chombo > 0 ? { chombo } : {}),
     });
   }
 

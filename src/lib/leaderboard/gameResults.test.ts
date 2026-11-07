@@ -47,6 +47,39 @@ describe("importedGameResults", () => {
     assert.ok(seats.every((s) => s.uma === null && s.net === s.score));
   });
 
+  it("charges chombo −15 to the offender and +5 to every other seat, after uma", () => {
+    const row = game("2026-11-03T20:00:00Z", [20000, 45000, 10000, 25000], 2);
+    row.entries_json[1].chombo = 1;
+    const { seats } = importedGameResults(row);
+    assert.deepEqual(
+      seats.map((s) => [s.display_name, s.placement, s.uma, s.chombo, s.chomboAdjustment, s.net]),
+      [
+        ["P1", 1, 15, 1, -15, 20],
+        ["P3", 2, 5, 0, 5, 10],
+        ["P0", 3, -5, 0, 5, -5],
+        ["AI", 4, -15, 0, 5, -25],
+      ]
+    );
+
+    const board = mergeImportedGamesIntoLeaderboard([], [row], { usePlacementBonus: true });
+    const bea = board.find((e) => e.playerId === "p1");
+    assert.equal(bea?.points, 20);
+    assert.equal(bea?.chomboCount, 1);
+    assert.equal(bea?.chomboAdjustment, -15);
+    assert.equal(board.find((e) => e.playerId === "p3")?.chomboAdjustment, 5);
+  });
+
+  it("nets out multiple chombo across seats", () => {
+    const row = game("2026-11-03T20:00:00Z", [25000, 25000, 25000, 25000]);
+    row.entries_json[0].chombo = 2;
+    row.entries_json[3].chombo = 1;
+    const bySeat = new Map(
+      importedGameResults(row).seats.map((s) => [s.seatIndex, s.chomboAdjustment])
+    );
+    // Seat 0: −30 own, +5 for seat 3's. Seat 3: −15 own, +10 for seat 0's. Others: +15.
+    assert.deepEqual([0, 1, 2, 3].map((i) => bySeat.get(i)), [-25, 15, 15, -5]);
+  });
+
   it("places AI seats and breaks ties toward East, matching the leaderboard", () => {
     const row = game("2026-10-10T20:00:00Z", [30000, 30000, 30000, 10000], 1);
     const { seats } = importedGameResults(row);

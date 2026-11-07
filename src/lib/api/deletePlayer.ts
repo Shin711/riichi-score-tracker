@@ -54,6 +54,7 @@ export async function deletePlayerProfile(
         display_name: entry.display_name || player.display_name,
         final_score: entry.final_score,
         ...(entry.is_ai ? { is_ai: true } : {}),
+        ...(entry.chombo ? { chombo: entry.chombo } : {}),
       };
     });
 

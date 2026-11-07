@@ -3,12 +3,10 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
 import { postGameLogAfterResponse } from "@/lib/discord/postGameLog";
 import { refreshDiscordLeaderboardAfterResponse } from "@/lib/discord/postLeaderboard";
+import { IMPORTED_GAME_COLUMNS, pendingChangesForGames } from "@/lib/imports/changeRequests";
 import { ImportBodyError, parseImportBody, type ImportBody } from "@/lib/imports/parseImportBody";
 import type { ImportedGameRow } from "@/lib/imports/types";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-
-const IMPORTED_GAME_COLUMNS =
-  "id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id";
 
 const DEFAULT_IMPORT_PAGE_SIZE = 10;
 const MAX_IMPORT_PAGE_SIZE = 50;
@@ -52,8 +50,15 @@ export async function GET(req: Request) {
   const total = count ?? 0;
   const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
 
+  const imports = (data ?? []) as ImportedGameRow[];
+  const pendingChanges = await pendingChangesForGames(
+    supabase,
+    imports.map((row) => row.id)
+  );
+
   return NextResponse.json({
-    imports: (data ?? []) as ImportedGameRow[],
+    imports,
+    pendingChanges,
     page,
     pageSize,
     total,

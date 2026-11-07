@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
-import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
+import { resolveImportPlayers, type ResolveImportOptions } from "@/lib/imports/resolvePlayers";
 import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
 import type { ImportedGameEntry } from "@/lib/imports/types";
 
@@ -42,7 +42,8 @@ export class ImportBodyError extends Error {
 export async function parseImportBody(
   supabase: SupabaseClient,
   body: ImportBody,
-  excludeId?: string
+  excludeId?: string,
+  resolveOptions: ResolveImportOptions = {}
 ): Promise<ParsedImportGame> {
   const seats = body.seats ?? [];
   if (seats.length !== 4) {
@@ -84,10 +85,14 @@ export async function parseImportBody(
       isAi: s.isAi === true,
       windLabel: importSeatWindLabel(index),
       chombo: s.isAi === true || s.chombo === undefined ? 0 : Number(s.chombo),
-    }))
+    })),
+    resolveOptions
   );
 
-  if (humanImportEntries({ entries_json: entries }).length < 2) {
+  const humanSeats = resolveOptions.dryRun
+    ? entries.filter((entry) => !entry.is_ai)
+    : humanImportEntries({ entries_json: entries });
+  if (humanSeats.length < 2) {
     throw new ImportBodyError("At least two human seats are required.");
   }
 

@@ -20,6 +20,8 @@ export const InteractionType = {
 export const InteractionResponseType = {
   Pong: 1,
   ChannelMessageWithSource: 4,
+  /** Edit the message the clicked button is on. */
+  UpdateMessage: 7,
   Modal: 9,
 } as const;
 
@@ -129,6 +131,9 @@ export type Interaction = {
     components?: SubmittedComponent[];
   };
   message?: { id?: string };
+  /** Where the button was clicked. Only people who can see a channel can click in it. */
+  channel_id?: string;
+  guild_id?: string;
   member?: { user?: InteractionUser };
   user?: InteractionUser;
 };

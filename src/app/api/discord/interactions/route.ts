@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { getApprovalChannelId } from "@/lib/discord/bot";
+import { parseChangeRequestCustomId } from "@/lib/discord/changeRequestMessage";
+
 import {
   buildAlreadyAnsweredReply,
   buildAnswerModal,
@@ -21,6 +24,7 @@ import {
   verifyInteractionSignature,
   type Interaction,
 } from "@/lib/discord/interactions";
+import { decideGameChange } from "@/lib/imports/changeRequests";
 import { parseCount, parseScore, type AnswerMode } from "@/lib/quiz/answer";
 import { withFuBreakdown } from "@/lib/quiz/fu";
 import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
@@ -103,6 +107,9 @@ export async function POST(req: Request) {
 }
 
 async function handleButton(interaction: Interaction) {
+  const changeRequest = parseChangeRequestCustomId(interaction.data?.custom_id ?? "");
+  if (changeRequest) return handleChangeRequestButton(interaction, changeRequest);
+
   const control = parseCustomId(interaction.data?.custom_id ?? "");
   if (!control) return ephemeralReply("That button is no longer valid.");
 
@@ -120,6 +127,36 @@ async function handleButton(interaction: Interaction) {
   return control.kind === "beginner"
     ? buildBeginnerModal(control.quizId, quiz.hand_json, quiz.answer_json)
     : buildAnswerModal(control.quizId, quiz.hand_json);
+}
+
+/**
+ * Approve / Reject on an edit or removal request. The buttons only exist in the
+ * approval channel, and only people who can see that channel can click them;
+ * the channel check below makes sure a click from anywhere else never counts.
+ */
+async function handleChangeRequestButton(
+  interaction: Interaction,
+  control: NonNullable<ReturnType<typeof parseChangeRequestCustomId>>
+) {
+  const approvalChannelId = getApprovalChannelId();
+  if (!approvalChannelId || interaction.channel_id !== approvalChannelId) {
+    return ephemeralReply("Game changes can only be approved in the approval channel.");
+  }
+
+  const user = interactionUser(interaction);
+  if (!user) return ephemeralReply("Could not identify who clicked that.");
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return ephemeralReply("The database is not configured.");
+
+  const result = await decideGameChange(supabase, control.requestId, control.decision, user);
+  if (!result.ok) return ephemeralReply(result.message);
+
+  // Replace the buttons with the outcome so the request can't be clicked again.
+  return {
+    type: InteractionResponseType.UpdateMessage,
+    data: { content: result.line, components: [], allowed_mentions: { parse: [] } },
+  };
 }
 
 async function handleModalSubmit(interaction: Interaction) {

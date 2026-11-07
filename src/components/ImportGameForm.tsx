@@ -20,6 +20,8 @@ const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 type PlayerOption = ImportPlayerOption;
 
+type PendingChangeKind = "edit" | "delete";
+
 type SeatForm = {
   playerId: string;
   displayName: string;
@@ -199,6 +201,7 @@ function ImportHistoryCard({
   onRequestDelete,
   isEditing,
   onEdit,
+  pendingChange,
 }: {
   row: ImportedGameRow;
   confirmDeleteId: string | null;
@@ -208,6 +211,7 @@ function ImportHistoryCard({
   onRequestDelete: (id: string) => void;
   isEditing: boolean;
   onEdit: (row: ImportedGameRow) => void;
+  pendingChange: PendingChangeKind | undefined;
 }) {
   const { usesUma, seats } = importedGameResults(row);
   const hasChombo = seats.some((seat) => seat.chombo > 0);
@@ -235,7 +239,14 @@ function ImportHistoryCard({
               Log
             </a>
           ) : null}
-          {isEditing ? (
+          {pendingChange ? (
+            <span
+              className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+              title="Waiting for someone in the Discord approval channel"
+            >
+              {pendingChange === "edit" ? "Edit awaiting approval" : "Removal awaiting approval"}
+            </span>
+          ) : isEditing ? (
             <span className="text-xs font-medium text-club-red dark:text-red-300">Editing…</span>
           ) : confirmDeleteId !== row.id ? (
             <button
@@ -246,7 +257,7 @@ function ImportHistoryCard({
               Edit
             </button>
           ) : null}
-          {confirmDeleteId !== row.id && !isEditing ? (
+          {confirmDeleteId !== row.id && !isEditing && !pendingChange ? (
             <button
               type="button"
               onClick={() => onRequestDelete(row.id)}
@@ -328,7 +339,9 @@ function ImportHistoryCard({
       {confirmDeleteId === row.id ? (
         <div className="border-t border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-950/40">
           <p className="text-xs leading-5 text-red-900 dark:text-red-200">
-            Remove this import? It will leave the {monthLabel} leaderboard. This cannot be undone.
+            Remove this game from the {monthLabel}{" "}
+            leaderboard? Unless you&apos;re a club admin, it&apos;s sent to Discord and only
+            removed once someone in the approval channel approves.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -345,7 +358,7 @@ function ImportHistoryCard({
               onClick={() => onConfirmDelete(row.id)}
               className="h-9 rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
             >
-              {deletingId === row.id ? "Removing…" : "Yes, remove"}
+              {deletingId === row.id ? "Sending…" : "Yes, remove"}
             </button>
           </div>
         </div>
@@ -457,6 +470,7 @@ export function ImportGameForm() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingRow, setEditingRow] = useState<ImportedGameRow | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<Record<string, PendingChangeKind>>({});
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -496,6 +510,7 @@ export function ImportGameForm() {
       const res = await fetch(`/api/imports/games?${params}`);
       const json = (await res.json()) as {
         imports?: ImportedGameRow[];
+        pendingChanges?: Record<string, PendingChangeKind>;
         total?: number;
         totalPages?: number;
       };
@@ -512,6 +527,7 @@ export function ImportGameForm() {
       }
 
       setImports(json.imports ?? []);
+      setPendingChanges(json.pendingChanges ?? {});
       setHistoryTotal(json.total ?? 0);
       setHistoryTotalPages(totalPages);
       setHistoryLoading(false);
@@ -597,12 +613,7 @@ export function ImportGameForm() {
 
     setSubmitting(true);
     try {
-      const { data: sessionData } = supabase
-        ? await supabase.auth.getSession()
-        : { data: { session: null } };
-      const token = sessionData.session?.access_token;
-      const headers: HeadersInit = { "Content-Type": "application/json" };
-      if (token) headers.Authorization = `Bearer ${token}`;
+      const headers = await authHeaders({ "Content-Type": "application/json" });
 
       const url = editingRow ? `/api/imports/games/${editingRow.id}` : "/api/imports/games";
       const res = await fetch(url, {
@@ -627,10 +638,15 @@ export function ImportGameForm() {
           })),
         }),
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await res.json()) as { error?: string; pending?: boolean };
       if (!res.ok) throw new Error(json.error ?? (editingRow ? "Update failed" : "Import failed"));
 
-      if (editingRow) {
+      if (editingRow && json.pending) {
+        setStatus(
+          "Edit sent to Discord for approval. The game stays as it is until someone in the approval channel approves it."
+        );
+        resetForm();
+      } else if (editingRow) {
         setStatus("Game updated. The leaderboard now uses the new scores.");
         resetForm();
       } else {
@@ -644,6 +660,14 @@ export function ImportGameForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function authHeaders(base: Record<string, string> = {}): Promise<Record<string, string>> {
+    const { data: sessionData } = supabase
+      ? await supabase.auth.getSession()
+      : { data: { session: null } };
+    const token = sessionData.session?.access_token;
+    return token ? { ...base, Authorization: `Bearer ${token}` } : base;
   }
 
   function resetForm() {
@@ -676,14 +700,25 @@ export function ImportGameForm() {
     setError(null);
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/imports/games/${id}`, { method: "DELETE" });
-      const json = (await res.json()) as { error?: string };
+      const res = await fetch(`/api/imports/games/${id}`, {
+        method: "DELETE",
+        headers: await authHeaders(),
+      });
+      const json = (await res.json()) as { error?: string; pending?: boolean };
       if (!res.ok) {
         setError(json.error ?? "Failed to delete");
         return;
       }
       setConfirmDeleteId(null);
-      setStatus(null);
+      setStatus(
+        json.pending
+          ? "Removal sent to Discord for approval. The game stays on the leaderboard until someone approves it."
+          : null
+      );
+      if (json.pending) {
+        setHistoryRefresh((n) => n + 1);
+        return;
+      }
       if (editingRow?.id === id) resetForm();
       if (imports.length === 1 && historyPage > 1) {
         setHistoryPage(historyPage - 1);
@@ -1061,6 +1096,7 @@ export function ImportGameForm() {
                     onConfirmDelete={(id) => void confirmDelete(id)}
                     isEditing={editingRow?.id === row.id}
                     onEdit={startEdit}
+                    pendingChange={pendingChanges[row.id]}
                   />
                 ))}
               </ul>

@@ -21,9 +21,18 @@ export type ImportSeatInput = {
 
 const MAX_CHOMBO_PER_SEAT = 10;
 
+export type ResolveImportOptions = {
+  /**
+   * Validate only: names that match no player come back without a player_id
+   * instead of being created. Used for edits waiting on approval.
+   */
+  dryRun?: boolean;
+};
+
 export async function resolveImportPlayers(
   supabase: SupabaseClient,
-  seats: ImportSeatInput[]
+  seats: ImportSeatInput[],
+  options: ResolveImportOptions = {}
 ): Promise<ImportedGameEntry[]> {
   const { data: existing, error } = await supabase.from("players").select("id, display_name");
   if (error) throw new Error(error.message);
@@ -35,6 +44,7 @@ export async function resolveImportPlayers(
 
   const resolved: ImportedGameEntry[] = [];
   const humanPlayerIds: string[] = [];
+  const newNameKeys: string[] = [];
 
   for (const seat of seats) {
     if (!Number.isFinite(seat.finalScore)) {
@@ -74,6 +84,15 @@ export async function resolveImportPlayers(
       const match = byNameLower.get(playerNameKey(name));
       if (match) {
         playerId = match.id;
+      } else if (options.dryRun) {
+        newNameKeys.push(playerNameKey(name));
+        resolved.push({
+          display_name: name,
+          final_score: Math.round(seat.finalScore),
+          is_ai: false,
+          ...(chombo > 0 ? { chombo } : {}),
+        });
+        continue;
       } else {
         const { data: created, error: createErr } = await supabase
           .from("players")
@@ -114,11 +133,14 @@ export async function resolveImportPlayers(
     });
   }
 
-  if (humanPlayerIds.length === 0) {
+  if (humanPlayerIds.length + newNameKeys.length === 0) {
     throw new Error("At least one human seat is required.");
   }
 
-  if (new Set(humanPlayerIds).size !== humanPlayerIds.length) {
+  if (
+    new Set(humanPlayerIds).size !== humanPlayerIds.length ||
+    new Set(newNameKeys).size !== newNameKeys.length
+  ) {
     throw new Error("Each player can only appear once per game.");
   }
 

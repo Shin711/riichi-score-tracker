@@ -30,6 +30,11 @@ export function getQuizChannelId(): string | null {
   return process.env.DISCORD_QUIZ_CHANNEL_ID?.trim() || null;
 }
 
+/** Private channel where edits/removals of recorded games are approved. */
+export function getApprovalChannelId(): string | null {
+  return process.env.DISCORD_APPROVAL_CHANNEL_ID?.trim() || null;
+}
+
 export function isQuizConfigured(): boolean {
   return getBotToken() !== null && getQuizChannelId() !== null;
 }
@@ -126,7 +131,7 @@ export async function postChannelMessage(
 
   if (!response.ok) {
     throw new DiscordBotError(
-      await errorMessage(response, "Discord rejected the quiz post"),
+      await errorMessage(response, "Discord rejected the post"),
       response.status
     );
   }

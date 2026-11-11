@@ -3,7 +3,7 @@ const FETCH_TIMEOUT_MS = 8_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 /** Last known-good Unity productVersion / resource version if live fetch fails. */
-const FALLBACK_PRODUCT_VERSION = "4.0.10";
+const FALLBACK_PRODUCT_VERSION = "4.0.13";
 const FALLBACK_RESOURCE_VERSION = "0.11.252.w";
 
 const BROWSER_UA =
@@ -33,8 +33,16 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
-function parseProductVersion(html: string): string | null {
-  return html.match(/productVersion\s*:\s*["']([^"']+)["']/)?.[1] ?? null;
+/**
+ * Unity WebGL no longer embeds `productVersion: "4.0.10"` in the HTML. The
+ * live build is the loader filename: `Build/en-WebGL-release-4.0.13(14).loader.js`.
+ * Falling back to a stale 4.0.10 made oauth succeed on an old string and then
+ * `fetchGameRecord` fail with error 540.
+ */
+export function parseProductVersion(html: string): string | null {
+  const fromField = html.match(/productVersion\s*:\s*["']([^"']+)["']/)?.[1];
+  if (fromField) return fromField;
+  return html.match(/en-WebGL-release-(\d+\.\d+\.\d+)(?:\(\d+\))?\.loader\.js/i)?.[1] ?? null;
 }
 
 function parseResourceVersion(jsonText: string): string | null {
@@ -69,9 +77,10 @@ async function loadLiveVersions(): Promise<{ product: string; resource: string }
 }
 
 /**
- * Mahjong Soul rejects oauth2Auth with code 151 when client_version_string is
- * stale. Routes want Unity `productVersion` (`WebGL_2022-4.0.10`); lobby
- * resource fields want `version.json` (`0.11.252.w`). Try both.
+ * Mahjong Soul rejects oauth2Auth with code 151 (and sometimes 540) when
+ * client_version_string is stale. Routes want Unity `productVersion`
+ * (`WebGL_2022-4.0.13`); lobby resource fields want `version.json`
+ * (`0.11.252.w`). Try both.
  */
 export async function getMajsoulVersionCandidates(
   override?: string

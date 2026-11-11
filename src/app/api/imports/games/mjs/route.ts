@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       );
     }
     if (e instanceof MajsoulError) {
-      if (e.code === 1203) {
+      if (e.code === 1203 || e.code === 540) {
         return NextResponse.json({ error: e.message }, { status: 404 });
       }
       // Credential/account problems are ours to fix, not the caller's.

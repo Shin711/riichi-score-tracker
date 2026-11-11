@@ -20,6 +20,9 @@ const ERROR_MESSAGES: Record<number, string> = {
   109: "The Mahjong Soul import token has expired — refresh MAJSOUL_TOKEN.",
   110: "Mahjong Soul rejected the import credentials — check MAJSOUL_UID and MAJSOUL_TOKEN.",
   151: "Mahjong Soul rejected the importer's client version. Try again in a minute; if it keeps failing the server needs a version bump.",
+  // Seen on fetchGameRecord when the claimed client version is behind the live Unity build,
+  // and also when the import account is not allowed to view a friend-table log.
+  540: "Mahjong Soul could not open that game log. Ranked logs should load; friend-table logs are only visible if the import account played in them. If ranked logs fail too, the importer's client version is stale.",
   503: "The Mahjong Soul account used for imports is banned.",
   1002: "The Mahjong Soul import account is not signed up.",
   1004: "The Mahjong Soul import account is not logged in.",
@@ -27,6 +30,9 @@ const ERROR_MESSAGES: Record<number, string> = {
   1006: "The Mahjong Soul import account does not exist.",
   1203: "No Mahjong Soul game found with that ID.",
 };
+
+/** oauth2Auth returns these when client_version_string is behind; try the next candidate. */
+const VERSION_RETRY_CODES = new Set([151, 540]);
 
 export class MajsoulError extends Error {
   constructor(
@@ -207,9 +213,10 @@ class MajsoulSession {
 
     const code = decoded.error?.code ?? 0;
     if (code) {
+      console.error("[majsoul]", method, "error", code, "version", this.clientVersion.string);
       throw new MajsoulError(
         code,
-        ERROR_MESSAGES[code] ?? `Mahjong Soul returned error code ${code}.`
+        ERROR_MESSAGES[code] ?? `Mahjong Soul returned error code ${code} (${method}).`
       );
     }
 
@@ -265,7 +272,7 @@ class MajsoulSession {
         );
         break;
       } catch (err) {
-        if (err instanceof MajsoulError && err.code === 151) {
+        if (err instanceof MajsoulError && VERSION_RETRY_CODES.has(err.code)) {
           lastVersionError = err;
           continue;
         }

@@ -25,6 +25,11 @@ const ERROR_MESSAGES: Record<number, string> = {
   1004: "The Mahjong Soul import account is not logged in.",
   1005: "The Mahjong Soul import account is already logged in elsewhere.",
   1006: "The Mahjong Soul import account does not exist.",
+  // Not in the client's own error table. First seen 2026-11-06 on every
+  // fetchGameRecord (old and new logs alike) while login and other lobby calls
+  // still worked, at normal import volume. Cause unconfirmed: an account-level
+  // restriction on game-log fetches, server-side.
+  540: "Mahjong Soul is temporarily refusing game-log lookups for the import account. Try again later, or enter the game manually.",
   1203: "No Mahjong Soul game found with that ID.",
 };
 
@@ -86,9 +91,22 @@ export function isMajsoulLookupConfigured(): boolean {
  * and replies with the same index under message type 0x03. Notifications
  * (0x01) carry no index and are ignored here.
  */
+/** Client version that last passed oauth2Auth on this (warm) instance. */
+let lastGoodVersion: MajsoulVersionCandidate | null = null;
+
+function isLastGoodVersion(candidate: MajsoulVersionCandidate): boolean {
+  return (
+    lastGoodVersion !== null &&
+    candidate.string === lastGoodVersion.string &&
+    candidate.resource === lastGoodVersion.resource
+  );
+}
+
 class MajsoulSession {
   private ws: WebSocket | null = null;
   private index = 0;
+  /** Requests sent this session, by method — logged so API load is visible. */
+  readonly callCounts: Record<string, number> = {};
   private readonly pending = new Map<number, PendingCall>();
   private clientVersion: MajsoulVersionCandidate = {
     string: "WebGL_2022-4.0.10",
@@ -171,6 +189,7 @@ class MajsoulSession {
 
     const msgIndex = this.index;
     this.index = (this.index + 1) % MAX_MSG_INDEX;
+    this.callCounts[method] = (this.callCounts[method] ?? 0) + 1;
 
     const request = liqiType(reqType);
     const reqErr = request.verify(payload);
@@ -244,7 +263,12 @@ class MajsoulSession {
       // Heartbeat is best-effort; oauth2Auth is what matters.
     }
 
+    // Try the version that worked last time first, so a warm instance doesn't
+    // burn several rejected oauth2Auth calls per login.
     const candidates = await getMajsoulVersionCandidates(this.credentials.clientVersion);
+    candidates.sort(
+      (a, b) => Number(isLastGoodVersion(b)) - Number(isLastGoodVersion(a))
+    );
     let auth: { access_token: string } | null = null;
     let lastVersionError: MajsoulError | null = null;
 
@@ -263,9 +287,11 @@ class MajsoulSession {
             client_version_string: candidate.string,
           }
         );
+        lastGoodVersion = candidate;
         break;
       } catch (err) {
         if (err instanceof MajsoulError && err.code === 151) {
+          if (isLastGoodVersion(candidate)) lastGoodVersion = null;
           lastVersionError = err;
           continue;
         }
@@ -382,12 +408,20 @@ export async function withMajsoulSession<T>(
   if (!credentials) throw new MajsoulNotConfiguredError();
 
   const session = new MajsoulSession(credentials);
+  const startedAt = Date.now();
+  let outcome = "ok";
   try {
     await session.connect();
     await session.login();
     return await fn((gameUuid) => session.fetchGameRecord(gameUuid));
+  } catch (err) {
+    outcome = err instanceof MajsoulError ? `error ${err.code}` : "error";
+    throw err;
   } finally {
     session.close();
+    console.info(
+      `[majsoul] session ${outcome} in ${Date.now() - startedAt}ms, calls: ${JSON.stringify(session.callCounts)}`
+    );
   }
 }
 

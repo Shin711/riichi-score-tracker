@@ -28,6 +28,7 @@ type PreviewPayload = {
   playedAt: string;
   startingPoints: number;
   seats: PreviewSeat[];
+  previewToken?: string | null;
 };
 
 type SeatDraft = {
@@ -83,6 +84,7 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
   const [players, setPlayers] = useState<ImportPlayerOption[]>([]);
   const [input, setInput] = useState("");
   const [previewInput, setPreviewInput] = useState("");
+  const [previewToken, setPreviewToken] = useState<string | null>(null);
   const [seats, setSeats] = useState<SeatDraft[] | null>(null);
   const [playedAt, setPlayedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,6 +148,7 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
     setSeats(null);
     setPlayedAt(null);
     setPreviewInput("");
+    setPreviewToken(null);
     setOpenNameSeat(null);
   }
 
@@ -176,6 +179,7 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
       if (!res.ok || !json.preview) throw new Error(json.error ?? "Lookup failed");
 
       setPreviewInput(trimmed);
+      setPreviewToken(json.preview.previewToken ?? null);
       setPlayedAt(json.preview.playedAt);
       setSeats(seatsFromPreview(json.preview));
     } catch (err) {
@@ -205,6 +209,7 @@ export function MajsoulQuickImport({ onImported }: { onImported: () => void }) {
         headers,
         body: JSON.stringify({
           input: previewInput,
+          previewToken: previewToken ?? undefined,
           seats: seats
             .filter((seat) => !seat.isAi)
             .map((seat) => ({

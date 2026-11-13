@@ -19,9 +19,19 @@ import {
   summarizeMajsoulRecord,
   type MajsoulGameSummary,
 } from "@/lib/majsoul/record";
-import { computeMajsoulGameStats } from "@/lib/majsoul/stats";
+import {
+  createMajsoulPreviewToken,
+  verifyMajsoulPreviewToken,
+} from "@/lib/majsoul/previewToken";
+import { computeMajsoulGameStats, type MajsoulGameStats } from "@/lib/majsoul/stats";
 import { findPlayerByDisplayName } from "@/lib/players/names";
-import { checkMajsoulImportRateLimit, rateLimitRetryAfterSeconds } from "@/lib/rateLimit";
+import {
+  checkMajsoulAccountRateLimit,
+  checkMajsoulImportRateLimit,
+  getMajsoulCooldownSeconds,
+  rateLimitRetryAfterSeconds,
+  startMajsoulCooldown,
+} from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/requestIp";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -42,6 +52,8 @@ type MjsImportBody = {
   input?: string;
   preview?: boolean;
   seats?: SeatOverride[];
+  /** From a preview response; lets the confirm skip a second Mahjong Soul lookup. */
+  previewToken?: string;
 };
 
 export type MjsPreviewSeat = {
@@ -60,6 +72,8 @@ export type MjsPreviewPayload = {
   playedAt: string;
   startingPoints: number;
   seats: MjsPreviewSeat[];
+  /** Signed copy of the lookup, to send back on confirm. Null if no signing secret. */
+  previewToken?: string | null;
 };
 
 /** Reports whether server-side Mahjong Soul lookup is available. */
@@ -72,8 +86,9 @@ export async function GET() {
  *
  * - `{ input, preview: true }` — fetch the log and return seats/scores with
  *   club-name suggestions. No DB write.
- * - `{ input, seats: [...] }` — re-fetch the log (scores cannot be forged),
- *   apply the caller's club names, then insert.
+ * - `{ input, seats: [...], previewToken }` — reuse the preview's signed
+ *   lookup (or re-fetch the log if the token is missing/expired; scores cannot
+ *   be forged either way), apply the caller's club names, then insert.
  * - `{ input }` alone — auto-import (nickname → club match/create) for bots.
  */
 export async function POST(req: Request) {
@@ -112,28 +127,31 @@ export async function POST(req: Request) {
     );
   }
 
-  try {
-    const { allowed, reason } = await checkMajsoulImportRateLimit(supabase, getClientIp(req));
-    if (!allowed && reason) {
-      return NextResponse.json(
-        { error: "Too many Mahjong Soul lookups. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": String(rateLimitRetryAfterSeconds(reason)) } }
-      );
-    }
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Rate limit check failed." },
-      { status: 500 }
-    );
+  // A confirm carrying a genuine preview token reuses that lookup: no second
+  // Mahjong Soul login, so it doesn't count against the lookup limits either.
+  const fromPreview =
+    body.preview === true ? null : verifyMajsoulPreviewToken(body.previewToken, parsed.recordUuid);
+
+  if (!fromPreview) {
+    const blocked = await guardMajsoulLookup(supabase, req);
+    if (blocked) return blocked;
   }
 
   try {
-    const { record, detail } = await fetchMajsoulGame(parsed.recordUuid);
-    const summary = summarizeMajsoulRecord(record);
+    let summary: MajsoulGameSummary;
+    let stats: MajsoulGameStats | null;
+    if (fromPreview) {
+      ({ summary, stats } = fromPreview);
+    } else {
+      const { record, detail } = await fetchMajsoulGame(parsed.recordUuid);
+      summary = summarizeMajsoulRecord(record);
+      stats = detail ? computeMajsoulGameStats(detail) : null;
+    }
 
     if (body.preview === true) {
       const preview = await buildPreview(supabase, summary, parsed.paipuUrl);
-      return NextResponse.json({ preview });
+      const previewToken = createMajsoulPreviewToken(parsed.recordUuid, summary, stats);
+      return NextResponse.json({ preview: { ...preview, previewToken } });
     }
 
     const entries =
@@ -184,10 +202,7 @@ export async function POST(req: Request) {
 
     refreshDiscordLeaderboardAfterResponse();
     // Entries are stored in the log's seat order, so replay stats line up by index.
-    postGameLogAfterResponse(
-      data as ImportedGameRow,
-      detail ? computeMajsoulGameStats(detail) : null
-    );
+    postGameLogAfterResponse(data as ImportedGameRow, stats);
 
     return NextResponse.json({ import: data as ImportedGameRow });
   } catch (e) {
@@ -204,8 +219,12 @@ export async function POST(req: Request) {
       if (e.code === 1203) {
         return NextResponse.json({ error: e.message }, { status: 404 });
       }
+      if (e.code === 540) {
+        await startMajsoulCooldown(supabase, e.code);
+      }
       // Credential/account problems are ours to fix, not the caller's.
-      const isCredentialProblem = [109, 110, 151, 503, 1002, 1005, 1006].includes(e.code);
+      // 540 is a log-fetch throttle on our import account — also ours, and temporary.
+      const isCredentialProblem = [109, 110, 151, 503, 540, 1002, 1005, 1006].includes(e.code);
       return NextResponse.json({ error: e.message }, { status: isCredentialProblem ? 503 : 502 });
     }
     if (e instanceof MajsoulRecordShapeError) {
@@ -216,6 +235,50 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to import from Mahjong Soul." },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Gate a real Mahjong Soul lookup: honour a 540 cooldown, then the per-IP and
+ * account-wide limits. Returns the error response to send, or null to proceed.
+ */
+async function guardMajsoulLookup(
+  supabase: SupabaseClient,
+  req: Request
+): Promise<NextResponse | null> {
+  try {
+    // Mahjong Soul recently throttled the import account — don't poke it again yet.
+    const cooldown = await getMajsoulCooldownSeconds(supabase);
+    if (cooldown > 0) {
+      return NextResponse.json(
+        {
+          error: `Mahjong Soul is throttling game-log lookups. Try again in about ${Math.ceil(cooldown / 60)} min, or enter the game manually.`,
+        },
+        { status: 503, headers: { "Retry-After": String(cooldown) } }
+      );
+    }
+
+    const { allowed, reason } = await checkMajsoulImportRateLimit(supabase, getClientIp(req));
+    if (!allowed && reason) {
+      return NextResponse.json(
+        { error: "Too many Mahjong Soul lookups. Please wait and try again." },
+        { status: 429, headers: { "Retry-After": String(rateLimitRetryAfterSeconds(reason)) } }
+      );
+    }
+
+    const account = await checkMajsoulAccountRateLimit(supabase);
+    if (!account.allowed) {
+      return NextResponse.json(
+        { error: "Lots of Mahjong Soul imports right now. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": String(account.retryAfterSeconds ?? 60) } }
+      );
+    }
+    return null;
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Rate limit check failed." },
       { status: 500 }
     );
   }

@@ -22,6 +22,15 @@ function formatLookup(entry: MajsoulLookupLogEntry): string {
     `${when}  ${entry.purpose.padEnd(7)}  ${outcome.padEnd(32)}  ${String(entry.durationMs).padStart(6)}ms  ${entry.recordUuid}`,
     `    calls: ${calls || "(none)"}`,
   ];
+  // Lookups recorded before version tracking have none of these fields.
+  if (entry.clientVersion !== undefined) {
+    const accepted = entry.clientVersion
+      ? `${entry.clientVersion.string} (resource ${entry.clientVersion.resource}, package ${entry.clientVersion.package})`
+      : "none — login never got past oauth2Auth";
+    const rejected = entry.rejectedVersions?.length ? entry.rejectedVersions.join(", ") : "none";
+    lines.push(`    version: ${accepted}`);
+    lines.push(`    rejected: ${rejected}; override: ${entry.versionOverride ?? "not set"}`);
+  }
   if (!entry.ok && entry.error) lines.push(`    error: ${entry.error}`);
   return lines.join("\n");
 }

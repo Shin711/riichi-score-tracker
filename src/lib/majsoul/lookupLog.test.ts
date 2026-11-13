@@ -16,6 +16,9 @@ function entry(n: number): MajsoulLookupLogEntry {
     failedAt: n % 2 === 0 ? null : "fetchGameRecord",
     durationMs: 3000,
     calls: { oauth2Login: 1, fetchGameRecord: 1 },
+    clientVersion: { string: "WebGL_2022-4.0.13", resource: "0.11.252.w", package: "4.0.13" },
+    rejectedVersions: [],
+    versionOverride: null,
     recordUuid: `game-${n}`,
     purpose: "preview",
   };

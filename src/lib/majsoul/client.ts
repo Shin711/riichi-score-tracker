@@ -107,6 +107,8 @@ class MajsoulSession {
   private index = 0;
   /** Requests sent this session, by method — logged so API load is visible. */
   readonly callCounts: Record<string, number> = {};
+  /** The step in flight; calls run one at a time, so on failure it's the one that failed. */
+  step = "connect";
   private readonly pending = new Map<number, PendingCall>();
   private clientVersion: MajsoulVersionCandidate = {
     string: "WebGL_2022-4.0.10",
@@ -190,6 +192,7 @@ class MajsoulSession {
     const msgIndex = this.index;
     this.index = (this.index + 1) % MAX_MSG_INDEX;
     this.callCounts[method] = (this.callCounts[method] ?? 0) + 1;
+    this.step = method;
 
     const request = liqiType(reqType);
     const reqErr = request.verify(payload);
@@ -402,30 +405,64 @@ async function readReplayDetail(
  * (~3-6s). Batch jobs should fetch all their games inside one call.
  */
 export async function withMajsoulSession<T>(
-  fn: (fetchGame: (gameUuid: string) => Promise<MajsoulGameFetch>) => Promise<T>
+  fn: (fetchGame: (gameUuid: string) => Promise<MajsoulGameFetch>) => Promise<T>,
+  onReport?: (report: MajsoulSessionReport) => void
 ): Promise<T> {
   const credentials = getMajsoulCredentials();
   if (!credentials) throw new MajsoulNotConfiguredError();
 
   const session = new MajsoulSession(credentials);
   const startedAt = Date.now();
-  let outcome = "ok";
+  let failure: unknown = null;
   try {
     await session.connect();
     await session.login();
     return await fn((gameUuid) => session.fetchGameRecord(gameUuid));
   } catch (err) {
-    outcome = err instanceof MajsoulError ? `error ${err.code}` : "error";
+    failure = err;
     throw err;
   } finally {
     session.close();
+    const report: MajsoulSessionReport = {
+      at: new Date(startedAt).toISOString(),
+      ok: failure === null,
+      code: failure instanceof MajsoulError ? failure.code : null,
+      error: failure === null ? null : failure instanceof Error ? failure.message : String(failure),
+      failedAt: failure === null ? null : session.step,
+      durationMs: Date.now() - startedAt,
+      calls: session.callCounts,
+    };
+    const outcome = report.ok ? "ok" : `error ${report.code ?? ""} at ${report.failedAt}`;
     console.info(
-      `[majsoul] session ${outcome} in ${Date.now() - startedAt}ms, calls: ${JSON.stringify(session.callCounts)}`
+      `[majsoul] session ${outcome} in ${report.durationMs}ms, calls: ${JSON.stringify(report.calls)}`
     );
+    try {
+      onReport?.(report);
+    } catch (err) {
+      console.error("[majsoul] session report handler failed:", err);
+    }
   }
 }
 
+/** What one Mahjong Soul session did — for spotting throttling without server logs. */
+export type MajsoulSessionReport = {
+  /** When the session started (ISO). */
+  at: string;
+  ok: boolean;
+  /** Mahjong Soul's error code (e.g. 540), when it sent one. */
+  code: number | null;
+  error: string | null;
+  /** The step that failed: "connect" or the request method (e.g. "fetchGameRecord"). */
+  failedAt: string | null;
+  durationMs: number;
+  /** Requests sent, by method. */
+  calls: Record<string, number>;
+};
+
 /** Log in, fetch one game's summary record plus its replay detail, and disconnect. */
-export async function fetchMajsoulGame(gameUuid: string): Promise<MajsoulGameFetch> {
-  return withMajsoulSession((fetchGame) => fetchGame(gameUuid));
+export async function fetchMajsoulGame(
+  gameUuid: string,
+  onReport?: (report: MajsoulSessionReport) => void
+): Promise<MajsoulGameFetch> {
+  return withMajsoulSession((fetchGame) => fetchGame(gameUuid), onReport);
 }

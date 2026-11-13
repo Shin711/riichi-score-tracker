@@ -63,6 +63,60 @@ export async function checkMajsoulImportRateLimit(
   return ok ? { allowed: true } : { allowed: false, reason: "hourly" };
 }
 
+/**
+ * Account-wide caps on Mahjong Soul lookups, across every IP. The per-IP limit
+ * above doesn't protect the single shared import account: several people
+ * importing at once all land on it. Each lookup is a full login + one
+ * fetchGameRecord.
+ */
+export const MJS_ACCOUNT_MINUTE_LIMIT = 4;
+export const MJS_ACCOUNT_HOURLY_LIMIT = 40;
+
+export async function checkMajsoulAccountRateLimit(
+  supabase: SupabaseClient
+): Promise<{ allowed: boolean; retryAfterSeconds?: number }> {
+  const minuteOk = await withinLimit(supabase, "mjs_account:minute", 60, MJS_ACCOUNT_MINUTE_LIMIT);
+  if (!minuteOk) return { allowed: false, retryAfterSeconds: 60 };
+  const hourOk = await withinLimit(
+    supabase,
+    "mjs_account:hour",
+    HOUR_SECONDS,
+    MJS_ACCOUNT_HOURLY_LIMIT
+  );
+  if (!hourOk) return { allowed: false, retryAfterSeconds: HOUR_SECONDS };
+  return { allowed: true };
+}
+
+const MJS_COOLDOWN_KEY = "mjs_cooldown";
+/** How long to stop calling Mahjong Soul after it throttles us (error 540). */
+export const MJS_COOLDOWN_SECONDS = 15 * 60;
+
+/**
+ * Seconds left on a Mahjong Soul cooldown, or 0 if lookups may proceed.
+ * Retrying into a 540 only extends the throttle, so we back off entirely.
+ */
+export async function getMajsoulCooldownSeconds(supabase: SupabaseClient): Promise<number> {
+  const { data, error } = await supabase
+    .from("maintenance_state")
+    .select("value_json")
+    .eq("key", MJS_COOLDOWN_KEY)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const until = Date.parse((data?.value_json as { until?: string } | undefined)?.until ?? "");
+  if (!Number.isFinite(until)) return 0;
+  return Math.max(0, Math.ceil((until - Date.now()) / 1000));
+}
+
+export async function startMajsoulCooldown(supabase: SupabaseClient, code: number): Promise<void> {
+  const until = new Date(Date.now() + MJS_COOLDOWN_SECONDS * 1000).toISOString();
+  const { error } = await supabase.from("maintenance_state").upsert({
+    key: MJS_COOLDOWN_KEY,
+    value_json: { until, code },
+    updated_at: new Date().toISOString(),
+  });
+  if (error) console.error("[majsoul] failed to record cooldown:", error.message);
+}
+
 export async function checkGameChangeRequestRateLimit(
   supabase: SupabaseClient,
   ip: string

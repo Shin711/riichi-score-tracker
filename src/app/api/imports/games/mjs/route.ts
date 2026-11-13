@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getUserIdFromRequest } from "@/lib/api/bearerAuth";
@@ -19,6 +19,7 @@ import {
   summarizeMajsoulRecord,
   type MajsoulGameSummary,
 } from "@/lib/majsoul/record";
+import { recordMajsoulLookup } from "@/lib/majsoul/lookupLog";
 import {
   createMajsoulPreviewToken,
   verifyMajsoulPreviewToken,
@@ -28,9 +29,7 @@ import { findPlayerByDisplayName } from "@/lib/players/names";
 import {
   checkMajsoulAccountRateLimit,
   checkMajsoulImportRateLimit,
-  getMajsoulCooldownSeconds,
   rateLimitRetryAfterSeconds,
-  startMajsoulCooldown,
 } from "@/lib/rateLimit";
 import { getClientIp } from "@/lib/requestIp";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -143,7 +142,12 @@ export async function POST(req: Request) {
     if (fromPreview) {
       ({ summary, stats } = fromPreview);
     } else {
-      const { record, detail } = await fetchMajsoulGame(parsed.recordUuid);
+      const purpose = body.preview === true ? "preview" : "import";
+      const { record, detail } = await fetchMajsoulGame(parsed.recordUuid, (report) => {
+        after(() =>
+          recordMajsoulLookup(supabase, { ...report, recordUuid: parsed.recordUuid, purpose })
+        );
+      });
       summary = summarizeMajsoulRecord(record);
       stats = detail ? computeMajsoulGameStats(detail) : null;
     }
@@ -219,9 +223,6 @@ export async function POST(req: Request) {
       if (e.code === 1203) {
         return NextResponse.json({ error: e.message }, { status: 404 });
       }
-      if (e.code === 540) {
-        await startMajsoulCooldown(supabase, e.code);
-      }
       // Credential/account problems are ours to fix, not the caller's.
       // 540 is a log-fetch throttle on our import account — also ours, and temporary.
       const isCredentialProblem = [109, 110, 151, 503, 540, 1002, 1005, 1006].includes(e.code);
@@ -241,25 +242,14 @@ export async function POST(req: Request) {
 }
 
 /**
- * Gate a real Mahjong Soul lookup: honour a 540 cooldown, then the per-IP and
- * account-wide limits. Returns the error response to send, or null to proceed.
+ * Gate a real Mahjong Soul lookup on the per-IP and account-wide limits.
+ * Returns the error response to send, or null to proceed.
  */
 async function guardMajsoulLookup(
   supabase: SupabaseClient,
   req: Request
 ): Promise<NextResponse | null> {
   try {
-    // Mahjong Soul recently throttled the import account — don't poke it again yet.
-    const cooldown = await getMajsoulCooldownSeconds(supabase);
-    if (cooldown > 0) {
-      return NextResponse.json(
-        {
-          error: `Mahjong Soul is throttling game-log lookups. Try again in about ${Math.ceil(cooldown / 60)} min, or enter the game manually.`,
-        },
-        { status: 503, headers: { "Retry-After": String(cooldown) } }
-      );
-    }
-
     const { allowed, reason } = await checkMajsoulImportRateLimit(supabase, getClientIp(req));
     if (!allowed && reason) {
       return NextResponse.json(

@@ -3,8 +3,12 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import type { MajsoulGameSummary, MajsoulSeat } from "@/lib/majsoul/record";
 import type { MajsoulGameStats } from "@/lib/majsoul/stats";
 
-/** How long a preview can sit before confirming needs a fresh lookup. */
-export const PREVIEW_TOKEN_TTL_MS = 30 * 60 * 1000;
+/**
+ * How long a preview can sit before confirming needs a fresh lookup. A
+ * finished game's scores never change and the uuid uniqueness check stops
+ * double imports, so this only bounds how long a signed token stays usable.
+ */
+export const PREVIEW_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 type PreviewTokenPayload = {
   v: 1;

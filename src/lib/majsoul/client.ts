@@ -109,6 +109,10 @@ class MajsoulSession {
   readonly callCounts: Record<string, number> = {};
   /** The step in flight; calls run one at a time, so on failure it's the one that failed. */
   step = "connect";
+  /** The client version oauth2Auth accepted, once login gets that far. */
+  acceptedVersion: MajsoulVersionCandidate | null = null;
+  /** Version strings oauth2Auth rejected (151) this session, in order. */
+  readonly rejectedVersions: string[] = [];
   private readonly pending = new Map<number, PendingCall>();
   private clientVersion: MajsoulVersionCandidate = {
     string: "WebGL_2022-4.0.10",
@@ -276,6 +280,9 @@ class MajsoulSession {
     let lastVersionError: MajsoulError | null = null;
 
     for (const candidate of candidates) {
+      // oauth2Auth only sends the string, so a string already rejected will be
+      // rejected again whatever resource version rides with it.
+      if (this.rejectedVersions.includes(candidate.string)) continue;
       this.clientVersion = candidate;
       try {
         auth = await this.call<{ access_token: string }>(
@@ -291,10 +298,12 @@ class MajsoulSession {
           }
         );
         lastGoodVersion = candidate;
+        this.acceptedVersion = candidate;
         break;
       } catch (err) {
         if (err instanceof MajsoulError && err.code === 151) {
           if (isLastGoodVersion(candidate)) lastGoodVersion = null;
+          this.rejectedVersions.push(candidate.string);
           lastVersionError = err;
           continue;
         }
@@ -431,10 +440,14 @@ export async function withMajsoulSession<T>(
       failedAt: failure === null ? null : session.step,
       durationMs: Date.now() - startedAt,
       calls: session.callCounts,
+      clientVersion: session.acceptedVersion,
+      rejectedVersions: session.rejectedVersions,
+      versionOverride: credentials.clientVersion ?? null,
     };
     const outcome = report.ok ? "ok" : `error ${report.code ?? ""} at ${report.failedAt}`;
     console.info(
-      `[majsoul] session ${outcome} in ${report.durationMs}ms, calls: ${JSON.stringify(report.calls)}`
+      `[majsoul] session ${outcome} in ${report.durationMs}ms, version: ${report.clientVersion?.string ?? "none"}` +
+        ` (rejected: ${report.rejectedVersions.join(", ") || "none"}), calls: ${JSON.stringify(report.calls)}`
     );
     try {
       onReport?.(report);
@@ -457,6 +470,12 @@ export type MajsoulSessionReport = {
   durationMs: number;
   /** Requests sent, by method. */
   calls: Record<string, number>;
+  /** The client version login went through with (null if login failed before that). */
+  clientVersion: MajsoulVersionCandidate | null;
+  /** Version strings Mahjong Soul rejected as outdated (151) before one was accepted. */
+  rejectedVersions: string[];
+  /** MAJSOUL_CLIENT_VERSION, when set: it's tried before the live versions. */
+  versionOverride: string | null;
 };
 
 /** Log in, fetch one game's summary record plus its replay detail, and disconnect. */

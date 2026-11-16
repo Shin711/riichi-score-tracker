@@ -8,8 +8,9 @@
  *
  * Layout:
  *   - a dora wall on top, face-down except the indicator
- *   - on a riichi hand, the wall's lower row, with the ura dora indicator
- *     flipped directly beneath the dora indicator
+ *   - each kan flips another indicator just right of the first
+ *   - on a riichi hand, the wall's lower row, with each ura dora indicator
+ *     flipped directly beneath its dora indicator
  *   - the hand on one line: concealed tiles, winning tile, then called melds
  *
  * Meld type is drawn, not just implied: a called tile lies on its side and a
@@ -21,8 +22,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
-import { indicatorTiles, type Meld, type QuizHand } from "@/lib/quiz/hand";
-import { sortTiles } from "@/lib/quiz/tiles";
+import { doraIndicators, uraDoraIndicators, type Meld, type QuizHand } from "@/lib/quiz/hand";
+import { isRedFive, sortTiles } from "@/lib/quiz/tiles";
 
 const ASSET_DIR = path.join(process.cwd(), "src", "assets", "tiles");
 
@@ -134,6 +135,10 @@ function meldTiles(meld: Meld): TileSpec[] {
   const tiles = sortTiles(meld.tiles);
 
   if (meld.kind === "ankan") {
+    // A kan of fives always holds the red one; keep it in a face-up slot so the
+    // aka dora can be counted from the picture.
+    const red = tiles.findIndex(isRedFive);
+    if (red === 0) [tiles[0], tiles[1]] = [tiles[1], tiles[0]];
     return [
       { name: BACK_TILE },
       { name: tiles[1] },
@@ -170,11 +175,15 @@ function layoutRows(hand: QuizHand): Row[] {
   ];
 }
 
-/** A row of the dead wall: face-down except for the one flipped indicator. */
-function wallRow(indicator: string): TileSpec[] {
+/**
+ * A row of the dead wall: face-down except for the flipped indicators, which
+ * sit side by side from the indicator slot — the dora, then one per kan.
+ */
+function wallRow(indicators: string[]): TileSpec[] {
   return upright(
-    Array.from({ length: WALL_LENGTH }, (_, slot) =>
-      slot === INDICATOR_SLOT ? indicator : BACK_TILE
+    Array.from(
+      { length: WALL_LENGTH },
+      (_, slot) => indicators[slot - INDICATOR_SLOT] ?? BACK_TILE
     )
   );
 }
@@ -189,7 +198,8 @@ export async function renderHandImage(hand: QuizHand): Promise<Buffer> {
   // only thing that can say which indicator is which. The lower row appears only
   // once there is an ura dora to show, so a hand without riichi looks as it
   // always did.
-  const wallRows = indicatorTiles(hand).map(wallRow);
+  const ura = uraDoraIndicators(hand);
+  const wallRows = [doraIndicators(hand), ...(ura.length > 0 ? [ura] : [])].map(wallRow);
 
   let wallRight = PADDING;
   let top = PADDING;

@@ -9,12 +9,20 @@
       "schedule": "0 11 * * *"
     },
     {
-      "path": "/api/cron/quiz-post",
+      "path": "/api/cron/quiz-post?at=10",
       "schedule": "0 14 * * *"
     },
     {
-      "path": "/api/cron/quiz-reveal",
+      "path": "/api/cron/quiz-post?at=10",
+      "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/quiz-reveal?at=22",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/quiz-reveal?at=22",
+      "schedule": "0 3 * * *"
     }
   ]
 }

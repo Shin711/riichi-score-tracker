@@ -17,9 +17,13 @@ import { trySolveHand, type SolvedHand } from "@/lib/quiz/solve";
 import {
   allTiles,
   doraFromIndicator,
+  effectiveRank,
+  isRedFive,
   makeTile,
   maxRank,
   sortTiles,
+  tileSuit,
+  toSolverTile,
   WINDS,
   type Suit,
   type Tile,
@@ -74,6 +78,11 @@ const KAN_CHANCE = 0.08;
  */
 const DORA_HIT_CHANCE = 0.2;
 const URA_DORA_HIT_CHANCE = 0.1;
+/**
+ * Kan dora and kan ura dora are flipped blind. A kan already shows four of a
+ * tile, so a nudged indicator would land a four-han hit far too often.
+ */
+const KAN_INDICATOR_HIT_CHANCE = 0;
 
 const NUMBER_SUITS: Suit[] = ["m", "p", "s"];
 
@@ -111,11 +120,22 @@ class TileSupply {
  * is just as impossible as a five-tile kan.
  */
 export function hasLegalTileCounts(hand: QuizHand): boolean {
-  const counts = new Map<Tile, number>();
+  // Keyed by solver id so a red five shares the four-copy limit with its suit's
+  // ordinary fives — `0m` and `5m` are the same tile with different paint.
+  const counts = new Map<number, number>();
+  const reds = new Map<string, number>();
   for (const tile of allShownTiles(hand)) {
-    const next = (counts.get(tile) ?? 0) + 1;
+    const id = toSolverTile(tile);
+    const next = (counts.get(id) ?? 0) + 1;
     if (next > 4) return false;
-    counts.set(tile, next);
+    counts.set(id, next);
+
+    // The set has exactly one red five per number suit.
+    if (isRedFive(tile)) {
+      const red = (reds.get(tileSuit(tile)) ?? 0) + 1;
+      if (red > 1) return false;
+      reds.set(tileSuit(tile), red);
+    }
   }
   return true;
 }
@@ -263,18 +283,91 @@ function buildCandidate(random: () => number): QuizHand | null {
     ? flipIndicator(inHand, shape.supply, URA_DORA_HIT_CHANCE, random)
     : null;
 
+  // Every kan turns over another indicator beside the first, and — for a riichi
+  // winner — another ura dora beneath it.
+  const kans = melds.filter((meld) => meld.tiles.length === 4).length;
+  const flipKanRow = () =>
+    Array.from({ length: kans }, () =>
+      flipIndicator(inHand, shape.supply, KAN_INDICATOR_HIT_CHANCE, random)
+    );
+  const kanDoraIndicators = flipKanRow();
+  const kanUraDoraIndicators = riichi ? flipKanRow() : [];
+
+  return paintRedFives(
+    {
+      concealed: sortTiles(concealed),
+      melds,
+      winningTile,
+      winType,
+      seatWind: pick(WINDS, random) as Wind,
+      roundWind: chance(0.75, random) ? "east" : "south",
+      doraIndicator,
+      // Left off entirely when there is none, so the hand matches its own JSON
+      // round trip through the database.
+      ...(uraDoraIndicator ? { uraDoraIndicator } : {}),
+      ...(kanDoraIndicators.length > 0 ? { kanDoraIndicators } : {}),
+      ...(kanUraDoraIndicators.length > 0 ? { kanUraDoraIndicators } : {}),
+      riichi,
+    },
+    random
+  );
+}
+
+/**
+ * Paints red fives onto the finished hand. The set holds one red five per
+ * number suit among its four fives, so when the puzzle shows `k` fives of a
+ * suit the red one is among them with probability exactly k/4 — and if it is,
+ * it is equally likely to be any of them. Indicators count: a red five can be
+ * lying on the wall, where it earns nothing.
+ *
+ * Done last, on the finished hand, so the shape, the supply and the indicator
+ * draws above never have to know red fives exist.
+ */
+function paintRedFives(hand: QuizHand, random: () => number): QuizHand {
+  // Every shown tile in one fixed order, so a chosen position can be written
+  // back to the field it came from.
+  const shown = [
+    ...hand.concealed,
+    hand.winningTile,
+    ...hand.melds.flatMap((meld) => meld.tiles),
+    hand.doraIndicator,
+    ...(hand.uraDoraIndicator ? [hand.uraDoraIndicator] : []),
+    ...(hand.kanDoraIndicators ?? []),
+    ...(hand.kanUraDoraIndicators ?? []),
+  ];
+
+  for (const suit of NUMBER_SUITS) {
+    const fives = shown.flatMap((tile, i) =>
+      tileSuit(tile) === suit && effectiveRank(tile) === 5 ? [i] : []
+    );
+    if (fives.length > 0 && chance(fives.length / 4, random)) {
+      shown[pick(fives, random)] = makeTile(0, suit);
+    }
+  }
+
+  let cursor = 0;
+  const next = () => shown[cursor++];
+  const take = (count: number) => Array.from({ length: count }, next);
+
+  const concealed = take(hand.concealed.length);
+  const winningTile = next();
+  const melds = hand.melds.map((meld) => ({ ...meld, tiles: take(meld.tiles.length) }));
+  const doraIndicator = next();
+  const uraDoraIndicator = hand.uraDoraIndicator ? next() : undefined;
+  const kanDoraIndicators = hand.kanDoraIndicators ? take(hand.kanDoraIndicators.length) : undefined;
+  const kanUraDoraIndicators = hand.kanUraDoraIndicators
+    ? take(hand.kanUraDoraIndicators.length)
+    : undefined;
+
   return {
+    ...hand,
     concealed: sortTiles(concealed),
-    melds,
     winningTile,
-    winType,
-    seatWind: pick(WINDS, random) as Wind,
-    roundWind: chance(0.75, random) ? "east" : "south",
+    melds,
     doraIndicator,
-    // Left off entirely when there is none, so the hand matches its own JSON
-    // round trip through the database.
     ...(uraDoraIndicator ? { uraDoraIndicator } : {}),
-    riichi,
+    ...(kanDoraIndicators ? { kanDoraIndicators } : {}),
+    ...(kanUraDoraIndicators ? { kanUraDoraIndicators } : {}),
   };
 }
 

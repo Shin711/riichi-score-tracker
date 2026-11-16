@@ -3,7 +3,7 @@
 import { ButtonStyle, ComponentType } from "@/lib/discord/interactions";
 import { describeCorrectScore } from "@/lib/quiz/answer";
 import { answerButtonId, beginnerButtonId } from "@/lib/discord/quizForm";
-import { uraDoraIndicator, type Meld, type QuizHand } from "@/lib/quiz/hand";
+import { doraIndicators, uraDoraIndicators, type Meld, type QuizHand } from "@/lib/quiz/hand";
 import { quizDateLabel } from "@/lib/quiz/schedule";
 import type { SolvedHand } from "@/lib/quiz/solve";
 import type { QuizRecap } from "@/lib/quiz/store";
@@ -104,24 +104,28 @@ function handFields(hand: QuizHand, visual: HandVisual): EmbedField[] {
 
   // Named explicitly either way: the image shows the indicator as the flipped
   // tile in the wall, which is obvious to a regular but not to a newer player.
-  fields.push({
-    name: "Dora indicator",
-    value: `${formatTiles([hand.doraIndicator])} — ${describeTile(hand.doraIndicator)}`,
-    inline: true,
-  });
+  // A kan adds an indicator, listed after the first in the order they were
+  // flipped — the same left-to-right order as the wall in the image.
+  fields.push(indicatorField("Dora indicator", doraIndicators(hand)));
 
-  // The image tells the two indicators apart by position alone — the ura dora
-  // is the flipped tile in the wall's lower row — so it is named here as well.
-  const ura = uraDoraIndicator(hand);
-  if (ura) {
-    fields.push({
-      name: "Ura dora indicator",
-      value: `${formatTiles([ura])} — ${describeTile(ura)}`,
-      inline: true,
-    });
-  }
+  // The image tells the two rows apart by position alone — the ura dora is the
+  // flipped tile in the wall's lower row — so it is named here as well.
+  const ura = uraDoraIndicators(hand);
+  if (ura.length > 0) fields.push(indicatorField("Ura dora indicator", ura));
 
   return fields;
+}
+
+function indicatorField(name: string, indicators: string[]): EmbedField {
+  // Not formatTiles: it sorts, and these have to stay in wall order.
+  const lines = indicators.map(
+    (tile, i) => `${formatTiles([tile])} — ${describeTile(tile)}${i > 0 ? " (kan)" : ""}`
+  );
+  return {
+    name: indicators.length > 1 ? `${name}s` : name,
+    value: lines.join("\n"),
+    inline: true,
+  };
 }
 
 function handImage(visual: HandVisual) {

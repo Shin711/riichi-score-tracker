@@ -39,3 +39,23 @@ describe("renderHandImage — dora wall", () => {
     assert.deepEqual(await size(STORED_HAND), await size({ ...RIICHI_HAND, riichi: false }));
   });
 });
+
+describe("renderHandImage — kan dora and red fives", () => {
+  it("fits kan dora beside the dora indicator without widening the wall", async () => {
+    const kan: QuizHand = {
+      ...STORED_HAND,
+      concealed: ["2m", "3m", "4m", "0m", "6m", "7m", "3p", "4p", "5p", "5s"],
+      melds: [{ kind: "ankan", tiles: ["0p", "5p", "5p", "5p"] }],
+      winningTile: "5s",
+    };
+    const plain = await size(kan);
+    const withKanDora = await size({
+      ...kan,
+      uraDoraIndicator: "9p",
+      kanDoraIndicators: ["2z"],
+      kanUraDoraIndicators: ["3z"],
+    });
+    assert.equal(withKanDora.width, plain.width);
+    assert.ok(withKanDora.height > plain.height, "ura row missing on a riichi kan hand");
+  });
+});

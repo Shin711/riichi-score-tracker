@@ -11,7 +11,7 @@ import { generateQuizHand, hasLegalTileCounts } from "@/lib/quiz/generate";
 import { allHandTiles, isClosedHand, type QuizHand } from "@/lib/quiz/hand";
 import { createRandom } from "@/lib/quiz/random";
 import { solveHand } from "@/lib/quiz/solve";
-import { doraFromIndicator } from "@/lib/quiz/tiles";
+import { doraFromIndicator, isRedFive, tileSuit, toSolverTile } from "@/lib/quiz/tiles";
 
 const SAMPLE = 500;
 
@@ -40,12 +40,17 @@ function tilesOnScreen(hand: QuizHand): string[] {
     hand.doraIndicator,
   ];
   if (hand.uraDoraIndicator) tiles.push(hand.uraDoraIndicator);
+  tiles.push(...(hand.kanDoraIndicators ?? []), ...(hand.kanUraDoraIndicators ?? []));
   return tiles;
 }
 
 function mostCopies(tiles: string[]): { tile: string; copies: number } {
+  // A red five is a five: `0m` and `5m` share one four-copy limit.
   const counts = new Map<string, number>();
-  for (const tile of tiles) counts.set(tile, (counts.get(tile) ?? 0) + 1);
+  for (const raw of tiles) {
+    const tile = isRedFive(raw) ? `5${tileSuit(raw)}` : raw;
+    counts.set(tile, (counts.get(tile) ?? 0) + 1);
+  }
   let worst = { tile: "", copies: 0 };
   for (const [tile, copies] of counts) if (copies > worst.copies) worst = { tile, copies };
   return worst;
@@ -100,6 +105,64 @@ describe("generateQuizHand", () => {
     assert.equal(hasLegalTileCounts({ ...hand, winningTile: "5s" }), false);
   });
 
+  it("flips one kan dora per kan, and a kan ura dora under each on riichi", () => {
+    for (const { hand } of hands) {
+      const kans = kanCount(hand);
+      assert.equal(hand.kanDoraIndicators?.length ?? 0, kans);
+      assert.equal(hand.kanUraDoraIndicators?.length ?? 0, hand.riichi ? kans : 0);
+    }
+    assert.ok(hands.some(({ hand }) => kanCount(hand) > 0), "sample has no kans");
+  });
+
+  it("shows at most one red five per suit, and some hands have one", () => {
+    for (const { hand } of hands) {
+      const reds = tilesOnScreen(hand).filter(isRedFive);
+      assert.equal(new Set(reds).size, reds.length, `two red fives of a suit: ${reds}`);
+    }
+    assert.ok(
+      hands.some(({ hand }) => tilesOnScreen(hand).some(isRedFive)),
+      "no red five in the sample"
+    );
+  });
+
+  it("always shows the red five when the puzzle holds all four fives", () => {
+    for (const { hand } of hands) {
+      for (const suit of ["m", "p", "s"]) {
+        const fives = tilesOnScreen(hand).filter(
+          (tile) => tileSuit(tile) === suit && toSolverTile(tile) % 9 === 5 % 9
+        );
+        if (fives.length === 4) assert.ok(fives.some(isRedFive), `four ${suit} fives, none red`);
+      }
+    }
+  });
+
+  it("scores each red five in the hand as one aka dora", () => {
+    for (const { hand, solved } of hands) {
+      const reds = allHandTiles(hand).filter(isRedFive).length;
+      assert.equal(solved.yaku.find((y) => y.name === "Aka dora")?.han ?? 0, reds);
+    }
+  });
+
+  it("rejects a second red five of the same suit", () => {
+    const hand: QuizHand = {
+      concealed: ["2m", "3m", "4m", "0m", "6m", "7m", "3p", "4p", "5p", "6p", "7p", "5s", "5s"],
+      melds: [],
+      winningTile: "8p",
+      winType: "ron",
+      seatWind: "south",
+      roundWind: "east",
+      doraIndicator: "1z",
+      riichi: false,
+    };
+    assert.equal(hasLegalTileCounts(hand), true);
+    assert.equal(hasLegalTileCounts({ ...hand, doraIndicator: "0m" }), false);
+    // A red five shares the limit with the ordinary fives.
+    assert.equal(
+      hasLegalTileCounts({ ...hand, concealed: [...hand.concealed.slice(0, 11), "0s", "5s"], doraIndicator: "5s", uraDoraIndicator: "5s", riichi: true }),
+      true
+    );
+  });
+
   it("turns over an ura dora indicator exactly when the hand is riichi", () => {
     for (const { hand } of hands) {
       assert.equal(
@@ -121,16 +184,29 @@ describe("generateQuizHand", () => {
   });
 
   it("scores each indicator as the matching tiles in the hand", () => {
-    const hanFor = (hand: QuizHand, indicator: string | undefined) =>
-      indicator === undefined
-        ? 0
-        : allHandTiles(hand).filter((tile) => tile === doraFromIndicator(indicator)).length;
+    const hanFor = (hand: QuizHand, indicators: Array<string | undefined>) =>
+      indicators.reduce(
+        (sum, indicator) =>
+          indicator === undefined
+            ? sum
+            : sum +
+              allHandTiles(hand).filter(
+                (tile) => toSolverTile(tile) === toSolverTile(doraFromIndicator(indicator))
+              ).length,
+        0
+      );
     const listed = (solved: { yaku: Array<{ name: string; han: number }> }, name: string) =>
       solved.yaku.find((y) => y.name === name)?.han ?? 0;
 
     for (const { hand, solved } of hands) {
-      assert.equal(listed(solved, "Dora"), hanFor(hand, hand.doraIndicator));
-      assert.equal(listed(solved, "Ura dora"), hanFor(hand, hand.uraDoraIndicator));
+      assert.equal(
+        listed(solved, "Dora"),
+        hanFor(hand, [hand.doraIndicator, ...(hand.kanDoraIndicators ?? [])])
+      );
+      assert.equal(
+        listed(solved, "Ura dora"),
+        hanFor(hand, [hand.uraDoraIndicator, ...(hand.kanUraDoraIndicators ?? [])])
+      );
     }
   });
 

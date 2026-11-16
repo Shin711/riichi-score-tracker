@@ -2,13 +2,13 @@
 
 Every morning the bot posts a winning hand to the club Discord and asks how much it is worth. Members answer **han**, **fu**, and the **score** privately, and the answer plus a recap goes up that evening.
 
-- **Posts:** 10am ET (14:00 UTC)
-- **Reveals:** 10pm ET (02:00 UTC)
+- **Posts:** 10am ET (14:00 UTC in summer, 15:00 UTC in winter)
+- **Reveals:** 10pm ET (02:00 UTC in summer, 03:00 UTC in winter)
 - **Channel:** `1534603299376992286`
 
 Hands are generated fresh each day and are always 1–5 han, so han and fu both still matter — no yakuman, no "it's just a mangan".
 
-> Vercel runs scheduled jobs to the hour, not the minute, so the post can land any time in the 10am hour. The schedule is fixed in UTC, so during winter (EST) both times shift an hour earlier — the morning post arrives around 9am.
+> Vercel runs scheduled jobs to the hour, not the minute, so the post can land any time in the 10am hour. Vercel schedules in UTC, so each job is scheduled at both UTC hours that can be 10am/10pm Eastern, and the route only acts on the run that lands on the Eastern hour (`?at=10` / `?at=22`). The other run returns `skipped`. Calling a route by hand without `?at` always runs it.
 
 ---
 

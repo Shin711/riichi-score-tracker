@@ -1,4 +1,4 @@
-import type { Tile, Wind } from "@/lib/quiz/tiles";
+import { isRedFive, type Tile, type Wind } from "@/lib/quiz/tiles";
 
 export type MeldKind = "chi" | "pon" | "ankan" | "minkan";
 
@@ -41,6 +41,16 @@ export type QuizHand = {
    * mean "no ura dora" either way. Read it through {@link uraDoraIndicator}.
    */
   uraDoraIndicator?: Tile;
+  /**
+   * One extra indicator per kan, flipped beside the dora indicator. Absent on
+   * hands without a kan (and on quizzes stored before kan dora existed).
+   */
+  kanDoraIndicators?: Tile[];
+  /**
+   * The tiles under each kan dora indicator, in the same order. Like the ura
+   * dora, only turned over for a riichi winner.
+   */
+  kanUraDoraIndicators?: Tile[];
   riichi: boolean;
 };
 
@@ -64,10 +74,29 @@ export function uraDoraIndicator(hand: QuizHand): Tile | null {
   return isRiichi(hand) ? (hand.uraDoraIndicator ?? null) : null;
 }
 
-/** The flipped indicators on the table: the dora, then the ura dora if any. */
+/** The face-up indicators on the wall's top row: dora, then one per kan. */
+export function doraIndicators(hand: QuizHand): Tile[] {
+  return [hand.doraIndicator, ...(hand.kanDoraIndicators ?? [])];
+}
+
+/**
+ * The ura indicators beneath them, in the same order — empty without riichi.
+ * A slot whose ura is missing (an old stored row) is simply skipped.
+ */
+export function uraDoraIndicators(hand: QuizHand): Tile[] {
+  if (!isRiichi(hand)) return [];
+  const ura = hand.uraDoraIndicator;
+  return [...(ura ? [ura] : []), ...(hand.kanUraDoraIndicators ?? [])];
+}
+
+/** Every flipped indicator on the table: the dora row, then the ura row. */
 export function indicatorTiles(hand: QuizHand): Tile[] {
-  const ura = uraDoraIndicator(hand);
-  return ura ? [hand.doraIndicator, ura] : [hand.doraIndicator];
+  return [...doraIndicators(hand), ...uraDoraIndicators(hand)];
+}
+
+/** Red fives held in the hand, each worth one han of aka dora. */
+export function akaCount(hand: QuizHand): number {
+  return allHandTiles(hand).filter(isRedFive).length;
 }
 
 /**

@@ -261,3 +261,63 @@ describe("solveHand — melds and fu", () => {
     assert.ok(result.yaku.some((y) => y.name === "Chun"));
   });
 });
+
+describe("solveHand — kan dora and red fives", () => {
+  const yakuHan = (result: ReturnType<typeof solveHand>, name: string) =>
+    result.yaku.find((y) => y.name === name)?.han ?? 0;
+
+  const kanHand = (overrides: Partial<QuizHand> = {}): QuizHand => ({
+    concealed: ["2m", "3m", "4m", "5m", "6m", "7m", "3p", "4p", "5p", "5s"],
+    melds: [{ kind: "ankan", tiles: ["9m", "9m", "9m", "9m"] }],
+    winningTile: "5s",
+    winType: "tsumo",
+    seatWind: "south",
+    roundWind: "east",
+    doraIndicator: "1z",
+    riichi: true,
+    ...overrides,
+  });
+
+  it("scores a kan dora indicator as dora", () => {
+    // Kan dora 4s -> 5s, held twice: riichi + menzen tsumo + 2 dora = 4 han.
+    const result = solveHand(kanHand({ kanDoraIndicators: ["4s"] }));
+    assert.equal(yakuHan(result, "Dora"), 2);
+    assert.equal(result.han, 4);
+  });
+
+  it("scores a kan ura dora indicator as ura dora, only under riichi", () => {
+    const riichi = solveHand(kanHand({ uraDoraIndicator: "1z", kanUraDoraIndicators: ["4s"] }));
+    assert.equal(yakuHan(riichi, "Ura dora"), 2);
+
+    const open = solveHand(
+      kanHand({
+        concealed: ["2m", "3m", "4m", "5m", "6m", "7m", "3p", "4p", "5p", "5s"],
+        melds: [{ kind: "minkan", tiles: ["2s", "2s", "2s", "2s"] }],
+        winningTile: "5s",
+        kanUraDoraIndicators: ["4s"],
+      })
+    );
+    assert.equal(yakuHan(open, "Ura dora"), 0);
+  });
+
+  it("scores a red five as aka dora and as an ordinary five otherwise", () => {
+    // Pinfu shape with 0m in place of 5m: riichi + pinfu + tanyao + 1 aka.
+    const result = solveHand(
+      hand({ concealed: PINFU_CONCEALED.map((t) => (t === "5m" ? "0m" : t)) })
+    );
+    assert.equal(result.han, 4);
+    assert.equal(result.fu, 30);
+    assert.equal(yakuHan(result, "Aka dora"), 1);
+    // Listed last, after the dora lines.
+    assert.equal(result.yaku[result.yaku.length - 1].name, "Aka dora");
+  });
+
+  it("counts a red five as the five a dora indicator points at", () => {
+    // Dora 4m -> 5m; the only 5m is red, so it is both dora and aka.
+    const result = solveHand(
+      hand({ concealed: PINFU_CONCEALED.map((t) => (t === "5m" ? "0m" : t)), doraIndicator: "4m" })
+    );
+    assert.equal(yakuHan(result, "Dora"), 1);
+    assert.equal(yakuHan(result, "Aka dora"), 1);
+  });
+});

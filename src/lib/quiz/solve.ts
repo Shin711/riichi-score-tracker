@@ -10,11 +10,13 @@ import { calc, Yaku as SolverYaku, type RiichiInput } from "riichi-rs-node";
 
 import { explainFu, SHAPE_YAKU, type FuLine } from "@/lib/quiz/fu";
 import {
+  akaCount,
   allHandTiles,
+  doraIndicators,
   indicatorTiles,
   isDealer,
   isRiichi,
-  uraDoraIndicator,
+  uraDoraIndicators,
   type Meld,
   type QuizHand,
 } from "@/lib/quiz/hand";
@@ -136,10 +138,7 @@ function meldToSolver(meld: Meld): SolverMeld {
     : [true, [tiles[0], tiles[1], tiles[2]]];
 }
 
-/**
- * All dora tiles a single indicator yields. Kept as an array so extra
- * indicators (kan dora) can be added later without changing callers.
- */
+/** The dora tile each indicator points at, one entry per indicator. */
 function doraTiles(indicators: Tile[]): SolverTile[] {
   return indicators.map((indicator) => asSolverTile(doraFromIndicator(indicator)));
 }
@@ -166,9 +165,11 @@ type YakuEntry = { name: string; han: number };
  * could not be trusted, so this refuses to score the hand rather than guess.
  */
 function splitDora(hand: QuizHand, solverDoraHan: number): YakuEntry[] {
-  const ura = uraDoraIndicator(hand);
-  const doraHan = countDora(hand, hand.doraIndicator);
-  const uraHan = ura ? countDora(hand, ura) : 0;
+  // Kan dora score as dora and kan ura dora as ura dora, the way they are called.
+  const sum = (indicators: string[]) =>
+    indicators.reduce((total, indicator) => total + countDora(hand, indicator), 0);
+  const doraHan = sum(doraIndicators(hand));
+  const uraHan = sum(uraDoraIndicators(hand));
 
   if (doraHan + uraHan !== solverDoraHan) {
     throw new Error(
@@ -201,6 +202,8 @@ export function solveHand(hand: QuizHand): SolvedHand {
       // Dora and ura dora together: the solver counts each entry separately, so
       // two indicators pointing at the same tile correctly score it twice.
       dora: doraTiles(indicatorTiles(hand)),
+      // Red fives score as aka dora; the solver only needs how many there are.
+      aka_count: akaCount(hand),
       tile_discarded_by_someone:
         hand.winType === "ron" ? asSolverTile(hand.winningTile) : -1,
     },
@@ -219,14 +222,17 @@ export function solveHand(hand: QuizHand): SolvedHand {
   }));
   const solverDoraHan = solverYaku.find((entry) => entry.id === SolverYaku.Dora)?.han ?? 0;
 
-  // Yaku first, biggest first; then dora and ura dora, the order they are called
-  // at the table.
+  const akaHan = solverYaku.find((entry) => entry.id === SolverYaku.Akadora)?.han ?? 0;
+
+  // Yaku first, biggest first; then dora, ura dora and aka dora, the order they
+  // are called at the table.
   const yaku = [
     ...solverYaku
-      .filter((entry) => entry.id !== SolverYaku.Dora)
+      .filter((entry) => entry.id !== SolverYaku.Dora && entry.id !== SolverYaku.Akadora)
       .map((entry) => ({ name: YAKU_NAMES[entry.id] ?? `Yaku ${entry.id}`, han: entry.han }))
       .sort((a, b) => b.han - a.han || a.name.localeCompare(b.name)),
     ...splitDora(hand, solverDoraHan),
+    ...(akaHan > 0 ? [{ name: YAKU_NAMES[SolverYaku.Akadora], han: akaHan }] : []),
   ];
 
   // The fu is the solver's; this only itemises it, and stays silent if it

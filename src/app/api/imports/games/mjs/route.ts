@@ -8,6 +8,7 @@ import { parseMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { resolveImportPlayers } from "@/lib/imports/resolvePlayers";
 import { humanImportEntries, importSeatWindLabel } from "@/lib/imports/types";
 import type { ImportedGameRow } from "@/lib/imports/types";
+import { storedHandResults } from "@/lib/leaderboard/handResults";
 import {
   fetchMajsoulGame,
   isMajsoulLookupConfigured,
@@ -39,7 +40,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const IMPORT_SELECT =
-  "id, played_at, starting_points, entries_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id";
+  "id, played_at, starting_points, entries_json, hand_results_json, mjs_paipu_url, mjs_record_uuid, created_at, imported_by_user_id";
 
 type SeatOverride = {
   seat?: number;
@@ -186,6 +187,7 @@ export async function POST(req: Request) {
         played_at: summary.playedAt.toISOString(),
         starting_points: summary.startingPoints,
         entries_json: entries,
+        hand_results_json: storedHandResults(stats),
         mjs_paipu_url: parsed.paipuUrl,
         mjs_record_uuid: summary.recordUuid || parsed.recordUuid,
         imported_by_user_id: importedByUserId,

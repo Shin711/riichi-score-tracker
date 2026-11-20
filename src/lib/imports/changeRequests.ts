@@ -43,9 +43,22 @@ export async function applyGameEdit(
   body: ImportBody
 ): Promise<ImportedGameRow> {
   const game = await parseImportBody(supabase, body, gameId);
+  // Hands are stored by seat index for a specific log. A different log (or no
+  // log) must not keep the previous hands; a name fix on the same log can.
+  const { data: existing, error: loadError } = await supabase
+    .from("imported_games")
+    .select("mjs_record_uuid")
+    .eq("id", gameId)
+    .maybeSingle();
+  if (loadError) throw new ImportBodyError(loadError.message);
+  const update =
+    (existing?.mjs_record_uuid ?? null) !== game.mjs_record_uuid
+      ? { ...game, hand_results_json: null }
+      : game;
+
   const { data, error } = await supabase
     .from("imported_games")
-    .update(game)
+    .update(update)
     .eq("id", gameId)
     .select(IMPORTED_GAME_COLUMNS)
     .single();

@@ -4,6 +4,11 @@
  * Discord must reply within three seconds and cannot defer a modal. Importing
  * the daily poster (wasm solver + sharp) into this route is what made the
  * first Answer click of the day fail with "This interaction failed".
+ *
+ * The approval buttons already import the Discord REST client (`bot.ts`).
+ * That file stays off this list because it is only `fetch`; the Mahjong Soul
+ * client and the slash-command registrar must still stay out, since a cold
+ * start that logs into Mahjong Soul would miss the same deadline.
  */
 
 import assert from "node:assert/strict";
@@ -31,7 +36,10 @@ const FORBIDDEN = [
   "@/lib/quiz/handImage",
   "@/lib/discord/quizMessage",
   "@/lib/discord/tileEmoji",
-  "@/lib/discord/bot",
+  "@/lib/discord/commands",
+  "@/lib/majsoul/client",
+  "@/lib/majsoul/stats",
+  "@/lib/majsoul/proto",
 ];
 
 const FROM_RE =

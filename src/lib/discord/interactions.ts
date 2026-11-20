@@ -14,6 +14,7 @@ export const InteractionType = {
   Ping: 1,
   ApplicationCommand: 2,
   MessageComponent: 3,
+  ApplicationCommandAutocomplete: 4,
   ModalSubmit: 5,
 } as const;
 
@@ -22,6 +23,7 @@ export const InteractionResponseType = {
   ChannelMessageWithSource: 4,
   /** Edit the message the clicked button is on. */
   UpdateMessage: 7,
+  AutocompleteResult: 8,
   Modal: 9,
 } as const;
 
@@ -124,11 +126,22 @@ export type SubmittedComponent = {
   component?: SubmittedComponent;
 };
 
+export type InteractionOption = {
+  name?: string;
+  type?: number;
+  value?: string | number | boolean;
+  focused?: boolean;
+  options?: InteractionOption[];
+};
+
 export type Interaction = {
   type: number;
   data?: {
+    /** Slash command name. Buttons and modals leave this unset. */
+    name?: string;
     custom_id?: string;
     components?: SubmittedComponent[];
+    options?: InteractionOption[];
   };
   message?: { id?: string };
   /** Where the button was clicked. Only people who can see a channel can click in it. */
@@ -162,5 +175,19 @@ export function ephemeralReply(content: string) {
   return {
     type: InteractionResponseType.ChannelMessageWithSource,
     data: { content, flags: MessageFlags.Ephemeral },
+  };
+}
+
+/** The string value of a top-level slash-command option, or "". */
+export function commandOptionValue(interaction: Interaction, name: string): string {
+  const option = interaction.data?.options?.find((entry) => entry.name === name);
+  if (option?.value == null) return "";
+  return String(option.value);
+}
+
+export function autocompleteReply(choices: Array<{ name: string; value: string }>) {
+  return {
+    type: InteractionResponseType.AutocompleteResult,
+    data: { choices },
   };
 }

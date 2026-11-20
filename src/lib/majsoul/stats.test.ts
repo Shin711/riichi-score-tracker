@@ -64,6 +64,17 @@ describe("computeMajsoulGameStats", () => {
     ]);
   });
 
+  it("keeps every winning hand, including the ron before the bigger tsumo", () => {
+    const stats = computeMajsoulGameStats(replay(EVENTS));
+    assert.deepEqual(
+      stats?.winningHands.map((hand) => [hand.seat, hand.points, hand.tsumo, hand.dealInSeat]),
+      [
+        [1, 5200, false, 0],
+        [2, 12000, true, null],
+      ]
+    );
+  });
+
   it("picks the biggest hand, totalling a tsumo when dadian is missing", () => {
     const stats = computeMajsoulGameStats(replay(EVENTS));
     assert.deepEqual(stats?.biggestHand, {
@@ -125,6 +136,13 @@ describe("alignMajsoulStatsToScores", () => {
       [2, 3, 0, 1]
     );
     assert.equal(aligned?.biggestHand?.seat, 0);
+    assert.deepEqual(
+      aligned?.winningHands.map((hand) => [hand.seat, hand.dealInSeat]),
+      [
+        [3, 2],
+        [0, null],
+      ]
+    );
   });
 
   it("gives up when the scores do not pair up", () => {

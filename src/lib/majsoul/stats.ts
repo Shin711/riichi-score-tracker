@@ -31,6 +31,8 @@ export type MajsoulGameStats = {
   /** Hands that ended without a win (exhaustive or abortive). */
   draws: number;
   seats: MajsoulSeatStats[];
+  /** Every winning hand, in play order. A double ron is two entries. */
+  winningHands: MajsoulWinningHand[];
   biggestHand: MajsoulWinningHand | null;
 };
 
@@ -102,6 +104,7 @@ export function computeMajsoulGameStats(detail: Uint8Array): MajsoulGameStats | 
   }));
   let hands = 0;
   let draws = 0;
+  const winningHands: MajsoulWinningHand[] = [];
   let biggestHand: MajsoulWinningHand | null = null;
   // Whoever last put a tile on the table — a discard, or a kan that can be robbed.
   let lastTileSeat: number | null = null;
@@ -134,17 +137,17 @@ export function computeMajsoulGameStats(detail: Uint8Array): MajsoulGameStats | 
             if (dealInSeat !== null) seats[dealInSeat].dealIns += 1;
 
             const points = handPoints(hule);
-            if (!biggestHand || points > biggestHand.points) {
-              biggestHand = {
-                seat: hule.seat,
-                points,
-                han: hule.count,
-                fu: hule.fu,
-                yakuman: hule.yiman,
-                tsumo: hule.zimo,
-                dealInSeat,
-              };
-            }
+            const winningHand: MajsoulWinningHand = {
+              seat: hule.seat,
+              points,
+              han: hule.count,
+              fu: hule.fu,
+              yakuman: hule.yiman,
+              tsumo: hule.zimo,
+              dealInSeat,
+            };
+            winningHands.push(winningHand);
+            if (!biggestHand || points > biggestHand.points) biggestHand = winningHand;
           }
           break;
         case ".lq.RecordNoTile":
@@ -159,7 +162,7 @@ export function computeMajsoulGameStats(detail: Uint8Array): MajsoulGameStats | 
   }
 
   if (hands === 0) return null;
-  return { hands, draws, seats, biggestHand };
+  return { hands, draws, seats, winningHands, biggestHand };
 }
 
 /**
@@ -187,14 +190,15 @@ export function alignMajsoulStatsToScores(
   if (targetOf.size !== targetScores.length) return null;
 
   const remap = (seat: number) => targetOf.get(seat) ?? seat;
+  const remapHand = (hand: MajsoulWinningHand): MajsoulWinningHand => ({
+    ...hand,
+    seat: remap(hand.seat),
+    dealInSeat: hand.dealInSeat === null ? null : remap(hand.dealInSeat),
+  });
   return {
     ...stats,
     seats: stats.seats.map((seat) => ({ ...seat, seat: remap(seat.seat) })),
-    biggestHand: stats.biggestHand && {
-      ...stats.biggestHand,
-      seat: remap(stats.biggestHand.seat),
-      dealInSeat:
-        stats.biggestHand.dealInSeat === null ? null : remap(stats.biggestHand.dealInSeat),
-    },
+    winningHands: (stats.winningHands ?? []).map(remapHand),
+    biggestHand: stats.biggestHand ? remapHand(stats.biggestHand) : null,
   };
 }

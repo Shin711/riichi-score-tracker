@@ -26,7 +26,13 @@ import {
   verifyInteractionSignatureWithKey,
   type Interaction,
 } from "@/lib/discord/interactions";
-import { handleImportCommand, IMPORT_COMMAND_NAME } from "@/lib/discord/importCommand";
+import {
+  handleImportButton,
+  handleImportCommand,
+  handleImportModalSubmit,
+  IMPORT_COMMAND_NAME,
+} from "@/lib/discord/importCommand";
+import { isImportControlId } from "@/lib/discord/importDraft";
 import { handlePlayerAutocomplete, handlePlayerCommand } from "@/lib/discord/playerCommand";
 import { decideGameChange } from "@/lib/imports/changeRequests";
 import { parseCount, parseScore, type AnswerMode } from "@/lib/quiz/answer";
@@ -84,9 +90,11 @@ export async function POST(req: Request) {
 
   const isPlayerInteraction =
     interaction.type === InteractionType.ApplicationCommandAutocomplete ||
-    interaction.type === InteractionType.ApplicationCommand;
-  // Once DISCORD_PLAYER_PUBLIC_KEY is set, slash commands must come from the
-  // player bot and buttons/modals from the quiz bot.
+    interaction.type === InteractionType.ApplicationCommand ||
+    isImportControlId(interaction.data?.custom_id);
+  // Once DISCORD_PLAYER_PUBLIC_KEY is set, slash commands (and the /import
+  // draft's buttons and form) must come from the club bot, and the quiz and
+  // approval buttons/modals from the quiz bot.
   if (isPlayerInteraction && playerKey && !signedByPlayer) {
     return new NextResponse("invalid request signature", { status: 401 });
   }
@@ -164,6 +172,8 @@ export async function POST(req: Request) {
 }
 
 async function handleButton(interaction: Interaction) {
+  if (isImportControlId(interaction.data?.custom_id)) return handleImportButton(interaction);
+
   const changeRequest = parseChangeRequestCustomId(interaction.data?.custom_id ?? "");
   if (changeRequest) return handleChangeRequestButton(interaction, changeRequest);
 
@@ -217,6 +227,8 @@ async function handleChangeRequestButton(
 }
 
 async function handleModalSubmit(interaction: Interaction) {
+  if (isImportControlId(interaction.data?.custom_id)) return handleImportModalSubmit(interaction);
+
   const control = parseCustomId(interaction.data?.custom_id ?? "");
   if (!control) return ephemeralReply("That form is no longer valid.");
   const mode: AnswerMode = control.kind === "beginner-modal" ? "beginner" : "typed";

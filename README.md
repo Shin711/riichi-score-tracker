@@ -63,7 +63,7 @@ After renaming an existing deployment, update **Google OAuth** authorized origin
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).
 - **Safety**: use **Undo last event** in session history to quickly revert the latest mistaken entry.
 - **Daily scoring quiz**: the bot posts a generated winning hand to Discord each morning (10am ET) and asks for **han**, **fu**, and the **score** — typed, or as multiple choice via the **Beginner** button. Answers are private, one attempt each; you see the correct answer, its yaku, and where the fu came from as soon as you submit, and the answer and a recap go up for everyone at 10pm ET. Setup: [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md).
-- **Discord `/player`**: in the club server, `/player` replies with who that player deals into, who they ron, and who they place above. It follows the leaderboard month unless you pick **All time**. Setup: [`docs/discord-player-command-setup.md`](docs/discord-player-command-setup.md).
+- **Discord `/player`**: in the club server, `/player` replies with who that player deals into, who they ron, and who they place above, using only this month's leaderboard games. Setup: [`docs/discord-player-command-setup.md`](docs/discord-player-command-setup.md).
 
 ## Event types (MVP)
 

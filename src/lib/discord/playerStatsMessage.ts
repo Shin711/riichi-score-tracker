@@ -59,7 +59,7 @@ function header(rivalry: PlayerRivalry): string {
 
 /** Embed body for `/player`. Also what the tests lock the wording to. */
 export function buildPlayerStatsDescription(rivalry: PlayerRivalry): string {
-  if (rivalry.games === 0) return "No games in this period.";
+  if (rivalry.games === 0) return "No games on this month's leaderboard.";
 
   const fed =
     rivalry.fed.length > 0

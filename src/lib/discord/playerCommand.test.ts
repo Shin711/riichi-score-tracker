@@ -41,27 +41,22 @@ describe("playerNotFoundMessage", () => {
 });
 
 describe("command options", () => {
-  it("reads the player name and the period", () => {
+  it("reads the player name", () => {
     const interaction = command({
-      options: [
-        { name: "name", value: "Alice" },
-        { name: "period", value: "all" },
-      ],
+      options: [{ name: "name", value: "Alice" }],
     });
     assert.equal(commandOptionValue(interaction, "name"), "Alice");
-    assert.equal(commandOptionValue(interaction, "period"), "all");
     assert.equal(commandOptionValue(interaction, "missing"), "");
   });
 });
 
 describe("PLAYER_COMMAND", () => {
-  it("asks Discord to autocomplete the player and offers both periods", () => {
+  it("asks for one player and counts the current leaderboard month", () => {
     assert.equal(PLAYER_COMMAND.name, "player");
+    assert.equal(PLAYER_COMMAND.options.length, 1);
+    assert.equal(PLAYER_COMMAND.options[0]?.name, "name");
     assert.equal(PLAYER_COMMAND.options[0]?.autocomplete, true);
     assert.equal(PLAYER_COMMAND.options[0]?.required, true);
-    assert.deepEqual(
-      PLAYER_COMMAND.options[1]?.choices?.map((choice) => choice.value),
-      ["month", "all"]
-    );
+    assert.match(PLAYER_COMMAND.description, /this month/);
   });
 });

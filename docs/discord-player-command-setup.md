@@ -6,7 +6,7 @@ Anyone in the club server can run `/player` and see one roster player's rivals:
 - **Won the most off** — rons they took from each opponent
 - **Beat most often** — how often they placed above each opponent
 
-It defaults to the current leaderboard month (US Eastern). The command also has **All time**. Tsumo counts on the player's own line and is not charged to one opponent. AI seats are left off the opponent lists.
+It counts only the games on the current leaderboard month (US Eastern), the same games as the standings. Tsumo counts on the player's own line and is not charged to one opponent. AI seats are left off the opponent lists.
 
 Deal-in totals come from Mahjong Soul logs and from sessions scored on the site. A game entered as final scores only still counts for "beat most often". The footer says how many of the games had a hand log.
 
@@ -65,7 +65,6 @@ In the club server:
 
 ```text
 /player name:Alice
-/player name:Alice period:All time
 ```
 
 The name field suggests roster names as you type. An unknown name gets a private reply.

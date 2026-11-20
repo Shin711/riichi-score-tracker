@@ -48,12 +48,14 @@ function listFieldValue(rows: RivalMatchup[], emptyText: string): string {
 
 function placementsFieldValue(rivalry: PlayerRivalry): string {
   const [first, second, third, fourth] = rivalry.placements;
-  const top2Pct = Math.round(((first + second) / rivalry.games) * 100);
+  const wins = first + second;
+  const losses = third + fourth;
+  const top2Pct = Math.round((wins / rivalry.games) * 100);
   const fourthPct = Math.round((fourth / rivalry.games) * 100);
 
   const lines = [
-    `🥇 **${first}**  ·  🥈 **${second}**  ·  🥉 **${third}**  ·  \`4th\` **${fourth}**`,
-    `Avg place \`${rivalry.avgPlacement.toFixed(2)}\`  ·  Top 2 \`${top2Pct}%\`  ·  4th \`${fourthPct}%\``,
+    `🟢 **${plural(wins, "win")}** (\`1st\` ${first} · \`2nd\` ${second})  ·  🔴 **${plural(losses, "loss", "losses")}** (\`3rd\` ${third} · \`4th\` ${fourth})`,
+    `Top 2 \`${top2Pct}%\`  ·  4th \`${fourthPct}%\`  ·  Avg \`${rivalry.avgPlacement.toFixed(2)}\``,
   ];
 
   if (rivalry.highScore !== null && rivalry.lowScore !== null) {

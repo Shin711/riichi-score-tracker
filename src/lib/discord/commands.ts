@@ -21,6 +21,7 @@ export const PLAYER_COMMAND = {
 } as const;
 
 type ListedCommand = {
+  id?: string;
   name?: string;
   description?: string;
   type?: number;
@@ -42,13 +43,19 @@ function keepCommand(command: ListedCommand) {
  * The bot has to be invited with the `applications.commands` scope.
  */
 export async function registerPlayerCommand(
-  guildId: string
-): Promise<Array<{ id: string; name: string }>> {
-  const applicationId = await getBotApplicationId();
+  guildId: string,
+  botToken?: string | null
+): Promise<{ applicationId: string; commands: Array<{ id: string; name: string }> }> {
+  const applicationId = await getBotApplicationId(botToken);
   const path = `/applications/${applicationId}/guilds/${guildId}/commands`;
   let existing: ListedCommand[];
   try {
-    existing = await botJson<ListedCommand[]>(path, { method: "GET" }, "Discord rejected the command list");
+    existing = await botJson<ListedCommand[]>(
+      path,
+      { method: "GET" },
+      "Discord rejected the command list",
+      botToken
+    );
   } catch (error) {
     throw withScopeHint(error);
   }
@@ -65,14 +72,55 @@ export async function registerPlayerCommand(
 
   let saved: Array<{ id?: string; name?: string }>;
   try {
-    saved = await botJson(path, { method: "PUT", body: JSON.stringify(commands) }, "Discord rejected the command update");
+    saved = await botJson(
+      path,
+      { method: "PUT", body: JSON.stringify(commands) },
+      "Discord rejected the command update",
+      botToken
+    );
   } catch (error) {
     throw withScopeHint(error);
   }
 
-  return saved.flatMap((command) =>
-    command.id && command.name ? [{ id: command.id, name: command.name }] : []
+  return {
+    applicationId,
+    commands: saved.flatMap((command) =>
+      command.id && command.name ? [{ id: command.id, name: command.name }] : []
+    ),
+  };
+}
+
+/** Drops `/player` from another bot application (e.g. moving off the quiz bot). */
+export async function unregisterPlayerCommand(
+  guildId: string,
+  botToken: string,
+  skipApplicationId?: string
+): Promise<boolean> {
+  const applicationId = await getBotApplicationId(botToken);
+  if (skipApplicationId && applicationId === skipApplicationId) return false;
+
+  const path = `/applications/${applicationId}/guilds/${guildId}/commands`;
+  const existing = await botJson<ListedCommand[]>(
+    path,
+    { method: "GET" },
+    "Discord rejected the command list",
+    botToken
   );
+  if (!Array.isArray(existing) || !existing.some((cmd) => cmd.name === PLAYER_COMMAND.name)) {
+    return false;
+  }
+
+  const kept = existing.flatMap((command) => {
+    const entry = keepCommand(command);
+    return entry ? [entry] : [];
+  });
+  await botJson(
+    path,
+    { method: "PUT", body: JSON.stringify(kept) },
+    "Discord rejected the command removal",
+    botToken
+  );
+  return true;
 }
 
 function withScopeHint(error: unknown): Error {

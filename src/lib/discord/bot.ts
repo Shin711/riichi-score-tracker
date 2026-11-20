@@ -26,6 +26,15 @@ export function getBotToken(): string | null {
   return process.env.DISCORD_BOT_TOKEN?.trim() || null;
 }
 
+/** Separate bot application for `/player`, so replies don't come from the quiz bot. */
+export function getPlayerBotToken(): string | null {
+  return process.env.DISCORD_PLAYER_BOT_TOKEN?.trim() || null;
+}
+
+export function getGuildId(): string | null {
+  return process.env.DISCORD_GUILD_ID?.trim() || null;
+}
+
 export function getQuizChannelId(): string | null {
   return process.env.DISCORD_QUIZ_CHANNEL_ID?.trim() || null;
 }
@@ -39,8 +48,12 @@ export function isQuizConfigured(): boolean {
   return getBotToken() !== null && getQuizChannelId() !== null;
 }
 
-async function botFetch(path: string, init: RequestInit): Promise<Response> {
-  const token = getBotToken();
+async function botFetch(
+  path: string,
+  init: RequestInit,
+  tokenOverride?: string | null
+): Promise<Response> {
+  const token = tokenOverride === undefined ? getBotToken() : tokenOverride?.trim() || null;
   if (!token) throw new DiscordBotError("DISCORD_BOT_TOKEN is not set.", 503);
 
   for (let attempt = 0; ; attempt += 1) {
@@ -144,8 +157,13 @@ export async function postChannelMessage(
 }
 
 /** JSON Discord call. Throws DiscordBotError with the response body on failure. */
-export async function botJson<T>(path: string, init: RequestInit, fallback: string): Promise<T> {
-  const response = await botFetch(path, init);
+export async function botJson<T>(
+  path: string,
+  init: RequestInit,
+  fallback: string,
+  tokenOverride?: string | null
+): Promise<T> {
+  const response = await botFetch(path, init, tokenOverride);
   if (!response.ok) {
     throw new DiscordBotError(await errorMessage(response, fallback), response.status);
   }
@@ -153,19 +171,23 @@ export async function botJson<T>(path: string, init: RequestInit, fallback: stri
 }
 
 /** The application this bot token belongs to. */
-export async function getBotApplicationId(): Promise<string> {
+export async function getBotApplicationId(tokenOverride?: string | null): Promise<string> {
   const data = await botJson<{ id?: string }>(
     "/oauth2/applications/@me",
     { method: "GET" },
-    "Discord rejected the application lookup"
+    "Discord rejected the application lookup",
+    tokenOverride
   );
   if (!data.id) throw new DiscordBotError("Discord returned an application without an id.", 502);
   return data.id;
 }
 
 /** The guild a channel belongs to, or null if the bot cannot see the channel. */
-export async function getChannelGuildId(channelId: string): Promise<string | null> {
-  const response = await botFetch(`/channels/${channelId}`, { method: "GET" });
+export async function getChannelGuildId(
+  channelId: string,
+  tokenOverride?: string | null
+): Promise<string | null> {
+  const response = await botFetch(`/channels/${channelId}`, { method: "GET" }, tokenOverride);
   if (!response.ok) return null;
   const data = (await response.json()) as { guild_id?: string };
   return data.guild_id ?? null;

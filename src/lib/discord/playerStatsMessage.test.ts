@@ -70,8 +70,8 @@ describe("buildPlayerStatsEmbed", () => {
       {
         name: "📊 Placements & Scores",
         value: [
-          "🥇 **1**  ·  🥈 **1**  ·  🥉 **0**  ·  `4th` **1**",
-          "Avg place `2.33`  ·  Top 2 `67%`  ·  4th `33%`",
+          "🟢 **2 wins** (`1st` 1 · `2nd` 1)  ·  🔴 **1 loss** (`3rd` 0 · `4th` 1)",
+          "Top 2 `67%`  ·  4th `33%`  ·  Avg `2.33`",
           "🔥 High `45,000`  ·  🥶 Low `11,000`",
         ].join("\n"),
       },

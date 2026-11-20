@@ -26,8 +26,8 @@ function rivalry(overrides: Partial<PlayerRivalry> = {}): PlayerRivalry {
   };
 }
 
-describe("buildPlayerStatsDescription", () => {
-  it("lists who was fed, who was ron'd, and who was beaten", () => {
+describe("buildPlayerStatsEmbed", () => {
+  it("lists who was fed, who was ron'd, and who was beaten in separate fields", () => {
     const games: RivalryGameInput[] = [
       {
         standings: [
@@ -42,50 +42,67 @@ describe("buildPlayerStatsDescription", () => {
         ],
       },
     ];
-    const description = buildPlayerStatsDescription(aggregatePlayerRivalry("a", "Alice", games));
-    assert.equal(
-      description,
-      [
-        "1 game · 1 ron · 1 tsumo · 1 deal-in",
-        "",
-        "**Fed the most points to**",
-        "1. **Bob** — 48,000 over 1 deal-in",
-        "",
-        "**Won the most off**",
-        "1. **Bob** — 1 ron, 62,000",
-        "",
-        "**Beat most often**",
-        "**Bob** — 1 of 1 game",
-        "**Cara** — 1 of 1 game",
-      ].join("\n")
+    const embed = buildPlayerStatsEmbed(
+      aggregatePlayerRivalry("a", "Alice", games),
+      "November 2026"
     );
+    assert.equal(embed.description, "🎲 **1** game  ·  ⚡ **1** ron  ·  ✨ **1** tsumo  ·  💥 **1** deal-in");
+    assert.deepEqual(embed.fields, [
+      {
+        name: "💥 Fed the most points to",
+        value: "🥇 **Bob** — `48,000` · 1 deal-in",
+      },
+      {
+        name: "🎯 Won the most off",
+        value: "🥇 **Bob** — **1** ron · `62,000`",
+      },
+      {
+        name: "🏆 Beat most often",
+        value: [
+          "🥇 **Bob** — **1/1** game (`100%`)",
+          "🥈 **Cara** — **1/1** game (`100%`)",
+        ].join("\n"),
+      },
+    ]);
   });
 
   it("says when a period has no games and when only the table was recorded", () => {
+    const empty = buildPlayerStatsEmbed(rivalry(), "November 2026");
+    assert.equal(empty.description, "No games on this month's leaderboard.");
+    assert.equal(empty.fields, undefined);
     assert.equal(buildPlayerStatsDescription(rivalry()), "No games on this month's leaderboard.");
-    const description = buildPlayerStatsDescription(
+
+    const tableOnly = buildPlayerStatsEmbed(
       rivalry({
         games: 2,
         beat: [{ playerId: "b", displayName: "Bob", games: 2, wins: 2 }],
-      })
+      }),
+      "November 2026"
     );
-    assert.match(description, /No hand logs for these games\./);
-    assert.match(description, /\*\*Bob\*\* — 2 of 2 games/);
+    assert.equal(tableOnly.fields?.[0]?.value, "*No hand logs for these games.*");
+    assert.equal(tableOnly.fields?.[1]?.value, "*No hand logs for these games.*");
+    assert.equal(tableOnly.fields?.[2]?.value, "🥇 **Bob** — **2/2** games (`100%`)");
   });
 
-  it("stops each list at five", () => {
+  it("stops each list at five with medals for top three", () => {
     const lines = Array.from({ length: 6 }, (_, index) => ({
       playerId: `p${index}`,
       displayName: `P${index}`,
       count: 6 - index,
       points: 1000 * (6 - index),
     }));
-    const description = buildPlayerStatsDescription(
-      rivalry({ games: 1, gamesWithHands: 1, fed: lines, wonOff: lines })
+    const embed = buildPlayerStatsEmbed(
+      rivalry({ games: 1, gamesWithHands: 1, fed: lines, wonOff: lines }),
+      "November 2026"
     );
-    assert.match(description, /5\. \*\*P4\*\*/);
-    assert.doesNotMatch(description, /\*\*P5\*\*/);
-    assert.match(description, /…and 1 more/);
+    const fedValue = embed.fields?.[0]?.value ?? "";
+    assert.match(fedValue, /🥇 \*\*P0\*\*/);
+    assert.match(fedValue, /🥈 \*\*P1\*\*/);
+    assert.match(fedValue, /🥉 \*\*P2\*\*/);
+    assert.match(fedValue, /`4` \*\*P3\*\*/);
+    assert.match(fedValue, /`5` \*\*P4\*\*/);
+    assert.doesNotMatch(fedValue, /\*\*P5\*\*/);
+    assert.match(fedValue, /\*…and 1 more\*/);
   });
 });
 
@@ -104,7 +121,7 @@ describe("buildPlayerStatsResponse", () => {
       "November 2026",
       new Date("2026-11-19T18:00:00.000Z")
     );
-    assert.equal(embed.title, "Alice · November 2026");
+    assert.equal(embed.title, "🀄 Alice · November 2026");
     assert.equal(embed.footer?.text, `${SITE_NAME} · Deal-ins cover 3 of 4 games`);
     assert.equal(response.data.embeds[0]?.footer?.text, embed.footer?.text);
   });

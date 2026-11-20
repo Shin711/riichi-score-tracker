@@ -143,6 +143,26 @@ export async function postChannelMessage(
   return { id: data.id, channelId: data.channel_id ?? channelId };
 }
 
+/** JSON Discord call. Throws DiscordBotError with the response body on failure. */
+export async function botJson<T>(path: string, init: RequestInit, fallback: string): Promise<T> {
+  const response = await botFetch(path, init);
+  if (!response.ok) {
+    throw new DiscordBotError(await errorMessage(response, fallback), response.status);
+  }
+  return (await response.json()) as T;
+}
+
+/** The application this bot token belongs to. */
+export async function getBotApplicationId(): Promise<string> {
+  const data = await botJson<{ id?: string }>(
+    "/oauth2/applications/@me",
+    { method: "GET" },
+    "Discord rejected the application lookup"
+  );
+  if (!data.id) throw new DiscordBotError("Discord returned an application without an id.", 502);
+  return data.id;
+}
+
 /** The guild a channel belongs to, or null if the bot cannot see the channel. */
 export async function getChannelGuildId(channelId: string): Promise<string | null> {
   const response = await botFetch(`/channels/${channelId}`, { method: "GET" });

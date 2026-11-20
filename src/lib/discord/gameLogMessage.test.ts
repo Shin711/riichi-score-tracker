@@ -33,6 +33,7 @@ const STATS: MajsoulGameStats = {
     { seat: 2, wins: 0, tsumo: 0, dealIns: 1, riichi: 0, calls: 5 },
     { seat: 3, wins: 2, tsumo: 1, dealIns: 1, riichi: 1, calls: 2 },
   ],
+  winningHands: [],
   biggestHand: { seat: 1, points: 12000, han: 6, fu: 30, yakuman: false, tsumo: false, dealInSeat: 0 },
 };
 

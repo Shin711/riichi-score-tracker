@@ -25,6 +25,8 @@ export type ImportedGameRow = {
   played_at: string;
   starting_points: number;
   entries_json: ImportedGameEntry[];
+  /** Winning hands in seat order, or null when this game has no hand log. */
+  hand_results_json?: unknown;
   mjs_paipu_url: string | null;
   mjs_record_uuid: string | null;
   created_at: string;

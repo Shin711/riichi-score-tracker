@@ -31,7 +31,7 @@ Setting this up means creating a Discord application. **You have to do this part
 ### Step 3: Invite the bot to the club server
 
 1. In the left sidebar, click **OAuth2** → **URL Generator**.
-2. Under **Scopes**, tick **`bot`**.
+2. Under **Scopes**, tick **`bot`** and **`applications.commands`**. The second scope is what lets the bot add slash commands such as `/player`.
 3. Under **Bot Permissions**, tick **Send Messages** and **Embed Links**. Nothing else is needed.
 4. Copy the generated URL at the bottom, open it, and add the bot to the club server.
 5. Make sure the bot can actually see and post in the quiz channel. If the channel is private, add the bot's role to it.

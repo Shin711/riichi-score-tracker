@@ -48,6 +48,7 @@ Open [http://localhost:3000](http://localhost:3000).
 4. Add the same environment variables in Vercel project settings.
 5. Deploy. For scheduled jobs on Vercel, also follow [`docs/vercel-monthly-cron-setup.md`](docs/vercel-monthly-cron-setup.md) (`CRON_SECRET` + production redeploy). The daily **maintenance** cron deletes empty sessions older than 7 days and checks database size (alerts at 400 MB).
 6. **Daily scoring quiz (optional):** follow [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md) to create the Discord app and point it at `/api/discord/interactions`.
+7. **Player rival command (optional):** follow [`docs/discord-player-command-setup.md`](docs/discord-player-command-setup.md) so `/player` can show who someone deals into and who they beat.
 
 After renaming an existing deployment, update **Google OAuth** authorized origins and any Supabase **Site URL** / redirect URLs to the new hostname.
 
@@ -62,6 +63,7 @@ After renaming an existing deployment, update **Google OAuth** authorized origin
 - **Claim**: sign in at `/login`, open a session you created, click **Claim session** to attach it to your account (`/my/sessions`).
 - **Safety**: use **Undo last event** in session history to quickly revert the latest mistaken entry.
 - **Daily scoring quiz**: the bot posts a generated winning hand to Discord each morning (10am ET) and asks for **han**, **fu**, and the **score** — typed, or as multiple choice via the **Beginner** button. Answers are private, one attempt each; you see the correct answer, its yaku, and where the fu came from as soon as you submit, and the answer and a recap go up for everyone at 10pm ET. Setup: [`docs/discord-scoring-quiz-setup.md`](docs/discord-scoring-quiz-setup.md).
+- **Discord `/player`**: in the club server, `/player` replies with who that player deals into, who they ron, and who they place above. It follows the leaderboard month unless you pick **All time**. Setup: [`docs/discord-player-command-setup.md`](docs/discord-player-command-setup.md).
 
 ## Event types (MVP)
 

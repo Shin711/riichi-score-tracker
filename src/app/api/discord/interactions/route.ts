@@ -15,6 +15,7 @@ import {
   parseCustomId,
 } from "@/lib/discord/quizForm";
 import {
+  autocompleteReply,
   ephemeralReply,
   getApplicationPublicKey,
   InteractionResponseType,
@@ -24,6 +25,7 @@ import {
   verifyInteractionSignature,
   type Interaction,
 } from "@/lib/discord/interactions";
+import { handlePlayerAutocomplete, handlePlayerCommand } from "@/lib/discord/playerCommand";
 import { decideGameChange } from "@/lib/imports/changeRequests";
 import { parseCount, parseScore, type AnswerMode } from "@/lib/quiz/answer";
 import { withFuBreakdown } from "@/lib/quiz/fu";
@@ -31,13 +33,13 @@ import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 /**
- * Discord interactions endpoint (buttons and modals for the daily quiz).
+ * Discord interactions endpoint (slash commands, buttons, and modals).
  *
  * Discord requires a reply within three seconds and cannot defer a modal, so
- * this module must stay small. Do not import `@/lib/quiz/daily` (or anything
- * else that pulls in `riichi-rs-node` / `sharp`): a cold start that loads the
- * wasm solver is enough to miss the deadline and show "This interaction failed"
- * on the first click of the day.
+ * this module must stay small. Do not import `@/lib/quiz/daily` or
+ * `@/lib/majsoul/*` (or anything else that pulls in `riichi-rs-node` / `sharp`):
+ * a cold start that loads the wasm solver is enough to miss the deadline and
+ * show "This interaction failed" on the first click of the day.
  *
  * Discord also verifies the endpoint by sending deliberately invalid
  * signatures, so every request is checked before it is parsed.
@@ -68,6 +70,27 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
+      const response = await handlePlayerAutocomplete(interaction);
+      console.log("[discord] autocomplete", {
+        command: interaction.data?.name,
+        region: process.env.VERCEL_REGION ?? "local",
+        ms: Date.now() - started,
+      });
+      return NextResponse.json(response);
+    }
+
+    if (interaction.type === InteractionType.ApplicationCommand) {
+      const response = await handlePlayerCommand(interaction);
+      console.log("[discord] command", {
+        command: interaction.data?.name,
+        user: interactionUser(interaction)?.id,
+        region: process.env.VERCEL_REGION ?? "local",
+        ms: Date.now() - started,
+      });
+      return NextResponse.json(response);
+    }
+
     if (interaction.type === InteractionType.MessageComponent) {
       const response = await handleButton(interaction);
       console.log("[quiz] button", {
@@ -90,16 +113,22 @@ export async function POST(req: Request) {
       return NextResponse.json(response);
     }
   } catch (e) {
-    console.error("[quiz] interaction handler failed", {
+    console.error("[discord] interaction handler failed", {
       type: interaction.type,
+      command: interaction.data?.name,
       customId: interaction.data?.custom_id,
       user: interactionUser(interaction)?.id,
       region: process.env.VERCEL_REGION ?? "local",
       ms: Date.now() - started,
       error: e instanceof Error ? e.message : e,
     });
+    // Autocomplete can only answer with choices. An ephemeral message here shows
+    // up in Discord as "This interaction failed".
+    if (interaction.type === InteractionType.ApplicationCommandAutocomplete) {
+      return NextResponse.json(autocompleteReply([]));
+    }
     return NextResponse.json(
-      ephemeralReply("Something went wrong with that request. Press the button again.")
+      ephemeralReply("Something went wrong with that request. Try it again.")
     );
   }
 

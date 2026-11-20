@@ -21,6 +21,8 @@ export const InteractionType = {
 export const InteractionResponseType = {
   Pong: 1,
   ChannelMessageWithSource: 4,
+  /** "Bot is thinking…" — the real reply is edited in later via the interaction token. */
+  DeferredChannelMessageWithSource: 5,
   /** Edit the message the clicked button is on. */
   UpdateMessage: 7,
   AutocompleteResult: 8,
@@ -148,6 +150,10 @@ export type InteractionOption = {
 
 export type Interaction = {
   type: number;
+  /** Needed with `token` to edit a deferred reply. */
+  application_id?: string;
+  /** Interaction token: valid for 15 minutes, used to edit the original reply. */
+  token?: string;
   data?: {
     /** Slash command name. Buttons and modals leave this unset. */
     name?: string;

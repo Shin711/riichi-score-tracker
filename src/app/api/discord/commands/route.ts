@@ -8,7 +8,7 @@ import {
   getPlayerBotToken,
   getQuizChannelId,
 } from "@/lib/discord/bot";
-import { registerPlayerCommand, unregisterPlayerCommand } from "@/lib/discord/commands";
+import { registerClubCommands, unregisterClubCommands } from "@/lib/discord/commands";
 
 async function resolveClubGuildId(playerToken: string): Promise<string | null> {
   const explicit = getGuildId();
@@ -25,8 +25,8 @@ async function resolveClubGuildId(playerToken: string): Promise<string | null> {
 }
 
 /**
- * Registers `/player` on the dedicated club bot (`DISCORD_PLAYER_BOT_TOKEN`),
- * and removes any leftover `/player` from `DISCORD_BOT_TOKEN` (the quiz bot).
+ * Registers `/player` and `/import` on the dedicated club bot (`DISCORD_PLAYER_BOT_TOKEN`),
+ * and removes any leftover copies from `DISCORD_BOT_TOKEN` (the quiz bot).
  *
  * Called by hand after deploy:
  *   curl -H "Authorization: Bearer $CRON_SECRET" -X POST …/api/discord/commands
@@ -58,12 +58,12 @@ export async function POST(req: Request) {
       );
     }
 
-    const { applicationId, commands } = await registerPlayerCommand(guildId, playerToken);
+    const { applicationId, commands } = await registerClubCommands(guildId, playerToken);
 
     const quizToken = getBotToken();
     let removedFromQuizBot = false;
     if (quizToken) {
-      removedFromQuizBot = await unregisterPlayerCommand(guildId, quizToken, applicationId).catch(
+      removedFromQuizBot = await unregisterClubCommands(guildId, quizToken, applicationId).catch(
         () => false
       );
     }

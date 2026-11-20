@@ -62,7 +62,7 @@ describe("buildPlayerStatsDescription", () => {
   });
 
   it("says when a period has no games and when only the table was recorded", () => {
-    assert.equal(buildPlayerStatsDescription(rivalry()), "No games in this period.");
+    assert.equal(buildPlayerStatsDescription(rivalry()), "No games on this month's leaderboard.");
     const description = buildPlayerStatsDescription(
       rivalry({
         games: 2,

@@ -8,7 +8,7 @@ import { DiscordBotError, botJson, getBotApplicationId } from "@/lib/discord/bot
  */
 export const PLAYER_COMMAND = {
   name: "player",
-  description: "Who a player rons, deals into, and beats",
+  description: "Who a player rons, deals into, and beats this month",
   options: [
     {
       type: 3,
@@ -16,16 +16,6 @@ export const PLAYER_COMMAND = {
       description: "Club player",
       required: true,
       autocomplete: true,
-    },
-    {
-      type: 3,
-      name: "period",
-      description: "Which games to count",
-      required: false,
-      choices: [
-        { name: "This month", value: "month" },
-        { name: "All time", value: "all" },
-      ],
     },
   ],
 } as const;

@@ -22,8 +22,6 @@ const IN_CHUNK = 100;
 const AUTOCOMPLETE_LIMIT = 25;
 const SUGGESTION_LIMIT = 5;
 
-export type PlayerStatsPeriod = "month" | "all";
-
 type PlayerName = { id: string; display_name: string };
 
 type ImportRow = {
@@ -109,8 +107,8 @@ function suggestionsFor(players: PlayerName[], query: string): string[] {
     .slice(0, SUGGESTION_LIMIT);
 }
 
-function periodBounds(period: PlayerStatsPeriod, now: Date) {
-  if (period !== "month") return null;
+/** Same Eastern month window as the current leaderboard. */
+function currentMonthBounds(now: Date) {
   const { year, month } = getMonthPartsInTimezone(now);
   return { ...getMonthPeriodBounds(year, month), label: formatMonthLabel(year, month) };
 }
@@ -118,7 +116,6 @@ function periodBounds(period: PlayerStatsPeriod, now: Date) {
 export async function lookupPlayerStats(
   supabase: SupabaseClient,
   name: string,
-  period: PlayerStatsPeriod,
   now = new Date()
 ): Promise<PlayerLookup> {
   const players = await selectPages<PlayerName>((from, to) =>
@@ -133,25 +130,27 @@ export async function lookupPlayerStats(
     return { status: "not_found", query: name, suggestions: suggestionsFor(players, name) };
   }
 
-  const bounds = periodBounds(period, now);
-  const imports = await selectPages<ImportRow>((from, to) => {
-    let query = supabase
+  const bounds = currentMonthBounds(now);
+  const imports = await selectPages<ImportRow>((from, to) =>
+    supabase
       .from("imported_games")
       .select("played_at, starting_points, entries_json, hand_results_json")
-      .order("played_at", { ascending: true });
-    if (bounds) query = query.gte("played_at", bounds.startIso).lt("played_at", bounds.endIso);
-    return query.range(from, to);
-  });
+      .gte("played_at", bounds.startIso)
+      .lt("played_at", bounds.endIso)
+      .order("played_at", { ascending: true })
+      .range(from, to)
+  );
 
-  const sessions = await selectPages<SessionRow>((from, to) => {
-    let query = supabase
+  const sessions = await selectPages<SessionRow>((from, to) =>
+    supabase
       .from("sessions")
       .select("id, rules_json")
       .not("ended_at", "is", null)
-      .order("ended_at", { ascending: true });
-    if (bounds) query = query.gte("ended_at", bounds.startIso).lt("ended_at", bounds.endIso);
-    return query.range(from, to);
-  });
+      .gte("ended_at", bounds.startIso)
+      .lt("ended_at", bounds.endIso)
+      .order("ended_at", { ascending: true })
+      .range(from, to)
+  );
 
   const sessionIds = sessions.map((session) => session.id);
   const sessionPlayers: SessionPlayerRow[] = [];
@@ -197,7 +196,7 @@ export async function lookupPlayerStats(
   return {
     status: "ok",
     rivalry,
-    periodLabel: bounds?.label ?? "All time",
+    periodLabel: bounds.label,
   };
 }
 
@@ -217,12 +216,11 @@ export async function handlePlayerCommand(interaction: Interaction, now = new Da
   const name = commandOptionValue(interaction, "name").trim();
   if (!name) return ephemeralReply("Name a player, for example `/player name:Alice`.");
 
-  const period: PlayerStatsPeriod = commandOptionValue(interaction, "period") === "all" ? "all" : "month";
   const supabase = getSupabaseAdmin();
   if (!supabase) return ephemeralReply("The database is not configured.");
 
   try {
-    const result = await lookupPlayerStats(supabase, name, period, now);
+    const result = await lookupPlayerStats(supabase, name, now);
     if (result.status === "not_found") {
       return ephemeralReply(playerNotFoundMessage(result.query, result.suggestions));
     }

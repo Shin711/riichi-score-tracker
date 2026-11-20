@@ -1,6 +1,11 @@
 import { InteractionResponseType } from "@/lib/discord/interactions";
 import type { DiscordEmbed } from "@/lib/discord/webhook";
-import type { PlayerRivalry, RivalPointsLine, RivalTableLine } from "@/lib/leaderboard/rivalries";
+import { formatLeaderboardAverage, formatPointsValue } from "@/lib/leaderboard/points";
+import type {
+  PlayerLeaderboardStanding,
+  PlayerRivalry,
+  RivalMatchup,
+} from "@/lib/leaderboard/rivalries";
 import { SITE_NAME, SITE_URL } from "@/lib/site";
 
 /** Club gold, matching the site header. */
@@ -10,8 +15,8 @@ const MAX_FIELD_VALUE = 1024;
 const TOP = 5;
 const RANK_BADGES = ["🥇", "🥈", "🥉"] as const;
 
-function formatPoints(points: number): string {
-  return points.toLocaleString("en-US");
+function formatScore(score: number): string {
+  return score.toLocaleString("en-US");
 }
 
 function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
@@ -26,78 +31,87 @@ function rankBadge(index: number): string {
   return RANK_BADGES[index] ?? `\`${index + 1}\``;
 }
 
-function pointsLine(line: RivalPointsLine, kind: "fed" | "won"): string {
-  if (kind === "fed") {
-    return `**${line.displayName}** — \`${formatPoints(line.points)}\` · ${plural(line.count, "deal-in")}`;
-  }
-  return `**${line.displayName}** — **${line.count}** ron · \`${formatPoints(line.points)}\``;
-}
-
-function tableLine(line: RivalTableLine): string {
+function matchupLine(line: RivalMatchup): string {
   const pct = line.games > 0 ? Math.round((line.wins / line.games) * 100) : 0;
-  const noun = line.games === 1 ? "game" : "games";
-  return `**${line.displayName}** — **${line.wins}/${line.games}** ${noun} (\`${pct}%\`)`;
+  return `**${line.displayName}** — **${line.wins}–${line.losses}** (\`${pct}%\`)`;
 }
 
-function listFieldValue<T>(rows: T[], render: (row: T) => string): string {
+function listFieldValue(rows: RivalMatchup[], emptyText: string): string {
+  if (rows.length === 0) return emptyText;
   const shown = rows.slice(0, TOP);
-  const lines = shown.map((row, index) => `${rankBadge(index)} ${render(row)}`);
+  const lines = shown.map((row, index) => `${rankBadge(index)} ${matchupLine(row)}`);
   const hidden = rows.length - shown.length;
   if (hidden > 0) lines.push(`*…and ${hidden} more*`);
   const value = lines.join("\n");
   return value.length > MAX_FIELD_VALUE ? `${value.slice(0, MAX_FIELD_VALUE - 1)}…` : value;
 }
 
-function emptyHands(rivalry: PlayerRivalry, kind: "fed" | "won"): string {
-  if (rivalry.gamesWithHands === 0) return "*No hand logs for these games.*";
-  return kind === "fed" ? "*No recorded deal-ins.*" : "*No recorded rons.*";
+function placementsFieldValue(rivalry: PlayerRivalry): string {
+  const [first, second, third, fourth] = rivalry.placements;
+  const top2Pct = Math.round(((first + second) / rivalry.games) * 100);
+  const fourthPct = Math.round((fourth / rivalry.games) * 100);
+
+  const lines = [
+    `🥇 **${first}**  ·  🥈 **${second}**  ·  🥉 **${third}**  ·  \`4th\` **${fourth}**`,
+    `Avg place \`${rivalry.avgPlacement.toFixed(2)}\`  ·  Top 2 \`${top2Pct}%\`  ·  4th \`${fourthPct}%\``,
+  ];
+
+  if (rivalry.highScore !== null && rivalry.lowScore !== null) {
+    lines.push(
+      `🔥 High \`${formatScore(rivalry.highScore)}\`  ·  🥶 Low \`${formatScore(rivalry.lowScore)}\``
+    );
+  }
+  return lines.join("\n");
 }
 
 /** Summary line at the top of the `/player` embed. */
-export function buildPlayerStatsDescription(rivalry: PlayerRivalry): string {
+export function buildPlayerStatsDescription(
+  rivalry: PlayerRivalry,
+  standing?: PlayerLeaderboardStanding | null
+): string {
   if (rivalry.games === 0) return "No games on this month's leaderboard.";
 
-  return [
-    `🎲 **${rivalry.games}** ${rivalry.games === 1 ? "game" : "games"}`,
-    `⚡ **${rivalry.ron}** ron`,
-    `✨ **${rivalry.tsumo}** tsumo`,
-    `💥 **${rivalry.dealIns}** ${rivalry.dealIns === 1 ? "deal-in" : "deal-ins"}`,
-  ].join("  ·  ");
+  const points = standing ? standing.rating : rivalry.netPoints;
+  const trendIcon = points >= 0 ? "📈" : "📉";
+  const ptsText = `${formatPointsValue(points)} pts (\`${formatLeaderboardAverage(rivalry.netPoints, rivalry.games)}\`/game)`;
+
+  const parts: string[] = [];
+  if (standing?.rank) {
+    parts.push(`🏅 **#${standing.rank}** of ${standing.rankedCount}`);
+  }
+  parts.push(
+    standing && standing.rank === null && standing.gamesToRank > 0
+      ? `🎲 **${plural(rivalry.games, "game")}** (${standing.gamesToRank} to rank)`
+      : `🎲 **${plural(rivalry.games, "game")}**`
+  );
+  parts.push(`${trendIcon} **${ptsText}**`);
+
+  return parts.join("  ·  ");
 }
 
 export function buildPlayerStatsEmbed(
   rivalry: PlayerRivalry,
   periodLabel: string,
-  now = new Date()
+  now = new Date(),
+  standing?: PlayerLeaderboardStanding | null
 ): DiscordEmbed {
-  const coverage =
-    rivalry.games > 0
-      ? `Deal-ins cover ${rivalry.gamesWithHands} of ${plural(rivalry.games, "game")}`
-      : null;
-
   const fields =
     rivalry.games > 0
       ? [
           {
-            name: "💥 Fed the most points to",
-            value:
-              rivalry.fed.length > 0
-                ? listFieldValue(rivalry.fed, (line) => pointsLine(line, "fed"))
-                : emptyHands(rivalry, "fed"),
+            name: "📊 Placements & Scores",
+            value: placementsFieldValue(rivalry),
           },
           {
-            name: "🎯 Won the most off",
-            value:
-              rivalry.wonOff.length > 0
-                ? listFieldValue(rivalry.wonOff, (line) => pointsLine(line, "won"))
-                : emptyHands(rivalry, "won"),
+            name: "🏆 Best matchups",
+            value: listFieldValue(rivalry.bestMatchups, "*No winning head-to-head records yet.*"),
           },
           {
-            name: "🏆 Beat most often",
-            value:
-              rivalry.beat.length > 0
-                ? listFieldValue(rivalry.beat, tableLine)
-                : "*Did not place above anyone.*",
+            name: "😈 Toughest matchups",
+            value: listFieldValue(
+              rivalry.toughestMatchups,
+              "*No losing head-to-head records yet.*"
+            ),
           },
         ]
       : undefined;
@@ -105,10 +119,10 @@ export function buildPlayerStatsEmbed(
   return {
     title: `🀄 ${titleName(rivalry.displayName)} · ${periodLabel}`,
     url: `${SITE_URL}/leaderboard`,
-    description: buildPlayerStatsDescription(rivalry),
+    description: buildPlayerStatsDescription(rivalry, standing),
     color: EMBED_COLOR,
     ...(fields ? { fields } : {}),
-    footer: { text: coverage ? `${SITE_NAME} · ${coverage}` : SITE_NAME },
+    footer: { text: `${SITE_NAME} · Current month's leaderboard` },
     timestamp: now.toISOString(),
   };
 }
@@ -117,12 +131,13 @@ export function buildPlayerStatsEmbed(
 export function buildPlayerStatsResponse(
   rivalry: PlayerRivalry,
   periodLabel: string,
-  now = new Date()
+  now = new Date(),
+  standing?: PlayerLeaderboardStanding | null
 ) {
   return {
     type: InteractionResponseType.ChannelMessageWithSource,
     data: {
-      embeds: [buildPlayerStatsEmbed(rivalry, periodLabel, now)],
+      embeds: [buildPlayerStatsEmbed(rivalry, periodLabel, now, standing)],
       allowed_mentions: { parse: [] as string[] },
     },
   };

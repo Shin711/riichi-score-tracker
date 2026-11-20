@@ -8,12 +8,25 @@ import {
 } from "@/lib/discord/interactions";
 import { buildPlayerStatsResponse } from "@/lib/discord/playerStatsMessage";
 import type { ImportedGameEntry } from "@/lib/imports/types";
+import { computeLeaderboard, groupSessionSnapshots } from "@/lib/leaderboard/computeLeaderboard";
+import { mergeImportedGamesIntoLeaderboard } from "@/lib/leaderboard/mergeImports";
+import { leaderboardRating } from "@/lib/leaderboard/points";
+import {
+  gamesUntilLeaderboardRank,
+  getLeaderboardScoringOptions,
+  splitLeaderboardEntries,
+} from "@/lib/leaderboard/qualification";
 import {
   aggregatePlayerRivalry,
   rivalryGamesFromRows,
+  type PlayerLeaderboardStanding,
   type PlayerRivalry,
 } from "@/lib/leaderboard/rivalries";
-import { formatMonthLabel, getMonthPartsInTimezone, getMonthPeriodBounds } from "@/lib/leaderboard/timezone";
+import {
+  formatMonthLabel,
+  getMonthPartsInTimezone,
+  getMonthPeriodBounds,
+} from "@/lib/leaderboard/timezone";
 import { findPlayerByDisplayName, playerNameKey } from "@/lib/players/names";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
@@ -28,7 +41,6 @@ type ImportRow = {
   played_at: string;
   starting_points: number;
   entries_json: ImportedGameEntry[] | null;
-  hand_results_json: unknown;
 };
 
 type SessionRow = { id: string; rules_json: unknown };
@@ -49,7 +61,12 @@ type EventQueryRow = {
 
 export type PlayerLookup =
   | { status: "not_found"; query: string; suggestions: string[] }
-  | { status: "ok"; rivalry: PlayerRivalry; periodLabel: string };
+  | {
+      status: "ok";
+      rivalry: PlayerRivalry;
+      standing: PlayerLeaderboardStanding | null;
+      periodLabel: string;
+    };
 
 async function selectPages<T>(
   fetchPage: (
@@ -110,7 +127,7 @@ function suggestionsFor(players: PlayerName[], query: string): string[] {
 /** Same Eastern month window as the current leaderboard. */
 function currentMonthBounds(now: Date) {
   const { year, month } = getMonthPartsInTimezone(now);
-  return { ...getMonthPeriodBounds(year, month), label: formatMonthLabel(year, month) };
+  return { year, month, ...getMonthPeriodBounds(year, month), label: formatMonthLabel(year, month) };
 }
 
 export async function lookupPlayerStats(
@@ -134,7 +151,7 @@ export async function lookupPlayerStats(
   const imports = await selectPages<ImportRow>((from, to) =>
     supabase
       .from("imported_games")
-      .select("played_at, starting_points, entries_json, hand_results_json")
+      .select("played_at, starting_points, entries_json")
       .gte("played_at", bounds.startIso)
       .lt("played_at", bounds.endIso)
       .order("played_at", { ascending: true })
@@ -177,6 +194,41 @@ export async function lookupPlayerStats(
     );
   }
 
+  const period = { year: bounds.year, month: bounds.month };
+  const scoring = getLeaderboardScoringOptions(period);
+  const normalizedEvents = events.map((event) => ({
+    ...event,
+    payload_json: event.payload_json ?? {},
+  }));
+
+  const snapshots = groupSessionSnapshots({
+    sessions,
+    sessionPlayers,
+    events: normalizedEvents,
+  });
+  const leaderboard = mergeImportedGamesIntoLeaderboard(
+    computeLeaderboard(snapshots, players, scoring),
+    imports.map((row) => ({
+      starting_points: row.starting_points,
+      entries_json: row.entries_json ?? [],
+    })),
+    scoring
+  );
+  const { ranked } = splitLeaderboardEntries(leaderboard, period);
+  const entry = leaderboard.find((row) => row.playerId === player.id);
+  const rankIndex = ranked.findIndex((row) => row.playerId === player.id);
+
+  const standing: PlayerLeaderboardStanding | null = entry
+    ? {
+        rank: rankIndex >= 0 ? rankIndex + 1 : null,
+        rankedCount: ranked.length,
+        gamesToRank: gamesUntilLeaderboardRank(entry.gamesPlayed, scoring.minGamesForRank),
+        rating: scoring.useRating
+          ? leaderboardRating(entry.points, entry.gamesPlayed, scoring.confidenceWeighted)
+          : entry.points,
+      }
+    : null;
+
   const names = new Map(players.map((row) => [row.id, row.display_name]));
   const rivalry = aggregatePlayerRivalry(
     player.id,
@@ -185,10 +237,8 @@ export async function lookupPlayerStats(
       imports,
       sessions,
       sessionPlayers,
-      events: events.map((event) => ({
-        ...event,
-        payload_json: event.payload_json ?? {},
-      })),
+      events: normalizedEvents,
+      usePlacementBonus: scoring.usePlacementBonus,
     }),
     names
   );
@@ -196,16 +246,9 @@ export async function lookupPlayerStats(
   return {
     status: "ok",
     rivalry,
+    standing,
     periodLabel: bounds.label,
   };
-}
-
-function loadErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : "";
-  if (message.includes("hand_results_json")) {
-    return "Player stats need a database update before they can load. Run migration 013, then try again.";
-  }
-  return "Could not load that player's stats.";
 }
 
 export async function handlePlayerCommand(interaction: Interaction, now = new Date()) {
@@ -224,10 +267,10 @@ export async function handlePlayerCommand(interaction: Interaction, now = new Da
     if (result.status === "not_found") {
       return ephemeralReply(playerNotFoundMessage(result.query, result.suggestions));
     }
-    return buildPlayerStatsResponse(result.rivalry, result.periodLabel, now);
+    return buildPlayerStatsResponse(result.rivalry, result.periodLabel, now, result.standing);
   } catch (error) {
     console.error("[discord] player command failed", error);
-    return ephemeralReply(loadErrorMessage(error));
+    return ephemeralReply("Could not load that player's stats.");
   }
 }
 
@@ -235,11 +278,12 @@ export async function handlePlayerAutocomplete(interaction: Interaction) {
   if (interaction.data?.name !== "player") return autocompleteReply([]);
 
   const focused = interaction.data?.options?.find((option) => option.focused);
-  if (focused && focused.name !== "name") return autocompleteReply([]);
+  if (focused?.name && focused.name !== "name") return autocompleteReply([]);
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return autocompleteReply([]);
 
+  const query = commandOptionValue(interaction, "name");
   try {
     const players = await selectPages<PlayerName>((from, to) =>
       supabase
@@ -251,7 +295,7 @@ export async function handlePlayerAutocomplete(interaction: Interaction) {
     return autocompleteReply(
       autocompletePlayerChoices(
         players.map((player) => player.display_name),
-        focused?.value == null ? "" : String(focused.value)
+        query
       )
     );
   } catch (error) {

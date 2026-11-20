@@ -8,7 +8,7 @@ import { DiscordBotError, botJson, getBotApplicationId } from "@/lib/discord/bot
  */
 export const PLAYER_COMMAND = {
   name: "player",
-  description: "Who a player rons, deals into, and beats this month",
+  description: "Monthly rank, placements, and matchups for a club player",
   options: [
     {
       type: 3,

@@ -10,7 +10,7 @@ import type { ImportedGameRow } from "@/lib/imports/types";
 
 export function mergeImportedGamesIntoLeaderboard(
   entries: LeaderboardEntry[],
-  imports: ImportedGameRow[],
+  imports: Array<Pick<ImportedGameRow, "entries_json" | "starting_points">>,
   options?: LeaderboardComputeOptions
 ): LeaderboardEntry[] {
   const byPlayer = new Map<string, LeaderboardEntry>();

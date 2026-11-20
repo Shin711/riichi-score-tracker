@@ -6,8 +6,11 @@ import {
   buildPlayerStatsEmbed,
   buildPlayerStatsResponse,
 } from "@/lib/discord/playerStatsMessage";
-import { aggregatePlayerRivalry } from "@/lib/leaderboard/rivalries";
-import type { PlayerRivalry, RivalryGameInput } from "@/lib/leaderboard/rivalries";
+import {
+  aggregatePlayerRivalry,
+  type PlayerRivalry,
+  type RivalryGameInput,
+} from "@/lib/leaderboard/rivalries";
 import { SITE_NAME } from "@/lib/site";
 
 function rivalry(overrides: Partial<PlayerRivalry> = {}): PlayerRivalry {
@@ -15,114 +18,124 @@ function rivalry(overrides: Partial<PlayerRivalry> = {}): PlayerRivalry {
     playerId: "a",
     displayName: "Alice",
     games: 0,
-    ron: 0,
-    tsumo: 0,
-    dealIns: 0,
-    gamesWithHands: 0,
-    fed: [],
-    wonOff: [],
-    beat: [],
+    placements: [0, 0, 0, 0],
+    avgPlacement: 0,
+    highScore: null,
+    lowScore: null,
+    netPoints: 0,
+    bestMatchups: [],
+    toughestMatchups: [],
     ...overrides,
   };
 }
 
 describe("buildPlayerStatsEmbed", () => {
-  it("lists who was fed, who was ron'd, and who was beaten in separate fields", () => {
+  it("shows rank, placements, scores, and head-to-head matchups", () => {
     const games: RivalryGameInput[] = [
       {
         standings: [
-          { playerId: "a", displayName: "Alice", placement: 1 },
-          { playerId: "b", displayName: "Bob", placement: 2 },
-          { playerId: "c", displayName: "Cara", placement: 3 },
+          { playerId: "a", displayName: "Alice", placement: 1, finalScore: 45000, net: 35 },
+          { playerId: "b", displayName: "Bob", placement: 2, finalScore: 28000, net: 8 },
+          { playerId: "c", displayName: "Cara", placement: 3, finalScore: 17000, net: -13 },
         ],
-        hands: [
-          { winnerId: "b", dealInId: "a", tsumo: false, points: 48000 },
-          { winnerId: "a", dealInId: "b", tsumo: false, points: 62000 },
-          { winnerId: "a", dealInId: null, tsumo: true, points: 8000 },
+      },
+      {
+        standings: [
+          { playerId: "b", displayName: "Bob", placement: 1, finalScore: 39000, net: 29 },
+          { playerId: "c", displayName: "Cara", placement: 2, finalScore: 26000, net: 6 },
+          { playerId: "a", displayName: "Alice", placement: 4, finalScore: 11000, net: -29 },
+        ],
+      },
+      {
+        standings: [
+          { playerId: "b", displayName: "Bob", placement: 1, finalScore: 36000, net: 26 },
+          { playerId: "a", displayName: "Alice", placement: 2, finalScore: 29000, net: 9 },
+          { playerId: "c", displayName: "Cara", placement: 3, finalScore: 20000, net: -10 },
         ],
       },
     ];
-    const embed = buildPlayerStatsEmbed(
-      aggregatePlayerRivalry("a", "Alice", games),
-      "November 2026"
+    const stats = aggregatePlayerRivalry("a", "Alice", games);
+    const embed = buildPlayerStatsEmbed(stats, "November 2026", new Date("2026-11-19T18:00:00Z"), {
+      rank: 2,
+      rankedCount: 15,
+      gamesToRank: 0,
+      rating: 15,
+    });
+
+    assert.equal(
+      embed.description,
+      "🏅 **#2** of 15  ·  🎲 **3 games**  ·  📈 **+15.0 pts (`+5.00`/game)**"
     );
-    assert.equal(embed.description, "🎲 **1** game  ·  ⚡ **1** ron  ·  ✨ **1** tsumo  ·  💥 **1** deal-in");
     assert.deepEqual(embed.fields, [
       {
-        name: "💥 Fed the most points to",
-        value: "🥇 **Bob** — `48,000` · 1 deal-in",
-      },
-      {
-        name: "🎯 Won the most off",
-        value: "🥇 **Bob** — **1** ron · `62,000`",
-      },
-      {
-        name: "🏆 Beat most often",
+        name: "📊 Placements & Scores",
         value: [
-          "🥇 **Bob** — **1/1** game (`100%`)",
-          "🥈 **Cara** — **1/1** game (`100%`)",
+          "🥇 **1**  ·  🥈 **1**  ·  🥉 **0**  ·  `4th` **1**",
+          "Avg place `2.33`  ·  Top 2 `67%`  ·  4th `33%`",
+          "🔥 High `45,000`  ·  🥶 Low `11,000`",
         ].join("\n"),
+      },
+      {
+        name: "🏆 Best matchups",
+        value: "🥇 **Cara** — **2–1** (`67%`)",
+      },
+      {
+        name: "😈 Toughest matchups",
+        value: "🥇 **Bob** — **1–2** (`33%`)",
       },
     ]);
   });
 
-  it("says when a period has no games and when only the table was recorded", () => {
+  it("handles zero games and unranked players", () => {
     const empty = buildPlayerStatsEmbed(rivalry(), "November 2026");
     assert.equal(empty.description, "No games on this month's leaderboard.");
     assert.equal(empty.fields, undefined);
     assert.equal(buildPlayerStatsDescription(rivalry()), "No games on this month's leaderboard.");
 
-    const tableOnly = buildPlayerStatsEmbed(
-      rivalry({
-        games: 2,
-        beat: [{ playerId: "b", displayName: "Bob", games: 2, wins: 2 }],
-      }),
-      "November 2026"
+    const unranked = buildPlayerStatsDescription(
+      rivalry({ games: 2, netPoints: -12.5 }),
+      { rank: null, rankedCount: 10, gamesToRank: 3, rating: -12.5 }
     );
-    assert.equal(tableOnly.fields?.[0]?.value, "*No hand logs for these games.*");
-    assert.equal(tableOnly.fields?.[1]?.value, "*No hand logs for these games.*");
-    assert.equal(tableOnly.fields?.[2]?.value, "🥇 **Bob** — **2/2** games (`100%`)");
+    assert.equal(unranked, "🎲 **2 games** (3 to rank)  ·  📉 **-12.5 pts (`-6.25`/game)**");
   });
 
-  it("stops each list at five with medals for top three", () => {
-    const lines = Array.from({ length: 6 }, (_, index) => ({
+  it("stops each matchup list at five with medals for top three", () => {
+    const matchups = Array.from({ length: 6 }, (_, index) => ({
       playerId: `p${index}`,
       displayName: `P${index}`,
-      count: 6 - index,
-      points: 1000 * (6 - index),
+      games: 10,
+      wins: 9 - index,
+      losses: 1 + index,
     }));
     const embed = buildPlayerStatsEmbed(
-      rivalry({ games: 1, gamesWithHands: 1, fed: lines, wonOff: lines }),
+      rivalry({ games: 10, placements: [4, 3, 2, 1], bestMatchups: matchups }),
       "November 2026"
     );
-    const fedValue = embed.fields?.[0]?.value ?? "";
-    assert.match(fedValue, /🥇 \*\*P0\*\*/);
-    assert.match(fedValue, /🥈 \*\*P1\*\*/);
-    assert.match(fedValue, /🥉 \*\*P2\*\*/);
-    assert.match(fedValue, /`4` \*\*P3\*\*/);
-    assert.match(fedValue, /`5` \*\*P4\*\*/);
-    assert.doesNotMatch(fedValue, /\*\*P5\*\*/);
-    assert.match(fedValue, /\*…and 1 more\*/);
+    const bestValue = embed.fields?.[1]?.value ?? "";
+    assert.match(bestValue, /🥇 \*\*P0\*\* — \*\*9–1\*\*/);
+    assert.match(bestValue, /🥈 \*\*P1\*\*/);
+    assert.match(bestValue, /🥉 \*\*P2\*\*/);
+    assert.match(bestValue, /`4` \*\*P3\*\*/);
+    assert.match(bestValue, /`5` \*\*P4\*\*/);
+    assert.doesNotMatch(bestValue, /\*\*P5\*\*/);
+    assert.match(bestValue, /\*…and 1 more\*/);
   });
 });
 
 describe("buildPlayerStatsResponse", () => {
-  it("replies in the channel, with deal-in coverage in the footer", () => {
+  it("replies publicly in the channel with leaderboard footer", () => {
     const response = buildPlayerStatsResponse(
-      rivalry({ games: 4, gamesWithHands: 3, displayName: "Alice" }),
+      rivalry({ games: 4, placements: [2, 1, 1, 0], displayName: "Alice" }),
       "November 2026",
       new Date("2026-11-19T18:00:00.000Z")
     );
     assert.equal(response.type, 4);
     assert.equal("flags" in response.data, false);
     assert.deepEqual(response.data.allowed_mentions, { parse: [] });
-    const embed = buildPlayerStatsEmbed(
-      rivalry({ games: 4, gamesWithHands: 3, displayName: "Alice" }),
-      "November 2026",
-      new Date("2026-11-19T18:00:00.000Z")
+    assert.equal(response.data.embeds[0]?.title, "🀄 Alice · November 2026");
+    assert.equal(
+      response.data.embeds[0]?.footer?.text,
+      `${SITE_NAME} · Current month's leaderboard`
     );
-    assert.equal(embed.title, "🀄 Alice · November 2026");
-    assert.equal(embed.footer?.text, `${SITE_NAME} · Deal-ins cover 3 of 4 games`);
-    assert.equal(response.data.embeds[0]?.footer?.text, embed.footer?.text);
   });
 });

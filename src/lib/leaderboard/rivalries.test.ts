@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { aggregatePlayerRivalry, rivalryGameFromImport, rivalryGameFromSession } from "@/lib/leaderboard/rivalries";
-import type { RivalryGameInput } from "@/lib/leaderboard/rivalries";
+import {
+  aggregatePlayerRivalry,
+  rivalryGameFromImport,
+  rivalryGameFromSession,
+  type RivalryGameInput,
+} from "@/lib/leaderboard/rivalries";
 import { defaultRules } from "@/lib/scoring/ledger";
 
 const alice = "a";
@@ -11,135 +15,108 @@ const cara = "c";
 const dan = "d";
 
 function game(
-  standings: Array<[string, string, number]>,
-  hands?: RivalryGameInput["hands"]
+  standings: Array<[string, string, number, number, number]>
 ): RivalryGameInput {
   return {
-    standings: standings.map(([playerId, displayName, placement]) => ({
+    standings: standings.map(([playerId, displayName, placement, finalScore, net]) => ({
       playerId,
       displayName,
       placement,
+      finalScore,
+      net,
     })),
-    ...(hands ? { hands } : {}),
   };
 }
 
 describe("aggregatePlayerRivalry", () => {
   const games: RivalryGameInput[] = [
-    game(
-      [
-        [alice, "Alice", 1],
-        [bob, "Bob", 2],
-        [cara, "Cara", 3],
-        [dan, "Dan", 4],
-      ],
-      [
-        { winnerId: alice, dealInId: bob, tsumo: false, points: 8000 },
-        { winnerId: alice, dealInId: bob, tsumo: false, points: 4000 },
-        { winnerId: bob, dealInId: alice, tsumo: false, points: 12000 },
-        { winnerId: alice, dealInId: null, tsumo: true, points: 6000 },
-      ]
-    ),
-    game(
-      [
-        [bob, "Bob", 1],
-        [alice, "Alice", 2],
-      ],
-      [
-        { winnerId: alice, dealInId: bob, tsumo: false, points: 2000 },
-        { winnerId: bob, dealInId: alice, tsumo: false, points: 1000 },
-      ]
-    ),
     game([
-      [alice, "Alice", 1],
-      [cara, "Cara", 2],
-      [bob, "Bob", 4],
+      [alice, "Alice", 1, 45000, 35],
+      [bob, "Bob", 2, 30000, 10],
+      [cara, "Cara", 3, 18000, -12],
+      [dan, "Dan", 4, 7000, -33],
+    ]),
+    game([
+      [bob, "Bob", 1, 38000, 28],
+      [alice, "Alice", 2, 26000, 6],
+      [cara, "Cara", 3, 21000, -9],
+    ]),
+    game([
+      [bob, "Bob", 1, 41000, 31],
+      [dan, "Dan", 2, 29000, 9],
+      [alice, "Alice", 4, 10000, -30],
     ]),
   ];
 
-  it("counts rons, deal-ins, and who finished ahead", () => {
+  it("summarizes placements, score range, and head-to-head matchups", () => {
     const rivalry = aggregatePlayerRivalry(alice, "Alice", games);
     assert.equal(rivalry.games, 3);
-    assert.equal(rivalry.ron, 3);
-    assert.equal(rivalry.tsumo, 1);
-    assert.equal(rivalry.dealIns, 2);
-    assert.equal(rivalry.gamesWithHands, 2);
-    assert.deepEqual(rivalry.fed, [{ playerId: bob, displayName: "Bob", count: 2, points: 13000 }]);
-    assert.deepEqual(rivalry.wonOff, [{ playerId: bob, displayName: "Bob", count: 3, points: 14000 }]);
+    assert.deepEqual(rivalry.placements, [1, 1, 0, 1]);
+    assert.equal(Number(rivalry.avgPlacement.toFixed(2)), 2.33);
+    assert.equal(rivalry.highScore, 45000);
+    assert.equal(rivalry.lowScore, 10000);
+    assert.equal(rivalry.netPoints, 11);
+
+    // Beat Cara 2-0 (+2); split with Dan 1-1 (omitted); lost to Bob 1-2 (-1).
     assert.deepEqual(
-      rivalry.beat.map((line) => [line.displayName, line.wins, line.games]),
-      [
-        ["Bob", 2, 3],
-        ["Cara", 2, 2],
-        ["Dan", 1, 1],
-      ]
+      rivalry.bestMatchups.map((m) => [m.displayName, m.wins, m.losses]),
+      [["Cara", 2, 0]]
+    );
+    assert.deepEqual(
+      rivalry.toughestMatchups.map((m) => [m.displayName, m.wins, m.losses]),
+      [["Bob", 1, 2]]
     );
   });
 
-  it("counts hands against AI on the player, not as an opponent", () => {
+  it("sorts matchups by net margin first, then wins or losses", () => {
     const rivalry = aggregatePlayerRivalry(alice, "Alice", [
-      game(
-        [
-          [alice, "Alice", 1],
-          [bob, "Bob", 2],
-        ],
-        [
-          { winnerId: null, dealInId: alice, tsumo: false, points: 8000 },
-          { winnerId: alice, dealInId: null, tsumo: false, points: 5200 },
-        ]
-      ),
+      // Beat Cara 3-1 (+2), beat Dan 2-0 (+2) -> Cara ahead because 3 wins > 2 wins
+      game([[alice, "Alice", 1, 40000, 30], [cara, "Cara", 2, 25000, 5], [dan, "Dan", 3, 20000, -10]]),
+      game([[alice, "Alice", 1, 40000, 30], [cara, "Cara", 2, 25000, 5], [dan, "Dan", 3, 20000, -10]]),
+      game([[alice, "Alice", 1, 40000, 30], [cara, "Cara", 2, 25000, 5]]),
+      game([[cara, "Cara", 1, 40000, 30], [alice, "Alice", 2, 25000, 5]]),
     ]);
-    assert.equal(rivalry.ron, 1);
-    assert.equal(rivalry.dealIns, 1);
-    assert.deepEqual(rivalry.fed, []);
-    assert.deepEqual(rivalry.wonOff, []);
-    assert.equal(rivalry.beat[0]?.displayName, "Bob");
+    assert.deepEqual(
+      rivalry.bestMatchups.map((m) => [m.displayName, m.wins, m.losses]),
+      [
+        ["Cara", 3, 1],
+        ["Dan", 2, 0],
+      ]
+    );
   });
 
   it("prefers the current roster name over the name stored on the game", () => {
     const rivalry = aggregatePlayerRivalry(alice, "Alice", games, new Map([[bob, "Robert"]]));
-    assert.equal(rivalry.fed[0]?.displayName, "Robert");
-    assert.equal(rivalry.beat[0]?.displayName, "Robert");
+    assert.equal(rivalry.toughestMatchups[0]?.displayName, "Robert");
   });
 });
 
 describe("rivalryGameFromImport", () => {
-  const row = {
-    played_at: "2026-11-03T20:00:00Z",
-    starting_points: 25000,
-    entries_json: [
-      { player_id: alice, display_name: "Alice", final_score: 30000 },
-      { display_name: "AI", final_score: 40000, is_ai: true },
-      { player_id: bob, display_name: "Bob", final_score: 20000 },
-      { player_id: cara, display_name: "Cara", final_score: 10000 },
-    ],
-    hand_results_json: [{ winnerSeat: 0, dealInSeat: 2, points: 8000 }],
-  };
-
-  it("keeps AI out of the standings and maps seats onto players", () => {
-    const game = rivalryGameFromImport(row);
+  it("keeps AI out of matchups while preserving 1-4 placement and net", () => {
+    const imported = rivalryGameFromImport({
+      played_at: "2026-11-03T20:00:00Z",
+      starting_points: 25000,
+      entries_json: [
+        { player_id: alice, display_name: "Alice", final_score: 30000 },
+        { display_name: "AI", final_score: 40000, is_ai: true },
+        { player_id: bob, display_name: "Bob", final_score: 20000 },
+        { player_id: cara, display_name: "Cara", final_score: 10000 },
+      ],
+    });
     assert.deepEqual(
-      game.standings.map((seat) => [seat.displayName, seat.placement]),
+      imported.standings.map((seat) => [seat.displayName, seat.placement, seat.finalScore, seat.net]),
       [
-        ["Alice", 2],
-        ["Bob", 3],
-        ["Cara", 4],
+        ["Alice", 2, 30000, 10],
+        ["Bob", 3, 20000, -10],
+        ["Cara", 4, 10000, -30],
       ]
     );
-    assert.deepEqual(game.hands, [
-      { winnerId: alice, dealInId: bob, tsumo: false, points: 8000 },
-    ]);
-  });
-
-  it("leaves hands off when the log was never read", () => {
-    const game = rivalryGameFromImport({ ...row, hand_results_json: null });
-    assert.equal(game.hands, undefined);
   });
 });
 
 describe("rivalryGameFromSession", () => {
-  it("reads a ron off the winner and the discarder, and ranks the table", () => {
-    const game = rivalryGameFromSession({
+  it("ranks the table with uma and computes final scores from events", () => {
+    const sessionGame = rivalryGameFromSession({
       sessionId: "s",
       rules: defaultRules(),
       assignments: [
@@ -161,37 +138,18 @@ describe("rivalryGameFromSession", () => {
         },
       ],
     });
-    assert.ok(game);
-    assert.equal(game.standings[0]?.playerId, bob);
-    assert.equal(game.standings.at(-1)?.playerId, alice);
-    assert.deepEqual(game.hands, [
-      { winnerId: bob, dealInId: alice, tsumo: false, points: 8000 },
-    ]);
-
-    const rivalry = aggregatePlayerRivalry(alice, "Alice", [game]);
-    assert.deepEqual(rivalry.fed, [{ playerId: bob, displayName: "Bob", count: 1, points: 8000 }]);
-    assert.equal(rivalry.gamesWithHands, 1);
-    assert.deepEqual(rivalry.beat, []);
-  });
-
-  it("infers a ron from the deltas when the win type was not stored", () => {
-    const game = rivalryGameFromSession({
-      sessionId: "s",
-      rules: defaultRules(),
-      assignments: [
-        { seat: "E", playerId: alice, displayName: "Alice" },
-        { seat: "S", playerId: bob, displayName: "Bob" },
-      ],
-      events: [
-        {
-          type: "win",
-          created_at: "1",
-          payload_json: { deltas: { E: 3900, S: -3900, W: 0, N: 0 } },
-        },
-      ],
-    });
-    assert.deepEqual(game?.hands, [
-      { winnerId: alice, dealInId: bob, tsumo: false, points: 3900 },
-    ]);
+    assert.ok(sessionGame);
+    assert.deepEqual(
+      sessionGame.standings.map((s) => [s.displayName, s.placement, s.finalScore]),
+      [
+        ["Bob", 1, 33000],
+        ["Cara", 2, 25000],
+        ["Dan", 3, 25000],
+        ["Alice", 4, 17000],
+      ]
+    );
+    const rivalry = aggregatePlayerRivalry(alice, "Alice", [sessionGame]);
+    assert.deepEqual(rivalry.placements, [0, 0, 0, 1]);
+    assert.equal(rivalry.toughestMatchups.length, 3);
   });
 });

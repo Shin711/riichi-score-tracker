@@ -60,7 +60,7 @@ Games imported before migration `013_imported_game_hand_results.sql` have no `ha
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" -X POST \
-  "https://flushing-riichi-mahjong-club.vercel.app/api/imports/games/mjs/backfill?limit=8"
+  "https://flushing-riichi-mahjong-club.vercel.app/api/imports/games/mjs/backfill?limit=3"
 ```
 
 Repeat until `"remaining": 0` (pass `afterId` from `"lastId"` if `"skipped"` or `"failed"` is non-zero). Manual in-person games have no hand log and stay placement-only.

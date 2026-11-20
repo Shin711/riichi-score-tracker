@@ -11,15 +11,16 @@ import {
 } from "@/lib/majsoul/client";
 import { summarizeMajsoulRecord } from "@/lib/majsoul/record";
 import { alignMajsoulStatsToScores, computeMajsoulGameStats } from "@/lib/majsoul/stats";
+import { checkMajsoulAccountRateLimit } from "@/lib/rateLimit";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-/** Mahjong Soul throttles rapid replay pulls; pause between fetches inside a batch. */
-const FETCH_INTERVAL_MS = 3_000;
-const DEFAULT_LIMIT = 8;
-const MAX_LIMIT = 12;
+/** Match MJS_ACCOUNT_MINUTE_LIMIT (4/min) so backfills do not trip error 540. */
+const FETCH_INTERVAL_MS = 15_000;
+const DEFAULT_LIMIT = 3;
+const MAX_LIMIT = 4;
 const MAX_FAILURES_IN_A_ROW = 2;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -104,6 +105,11 @@ export async function POST(req: Request) {
     await withMajsoulSession(async (fetchGame) => {
       let failuresInARow = 0;
       for (let i = 0; i < rows.length; i += 1) {
+        const rate = await checkMajsoulAccountRateLimit(supabase);
+        if (!rate.allowed) {
+          stoppedError = `Account rate limit reached; retry in ${rate.retryAfterSeconds ?? 60}s.`;
+          return;
+        }
         const row = rows[i];
         lastId = row.id;
         try {

@@ -76,7 +76,19 @@ function localMidnightToUtcIso(
   day: number,
   timeZone: string
 ) {
-  const desiredLocalMs = Date.UTC(year, month - 1, day, 0, 0, 0);
+  return localTimeToUtcIso(year, month, day, 0, 0, timeZone);
+}
+
+/** UTC instant of a wall-clock time in `timeZone` (e.g. 9:30 PM Eastern). */
+export function localTimeToUtcIso(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timeZone = LEADERBOARD_TIMEZONE
+) {
+  const desiredLocalMs = Date.UTC(year, month - 1, day, hour, minute, 0);
 
   // Initial guess: Eastern is typically UTC−4 or UTC−5
   let utcMs = desiredLocalMs + 5 * 60 * 60 * 1000;
@@ -95,6 +107,11 @@ function localMidnightToUtcIso(
   }
 
   return new Date(utcMs).toISOString();
+}
+
+/** Wall-clock parts of `date` in `timeZone`. */
+export function getLocalPartsInTimezone(date: Date, timeZone = LEADERBOARD_TIMEZONE) {
+  return readDateParts(date, timeZone);
 }
 
 export function formatTimezoneLabel(timeZone = LEADERBOARD_TIMEZONE) {

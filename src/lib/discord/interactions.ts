@@ -23,6 +23,8 @@ export const InteractionResponseType = {
   ChannelMessageWithSource: 4,
   /** "Bot is thinking…" — the real reply is edited in later via the interaction token. */
   DeferredChannelMessageWithSource: 5,
+  /** Acknowledge a button now and edit its message later via the interaction token. */
+  DeferredUpdateMessage: 6,
   /** Edit the message the clicked button is on. */
   UpdateMessage: 7,
   AutocompleteResult: 8,

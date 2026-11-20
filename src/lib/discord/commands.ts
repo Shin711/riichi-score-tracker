@@ -20,16 +20,19 @@ export const PLAYER_COMMAND = {
   ],
 } as const;
 
-/** `/import` — auto-imports a finished Mahjong Soul game from its log link. */
+/**
+ * `/import` — a Mahjong Soul log link, or no link to type the game in. Either
+ * way it posts a draft to check and edit before saving.
+ */
 export const IMPORT_COMMAND = {
   name: "import",
-  description: "Import a finished Mahjong Soul game to the club leaderboard",
+  description: "Add a finished game to the club leaderboard (MJS link, or leave blank to type it in)",
   options: [
     {
       type: 3,
       name: "game",
-      description: "Mahjong Soul game log link or game ID",
-      required: true,
+      description: "Mahjong Soul game log link or game ID — leave blank to enter names and scores",
+      required: false,
     },
   ],
 } as const;

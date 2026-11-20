@@ -51,12 +51,12 @@ describe("command options", () => {
 });
 
 describe("PLAYER_COMMAND", () => {
-  it("asks for one player and counts the current leaderboard month", () => {
+  it("asks for one player and describes monthly stats", () => {
     assert.equal(PLAYER_COMMAND.name, "player");
     assert.equal(PLAYER_COMMAND.options.length, 1);
     assert.equal(PLAYER_COMMAND.options[0]?.name, "name");
     assert.equal(PLAYER_COMMAND.options[0]?.autocomplete, true);
     assert.equal(PLAYER_COMMAND.options[0]?.required, true);
-    assert.match(PLAYER_COMMAND.description, /this month/);
+    assert.match(PLAYER_COMMAND.description, /Monthly/i);
   });
 });

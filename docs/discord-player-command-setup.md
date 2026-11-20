@@ -1,14 +1,13 @@
 # Discord `/player` command
 
-Anyone in the club server can run `/player` and see one roster player's rivals:
+Anyone in the club server can run `/player` and see one roster player's stats for the current leaderboard month (US Eastern):
 
-- **Fed the most points to** — rons they dealt into, and the points on those hands
-- **Won the most off** — rons they took from each opponent
-- **Beat most often** — how often they placed above each opponent
+- **Rank & rating** — exact leaderboard standing, net points, and per-game average
+- **Placements & scores** — 1st/2nd/3rd/4th breakdown, average placement, Top 2 and 4th rates, and high/low game scores
+- **Best matchups** — opponents they finish above most often (head-to-head win–loss record)
+- **Toughest matchups** — opponents who finish above them most often
 
-It counts only the games on the current leaderboard month (US Eastern), the same games as the standings. Tsumo counts on the player's own line and is not charged to one opponent. AI seats are left off the opponent lists.
-
-Deal-in totals come from Mahjong Soul logs and from sessions scored on the site. A game entered as final scores only still counts for "beat most often". The footer says how many of the games had a hand log.
+Everything comes from final game scores and placements, so in-person games and online Mahjong Soul games count equally with 100% coverage and no replay backfill required. AI seats are included in 1–4 table numbering and left off the matchup lists.
 
 The reply is visible in the channel.
 
@@ -53,17 +52,6 @@ In Vercel → **Settings** → **Environment Variables** (Production):
    ```
 
    A successful response looks like `{"ok":true,"guildId":"…","applicationId":"…","commands":[{"id":"…","name":"player"}],"removedFromQuizBot":true}`.
-
-### Step 4: Backfill older Mahjong Soul logs
-
-Games imported before migration `013_imported_game_hand_results.sql` have no `hand_results_json` yet, so they count for placement only until backfilled. Because `MAJSOUL_UID` and `MAJSOUL_TOKEN` live on Vercel, you can backfill in small batches directly on the server:
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" -X POST \
-  "https://flushing-riichi-mahjong-club.vercel.app/api/imports/games/mjs/backfill?limit=3"
-```
-
-Repeat until `"remaining": 0` (pass `afterId` from `"lastId"` if `"skipped"` or `"failed"` is non-zero). Manual in-person games have no hand log and stay placement-only.
 
 ---
 

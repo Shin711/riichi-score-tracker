@@ -2,14 +2,10 @@ import type { ImportedGameEntry } from "@/lib/imports/types";
 import { isHumanImportEntry } from "@/lib/imports/types";
 import { groupSessionSnapshots, type SessionSnapshot } from "@/lib/leaderboard/computeLeaderboard";
 import { importedGameResults } from "@/lib/leaderboard/gameResults";
-import { parseHandResults } from "@/lib/leaderboard/handResults";
+import { umaAdjustments } from "@/lib/leaderboard/placement";
+import { gameScoreDelta, leaderboardPoints } from "@/lib/leaderboard/points";
 import { mapEventRow } from "@/lib/scoring/events";
-import {
-  computeTotals,
-  inferWinWinner,
-  type Seat,
-  type SessionEvent,
-} from "@/lib/scoring/ledger";
+import { computeTotals, type Seat } from "@/lib/scoring/ledger";
 
 const SEATS: Seat[] = ["E", "S", "W", "N"];
 
@@ -18,145 +14,80 @@ export type RivalryStanding = {
   displayName: string;
   /** 1 is first. Unique within a game, AI seats included in the numbering. */
   placement: number;
-};
-
-export type RivalryHand = {
-  /** Null when the winner is not a club player (an AI seat). */
-  winnerId: string | null;
-  /** Null for a tsumo, or when the discarder is not a club player. */
-  dealInId: string | null;
-  tsumo: boolean;
-  points: number;
+  finalScore: number;
+  /** Leaderboard points for this game (score delta ÷ 1,000 + uma + chombo). */
+  net: number;
 };
 
 export type RivalryGameInput = {
   standings: RivalryStanding[];
-  /**
-   * Present when this game has a hand log (Mahjong Soul results, or a scored
-   * session). Absent for a score-only import. An empty list means nobody won.
-   */
-  hands?: RivalryHand[];
 };
 
-export type RivalPointsLine = {
-  playerId: string;
-  displayName: string;
-  count: number;
-  points: number;
-};
-
-export type RivalTableLine = {
+export type RivalMatchup = {
   playerId: string;
   displayName: string;
   games: number;
   wins: number;
+  losses: number;
+};
+
+export type PlayerLeaderboardStanding = {
+  /** 1-based rank among qualified players, or null when not ranked yet. */
+  rank: number | null;
+  rankedCount: number;
+  gamesToRank: number;
+  /** Matches the rating shown on the monthly leaderboard. */
+  rating: number;
 };
 
 export type PlayerRivalry = {
   playerId: string;
   displayName: string;
   games: number;
-  ron: number;
-  tsumo: number;
-  dealIns: number;
-  /** Games whose hands we could read. The rest still count toward placement. */
-  gamesWithHands: number;
-  fed: RivalPointsLine[];
-  wonOff: RivalPointsLine[];
-  /** Times this player placed above the opponent. Opponents they never beat are omitted. */
-  beat: RivalTableLine[];
+  /** Counts for [1st, 2nd, 3rd, 4th]. */
+  placements: [number, number, number, number];
+  avgPlacement: number;
+  highScore: number | null;
+  lowScore: number | null;
+  netPoints: number;
+  /** Opponents this player placed above more often than below. */
+  bestMatchups: RivalMatchup[];
+  /** Opponents this player placed below more often than above. */
+  toughestMatchups: RivalMatchup[];
 };
 
 function seatIndex(seat: Seat): number {
   return SEATS.indexOf(seat);
 }
 
-function playerIdAt(
-  entries: ImportedGameEntry[],
-  seat: number
-): string | null {
-  const entry = entries[seat];
-  if (!entry || !isHumanImportEntry(entry)) return null;
-  return entry.player_id;
-}
-
-export function rivalryGameFromImport(
-  row: {
-    entries_json: ImportedGameEntry[] | null;
-    starting_points: number;
-    played_at: string;
-    hand_results_json?: unknown;
-  }
-): RivalryGameInput {
+export function rivalryGameFromImport(row: {
+  entries_json: ImportedGameEntry[] | null;
+  starting_points: number;
+  played_at: string;
+}): RivalryGameInput {
   const entries = Array.isArray(row.entries_json) ? row.entries_json : [];
   const standings = importedGameResults({ ...row, entries_json: entries }).seats.flatMap((seat) =>
     isHumanImportEntry(seat)
-      ? [{ playerId: seat.player_id, displayName: seat.display_name, placement: seat.placement }]
+      ? [
+          {
+            playerId: seat.player_id,
+            displayName: seat.display_name,
+            placement: seat.placement,
+            finalScore: seat.final_score,
+            net: seat.net,
+          },
+        ]
       : []
   );
 
-  const stored = parseHandResults(row.hand_results_json);
-  if (!stored) return { standings };
-
-  return {
-    standings,
-    hands: stored.map((hand) => ({
-      winnerId: playerIdAt(entries, hand.winnerSeat),
-      dealInId: hand.dealInSeat === null ? null : playerIdAt(entries, hand.dealInSeat),
-      tsumo: hand.dealInSeat === null,
-      points: hand.points,
-    })),
-  };
+  return { standings };
 }
 
-function ronPayment(
-  ev: Extract<SessionEvent, { type: "win" }>,
-  from: Seat,
-  winner: Seat
-): number {
-  const paid = ev.deltas[from] ?? 0;
-  if (paid < 0) return -paid;
-  const gained = ev.deltas[winner] ?? 0;
-  return gained > 0 ? gained : 0;
-}
-
-function sessionWinHand(
-  ev: Extract<SessionEvent, { type: "win" }>,
-  playerAt: Map<Seat, string>
-): RivalryHand | null {
-  const losers = SEATS.filter((seat) => (ev.deltas[seat] ?? 0) < 0);
-  const winner = ev.winner ?? inferWinWinner(ev);
-  if (!winner) return null;
-
-  let winType = ev.winType;
-  if (!winType) {
-    if (losers.length === 1) winType = "ron";
-    else if (losers.length === 3) winType = "tsumo";
-  }
-
-  if (winType === "tsumo") {
-    const gained = ev.deltas[winner] ?? 0;
-    return {
-      winnerId: playerAt.get(winner) ?? null,
-      dealInId: null,
-      tsumo: true,
-      points: gained > 0 ? gained : 0,
-    };
-  }
-  if (winType !== "ron") return null;
-
-  const from = ev.fromSeat ?? (losers.length === 1 ? losers[0] : null);
-  if (!from || from === winner) return null;
-  return {
-    winnerId: playerAt.get(winner) ?? null,
-    dealInId: playerAt.get(from) ?? null,
-    tsumo: false,
-    points: ronPayment(ev, from, winner),
-  };
-}
-
-/** Table order plus every scored win. Null when the session has no seated players. */
-export function rivalryGameFromSession(snapshot: SessionSnapshot): RivalryGameInput | null {
+/** Table standings for a finished session. Null when no players were seated. */
+export function rivalryGameFromSession(
+  snapshot: SessionSnapshot,
+  usePlacementBonus = true
+): RivalryGameInput | null {
   if (snapshot.assignments.length === 0) return null;
 
   const events = snapshot.events.map((row) =>
@@ -169,30 +100,34 @@ export function rivalryGameFromSession(snapshot: SessionSnapshot): RivalryGameIn
     })
   );
   const totals = computeTotals(SEATS, snapshot.rules, events);
-  const ranked = [...snapshot.assignments].sort(
-    (a, b) => totals[b.seat] - totals[a.seat] || seatIndex(a.seat) - seatIndex(b.seat)
+  const bonuses = usePlacementBonus ? umaAdjustments(SEATS.map((seat) => totals[seat])) : null;
+  const seatOrder = [...SEATS].sort(
+    (a, b) => totals[b] - totals[a] || seatIndex(a) - seatIndex(b)
   );
-  const playerAt = new Map(snapshot.assignments.map((seat) => [seat.seat, seat.playerId]));
+  const placementOf = new Map(seatOrder.map((seat, index) => [seat, index + 1]));
 
-  const hands: RivalryHand[] = [];
-  for (const ev of events) {
-    if (ev.type !== "win") continue;
-    const hand = sessionWinHand(ev, playerAt);
-    if (hand) hands.push(hand);
-  }
+  const ranked = [...snapshot.assignments].sort(
+    (a, b) => (placementOf.get(a.seat) ?? 4) - (placementOf.get(b.seat) ?? 4)
+  );
 
   return {
-    standings: ranked.map((seat, index) => ({
-      playerId: seat.playerId,
-      displayName: seat.displayName,
-      placement: index + 1,
-    })),
-    hands,
+    standings: ranked.map((seat) => {
+      const idx = seatIndex(seat.seat);
+      const score = leaderboardPoints(
+        gameScoreDelta(totals[seat.seat], snapshot.rules.startingPoints)
+      );
+      return {
+        playerId: seat.playerId,
+        displayName: seat.displayName,
+        placement: placementOf.get(seat.seat) ?? idx + 1,
+        finalScore: totals[seat.seat],
+        net: score + (bonuses ? bonuses[idx] : 0),
+      };
+    }),
   };
 }
 
-type PointsBucket = { count: number; points: number; displayName: string };
-type TableBucket = { games: number; wins: number; displayName: string };
+type MatchupBucket = { games: number; wins: number; losses: number; displayName: string };
 
 function nameOf(
   playerId: string,
@@ -207,11 +142,8 @@ function compareNames(a: string, b: string): number {
 }
 
 /**
- * Head-to-head totals for one player.
- *
- * Rons only: tsumo is counted on the player, not charged to an opponent.
- * Deal-ins into (and rons off) an AI seat count on the player's own line and
- * are left off the opponent lists.
+ * Placement, score, and head-to-head matchup totals for one player.
+ * Uses only final table results so IRL manual entries and online games count equally.
  */
 export function aggregatePlayerRivalry(
   playerId: string,
@@ -220,25 +152,12 @@ export function aggregatePlayerRivalry(
   names: ReadonlyMap<string, string> = new Map()
 ): PlayerRivalry {
   let gameCount = 0;
-  let ron = 0;
-  let tsumo = 0;
-  let dealIns = 0;
-  let gamesWithHands = 0;
-  const fed = new Map<string, PointsBucket>();
-  const wonOff = new Map<string, PointsBucket>();
-  const beat = new Map<string, TableBucket>();
-
-  const bump = (map: Map<string, PointsBucket>, opponentId: string, points: number, fallback: string) => {
-    const bucket = map.get(opponentId) ?? {
-      count: 0,
-      points: 0,
-      displayName: nameOf(opponentId, fallback, names),
-    };
-    bucket.count += 1;
-    bucket.points += points;
-    bucket.displayName = nameOf(opponentId, bucket.displayName, names);
-    map.set(opponentId, bucket);
-  };
+  let placementSum = 0;
+  let netPoints = 0;
+  let highScore: number | null = null;
+  let lowScore: number | null = null;
+  const placements: [number, number, number, number] = [0, 0, 0, 0];
+  const matchups = new Map<string, MatchupBucket>();
 
   for (const game of games) {
     const seen = new Map<string, RivalryStanding>();
@@ -250,74 +169,67 @@ export function aggregatePlayerRivalry(
     if (!me) continue;
 
     gameCount += 1;
-    if (game.hands) gamesWithHands += 1;
+    placementSum += me.placement;
+    netPoints += me.net;
+    if (me.placement >= 1 && me.placement <= 4) placements[me.placement - 1] += 1;
+    if (highScore === null || me.finalScore > highScore) highScore = me.finalScore;
+    if (lowScore === null || me.finalScore < lowScore) lowScore = me.finalScore;
 
     for (const other of seen.values()) {
       if (other.playerId === playerId) continue;
-      const bucket = beat.get(other.playerId) ?? {
+      const bucket = matchups.get(other.playerId) ?? {
         games: 0,
         wins: 0,
+        losses: 0,
         displayName: nameOf(other.playerId, other.displayName, names),
       };
       bucket.games += 1;
       if (me.placement < other.placement) bucket.wins += 1;
-      bucket.displayName = nameOf(other.playerId, other.displayName, names);
-      beat.set(other.playerId, bucket);
-    }
-
-    for (const hand of game.hands ?? []) {
-      if (hand.winnerId === playerId) {
-        if (hand.tsumo) tsumo += 1;
-        else ron += 1;
-      }
-      if (!hand.tsumo && hand.dealInId === playerId) dealIns += 1;
-
-      if (hand.tsumo) continue;
-      const standingName = (id: string) => seen.get(id)?.displayName ?? "";
-      if (hand.dealInId === playerId && hand.winnerId && hand.winnerId !== playerId) {
-        bump(fed, hand.winnerId, hand.points, standingName(hand.winnerId));
-      }
-      if (hand.winnerId === playerId && hand.dealInId && hand.dealInId !== playerId) {
-        bump(wonOff, hand.dealInId, hand.points, standingName(hand.dealInId));
-      }
+      else if (me.placement > other.placement) bucket.losses += 1;
+      bucket.displayName = nameOf(other.playerId, bucket.displayName, names);
+      matchups.set(other.playerId, bucket);
     }
   }
 
-  const pointsLines = (map: Map<string, PointsBucket>, byCountFirst: boolean): RivalPointsLine[] =>
-    [...map.entries()]
-      .map(([id, bucket]) => ({
-        playerId: id,
-        displayName: bucket.displayName || nameOf(id, "Player", names),
-        count: bucket.count,
-        points: bucket.points,
-      }))
-      .sort((a, b) =>
-        byCountFirst
-          ? b.count - a.count || b.points - a.points || compareNames(a.displayName, b.displayName)
-          : b.points - a.points || b.count - a.count || compareNames(a.displayName, b.displayName)
-      );
+  const allMatchups: RivalMatchup[] = [...matchups.entries()].map(([id, bucket]) => ({
+    playerId: id,
+    displayName: bucket.displayName,
+    games: bucket.games,
+    wins: bucket.wins,
+    losses: bucket.losses,
+  }));
+
+  const bestMatchups = allMatchups
+    .filter((m) => m.wins > m.losses)
+    .sort(
+      (a, b) =>
+        b.wins - b.losses - (a.wins - a.losses) ||
+        b.wins - a.wins ||
+        b.games - a.games ||
+        compareNames(a.displayName, b.displayName)
+    );
+
+  const toughestMatchups = allMatchups
+    .filter((m) => m.losses > m.wins)
+    .sort(
+      (a, b) =>
+        b.losses - b.wins - (a.losses - a.wins) ||
+        b.losses - a.losses ||
+        b.games - a.games ||
+        compareNames(a.displayName, b.displayName)
+    );
 
   return {
     playerId,
     displayName: nameOf(playerId, displayName, names),
     games: gameCount,
-    ron,
-    tsumo,
-    dealIns,
-    gamesWithHands,
-    fed: pointsLines(fed, false),
-    wonOff: pointsLines(wonOff, true),
-    beat: [...beat.entries()]
-      .map(([id, bucket]) => ({
-        playerId: id,
-        displayName: bucket.displayName,
-        games: bucket.games,
-        wins: bucket.wins,
-      }))
-      .filter((line) => line.wins > 0)
-      .sort(
-        (a, b) => b.wins - a.wins || b.games - a.games || compareNames(a.displayName, b.displayName)
-      ),
+    placements,
+    avgPlacement: gameCount > 0 ? placementSum / gameCount : 0,
+    highScore,
+    lowScore,
+    netPoints,
+    bestMatchups,
+    toughestMatchups,
   };
 }
 
@@ -326,7 +238,6 @@ export function rivalryGamesFromRows(input: {
     entries_json: ImportedGameEntry[] | null;
     starting_points: number;
     played_at: string;
-    hand_results_json?: unknown;
   }>;
   sessions: Array<{ id: string; rules_json: unknown }>;
   sessionPlayers: Array<{
@@ -341,10 +252,11 @@ export function rivalryGamesFromRows(input: {
     payload_json: Record<string, unknown>;
     created_at: string;
   }>;
+  usePlacementBonus?: boolean;
 }): RivalryGameInput[] {
   const games = input.imports.map((row) => rivalryGameFromImport(row));
   for (const snapshot of groupSessionSnapshots(input)) {
-    const game = rivalryGameFromSession(snapshot);
+    const game = rivalryGameFromSession(snapshot, input.usePlacementBonus ?? true);
     if (game) games.push(game);
   }
   return games;

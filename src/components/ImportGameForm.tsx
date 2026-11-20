@@ -8,7 +8,11 @@ import {
   type ImportPlayerOption,
 } from "@/components/ImportPlayerNameInput";
 import { MajsoulQuickImport } from "@/components/MajsoulQuickImport";
-import { importSeatWindLabel, type ImportedGameRow } from "@/lib/imports/types";
+import {
+  importSeatWindLabel,
+  normalizeImportNameQuery,
+  type ImportedGameRow,
+} from "@/lib/imports/types";
 import { isValidMjsPaipuUrl } from "@/lib/imports/mjsPaipu";
 import { importedGameResults } from "@/lib/leaderboard/gameResults";
 import { formatPointsValue } from "@/lib/leaderboard/points";
@@ -192,6 +196,23 @@ function isNegativeIntegerDraft(raw: string): boolean {
   return raw.trim().startsWith("-");
 }
 
+/** Wrap the first case-insensitive match of `query` in `name` with a highlight. */
+function highlightName(name: string, query: string) {
+  if (!query) return name;
+  const start = name.toLowerCase().indexOf(query);
+  if (start < 0) return name;
+  const end = start + query.length;
+  return (
+    <>
+      {name.slice(0, start)}
+      <mark className="rounded-sm bg-amber-200 text-stone-900 dark:bg-amber-400/35 dark:text-amber-50">
+        {name.slice(start, end)}
+      </mark>
+      {name.slice(end)}
+    </>
+  );
+}
+
 function ImportHistoryCard({
   row,
   confirmDeleteId,
@@ -202,8 +223,10 @@ function ImportHistoryCard({
   isEditing,
   onEdit,
   pendingChange,
+  nameQuery,
 }: {
   row: ImportedGameRow;
+  nameQuery: string;
   confirmDeleteId: string | null;
   deletingId: string | null;
   onConfirmDelete: (id: string) => void;
@@ -294,7 +317,9 @@ function ImportHistoryCard({
               >
                 <td className="py-2 pr-3 tabular-nums text-subtle">{entry.placement}</td>
                 <td className="max-w-[10rem] truncate py-2 pr-3 sm:max-w-none">
-                  <span className="font-medium text-club-ink">{entry.display_name}</span>
+                  <span className="font-medium text-club-ink">
+                    {entry.is_ai ? entry.display_name : highlightName(entry.display_name, nameQuery)}
+                  </span>
                   {entry.is_ai ? <span className="text-subtle"> · AI</span> : null}
                   {entry.chombo > 0 ? (
                     <span className="text-red-600 dark:text-red-400">
@@ -464,6 +489,8 @@ export function ImportGameForm() {
   const [historyTotal, setHistoryTotal] = useState(0);
   const [historyTotalPages, setHistoryTotalPages] = useState(0);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyQuery, setHistoryQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -499,6 +526,16 @@ export function ImportGameForm() {
   }, [supabase]);
 
   useEffect(() => {
+    const next = normalizeImportNameQuery(historySearch);
+    if (next === historyQuery) return;
+    const timer = window.setTimeout(() => {
+      setHistoryQuery(next);
+      setHistoryPage(1);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [historySearch, historyQuery]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadHistory() {
@@ -507,6 +544,7 @@ export function ImportGameForm() {
         page: String(historyPage),
         pageSize: String(IMPORT_HISTORY_PAGE_SIZE),
       });
+      if (historyQuery) params.set("q", historyQuery);
       const res = await fetch(`/api/imports/games?${params}`);
       const json = (await res.json()) as {
         imports?: ImportedGameRow[];
@@ -537,7 +575,7 @@ export function ImportGameForm() {
     return () => {
       cancelled = true;
     };
-  }, [historyPage, historyRefresh]);
+  }, [historyPage, historyRefresh, historyQuery]);
 
   const paipuValid = !mjsPaipuUrl.trim() || isValidMjsPaipuUrl(mjsPaipuUrl);
 
@@ -1057,8 +1095,31 @@ export function ImportGameForm() {
         </div>
       </form>
 
-      {historyTotal > 0 || historyLoading ? (
+      {historyTotal > 0 || historyLoading || historyQuery || historySearch ? (
         <div className="card">
+          <div className="border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+            <div className="relative">
+              <input
+                type="text"
+                enterKeyHint="search"
+                value={historySearch}
+                onChange={(e) => setHistorySearch(e.target.value)}
+                placeholder="Search by player name"
+                aria-label="Search import history by player name"
+                className="field h-10 w-full min-w-0 px-3 pr-9 text-base sm:text-sm"
+              />
+              {historySearch ? (
+                <button
+                  type="button"
+                  onClick={() => setHistorySearch("")}
+                  className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-subtle hover:text-club-ink"
+                  aria-label="Clear search"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          </div>
           <div className="flex flex-col gap-2 border-b border-zinc-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
             <div>
               <div className="text-sm font-medium">Import history</div>
@@ -1066,6 +1127,7 @@ export function ImportGameForm() {
                 <>
                   <div className="mt-0.5 text-xs text-subtle">
                     Showing {historyRangeStart}–{historyRangeEnd} of {historyTotal}
+                    {historyQuery ? <> matching &ldquo;{historyQuery}&rdquo;</> : null}
                   </div>
                   <div className="mt-0.5 text-xs text-subtle">
                     Pts = (score − start) ÷ 1,000 · Net = Pts + uma (from Oct 2026) + chombo
@@ -1097,9 +1159,15 @@ export function ImportGameForm() {
                     isEditing={editingRow?.id === row.id}
                     onEdit={startEdit}
                     pendingChange={pendingChanges[row.id]}
+                    nameQuery={historyQuery}
                   />
                 ))}
               </ul>
+              {imports.length === 0 && historyQuery ? (
+                <div className="px-4 pb-6 text-sm text-muted">
+                  No imported games with a player matching &ldquo;{historyQuery}&rdquo;.
+                </div>
+              ) : null}
               {historyTotalPages > 1 ? (
                 <div className="border-t border-zinc-200 px-4 py-3 dark:border-zinc-800">
                   <ImportHistoryPagination

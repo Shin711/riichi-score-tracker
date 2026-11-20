@@ -44,3 +44,23 @@ export function isHumanImportEntry(
 export function humanImportEntries(game: Pick<ImportedGameRow, "entries_json">): ImportedGameEntry[] {
   return (game.entries_json ?? []).filter(isHumanImportEntry);
 }
+
+/** Lowercased, trimmed, whitespace-collapsed form of a player-name search. */
+export function normalizeImportNameQuery(query: string): string {
+  return query.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * True when any human seat's display name contains `query` (case-insensitive).
+ * An empty query matches every game.
+ */
+export function importMatchesNameQuery(
+  game: Pick<ImportedGameRow, "entries_json">,
+  query: string
+): boolean {
+  const needle = normalizeImportNameQuery(query);
+  if (!needle) return true;
+  return (game.entries_json ?? []).some(
+    (entry) => !entry.is_ai && normalizeImportNameQuery(entry.display_name ?? "").includes(needle)
+  );
+}

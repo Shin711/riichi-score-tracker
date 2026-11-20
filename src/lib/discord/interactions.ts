@@ -59,6 +59,11 @@ export function getApplicationPublicKey(): string | null {
   return process.env.DISCORD_PUBLIC_KEY?.trim() || null;
 }
 
+/** Public key for the separate `/player` Discord application, when configured. */
+export function getPlayerPublicKey(): string | null {
+  return process.env.DISCORD_PLAYER_PUBLIC_KEY?.trim() || null;
+}
+
 /**
  * Backed by an explicit ArrayBuffer rather than the default `ArrayBufferLike`,
  * which WebCrypto will not accept because it could be a SharedArrayBuffer.
@@ -72,17 +77,11 @@ function hexToBytes(hex: string): Uint8Array<ArrayBuffer> | null {
   return bytes;
 }
 
-/**
- * Verifies the Ed25519 signature over `timestamp + rawBody`.
- *
- * Uses WebCrypto directly rather than pulling in tweetnacl — Node has supported
- * Ed25519 here since 18.4, and the Vercel Node runtime is well past that.
- */
-export async function verifyInteractionSignature(
+export async function verifyInteractionSignatureWithKey(
   request: Request,
-  rawBody: string
+  rawBody: string,
+  publicKeyHex: string | null
 ): Promise<boolean> {
-  const publicKeyHex = getApplicationPublicKey();
   if (!publicKeyHex) return false;
 
   const signatureHex = request.headers.get(SIGNATURE_HEADER);
@@ -107,6 +106,19 @@ export async function verifyInteractionSignature(
     // A malformed key or signature is a failed verification, not a crash.
     return false;
   }
+}
+
+/**
+ * Verifies the Ed25519 signature over `timestamp + rawBody`.
+ *
+ * Uses WebCrypto directly rather than pulling in tweetnacl — Node has supported
+ * Ed25519 here since 18.4, and the Vercel Node runtime is well past that.
+ */
+export async function verifyInteractionSignature(
+  request: Request,
+  rawBody: string
+): Promise<boolean> {
+  return verifyInteractionSignatureWithKey(request, rawBody, getApplicationPublicKey());
 }
 
 export type InteractionUser = { id: string; username: string };

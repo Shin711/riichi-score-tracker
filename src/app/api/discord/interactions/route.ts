@@ -18,11 +18,12 @@ import {
   autocompleteReply,
   ephemeralReply,
   getApplicationPublicKey,
+  getPlayerPublicKey,
   InteractionResponseType,
   InteractionType,
   interactionUser,
   modalValues,
-  verifyInteractionSignature,
+  verifyInteractionSignatureWithKey,
   type Interaction,
 } from "@/lib/discord/interactions";
 import { handlePlayerAutocomplete, handlePlayerCommand } from "@/lib/discord/playerCommand";
@@ -46,15 +47,23 @@ import { getSupabaseAdmin } from "@/lib/supabase/server";
  */
 export async function POST(req: Request) {
   const started = Date.now();
-  if (!getApplicationPublicKey()) {
-    console.error("[quiz] DISCORD_PUBLIC_KEY is not set");
-    return NextResponse.json({ error: "DISCORD_PUBLIC_KEY is not set." }, { status: 503 });
+  const quizKey = getApplicationPublicKey();
+  const playerKey = getPlayerPublicKey();
+  if (!quizKey && !playerKey) {
+    console.error("[discord] neither DISCORD_PUBLIC_KEY nor DISCORD_PLAYER_PUBLIC_KEY is set");
+    return NextResponse.json({ error: "Discord public key is not set." }, { status: 503 });
   }
 
   // The signature covers the exact bytes Discord sent, so verify before parsing.
   const rawBody = await req.text();
-  if (!(await verifyInteractionSignature(req, rawBody))) {
-    console.warn("[quiz] invalid request signature", { ms: Date.now() - started });
+  const [signedByPlayer, signedByQuiz] = await Promise.all([
+    verifyInteractionSignatureWithKey(req, rawBody, playerKey),
+    playerKey && quizKey === playerKey
+      ? Promise.resolve(false)
+      : verifyInteractionSignatureWithKey(req, rawBody, quizKey),
+  ]);
+  if (!signedByPlayer && !signedByQuiz) {
+    console.warn("[discord] invalid request signature", { ms: Date.now() - started });
     return new NextResponse("invalid request signature", { status: 401 });
   }
 
@@ -67,6 +76,18 @@ export async function POST(req: Request) {
 
   if (interaction.type === InteractionType.Ping) {
     return NextResponse.json({ type: InteractionResponseType.Pong });
+  }
+
+  const isPlayerInteraction =
+    interaction.type === InteractionType.ApplicationCommandAutocomplete ||
+    interaction.type === InteractionType.ApplicationCommand;
+  // Once DISCORD_PLAYER_PUBLIC_KEY is set, slash commands must come from the
+  // player bot and buttons/modals from the quiz bot.
+  if (isPlayerInteraction && playerKey && !signedByPlayer) {
+    return new NextResponse("invalid request signature", { status: 401 });
+  }
+  if (!isPlayerInteraction && !signedByQuiz) {
+    return new NextResponse("invalid request signature", { status: 401 });
   }
 
   try {

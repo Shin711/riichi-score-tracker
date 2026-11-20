@@ -14,6 +14,7 @@ import {
   interactionUser,
   modalValues,
   verifyInteractionSignature,
+  verifyInteractionSignatureWithKey,
   type Interaction,
 } from "@/lib/discord/interactions";
 
@@ -137,6 +138,15 @@ describe("verifyInteractionSignature", () => {
 
     const request = await signedRequest(pair.privateKey, timestamp, body);
     assert.equal(await verifyInteractionSignature(request, body), false);
+  });
+
+  it("verifies against an explicit application key for a second bot", async () => {
+    const quiz = await makeKeyPair();
+    const player = await makeKeyPair();
+    const request = await signedRequest(player.pair.privateKey, timestamp, body);
+
+    assert.equal(await verifyInteractionSignatureWithKey(request, body, quiz.publicKeyHex), false);
+    assert.equal(await verifyInteractionSignatureWithKey(request, body, player.publicKeyHex), true);
   });
 });
 

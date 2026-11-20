@@ -26,12 +26,16 @@ import {
   verifyInteractionSignatureWithKey,
   type Interaction,
 } from "@/lib/discord/interactions";
+import { handleImportCommand, IMPORT_COMMAND_NAME } from "@/lib/discord/importCommand";
 import { handlePlayerAutocomplete, handlePlayerCommand } from "@/lib/discord/playerCommand";
 import { decideGameChange } from "@/lib/imports/changeRequests";
 import { parseCount, parseScore, type AnswerMode } from "@/lib/quiz/answer";
 import { withFuBreakdown } from "@/lib/quiz/fu";
 import { loadQuiz, recordAnswer } from "@/lib/quiz/store";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
+
+/** `/import` finishes its Mahjong Soul lookup in `after()`, which shares this budget. */
+export const maxDuration = 60;
 
 /**
  * Discord interactions endpoint (slash commands, buttons, and modals).
@@ -102,7 +106,10 @@ export async function POST(req: Request) {
     }
 
     if (interaction.type === InteractionType.ApplicationCommand) {
-      const response = await handlePlayerCommand(interaction);
+      const response =
+        interaction.data?.name === IMPORT_COMMAND_NAME
+          ? await handleImportCommand(interaction, new URL(req.url).origin)
+          : await handlePlayerCommand(interaction);
       console.log("[discord] command", {
         command: interaction.data?.name,
         user: interactionUser(interaction)?.id,

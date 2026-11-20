@@ -20,6 +20,24 @@ export const PLAYER_COMMAND = {
   ],
 } as const;
 
+/** `/import` — auto-imports a finished Mahjong Soul game from its log link. */
+export const IMPORT_COMMAND = {
+  name: "import",
+  description: "Import a finished Mahjong Soul game to the club leaderboard",
+  options: [
+    {
+      type: 3,
+      name: "game",
+      description: "Mahjong Soul game log link or game ID",
+      required: true,
+    },
+  ],
+} as const;
+
+/** Every command the club bot owns; registration replaces exactly these. */
+export const CLUB_COMMANDS = [PLAYER_COMMAND, IMPORT_COMMAND] as const;
+const CLUB_COMMAND_NAMES = new Set<string>(CLUB_COMMANDS.map((command) => command.name));
+
 type ListedCommand = {
   id?: string;
   name?: string;
@@ -29,7 +47,7 @@ type ListedCommand = {
 };
 
 function keepCommand(command: ListedCommand) {
-  if (!command.name || !command.description || command.name === PLAYER_COMMAND.name) return null;
+  if (!command.name || !command.description || CLUB_COMMAND_NAMES.has(command.name)) return null;
   return {
     name: command.name,
     description: command.description,
@@ -39,10 +57,10 @@ function keepCommand(command: ListedCommand) {
 }
 
 /**
- * Upserts `/player` on one guild. Guild commands show up immediately.
+ * Upserts `/player` and `/import` on one guild. Guild commands show up immediately.
  * The bot has to be invited with the `applications.commands` scope.
  */
-export async function registerPlayerCommand(
+export async function registerClubCommands(
   guildId: string,
   botToken?: string | null
 ): Promise<{ applicationId: string; commands: Array<{ id: string; name: string }> }> {
@@ -67,7 +85,7 @@ export async function registerPlayerCommand(
           return kept ? [kept] : [];
         })
       : []),
-    PLAYER_COMMAND,
+    ...CLUB_COMMANDS,
   ];
 
   let saved: Array<{ id?: string; name?: string }>;
@@ -90,8 +108,8 @@ export async function registerPlayerCommand(
   };
 }
 
-/** Drops `/player` from another bot application (e.g. moving off the quiz bot). */
-export async function unregisterPlayerCommand(
+/** Drops the club commands from another bot application (e.g. moving off the quiz bot). */
+export async function unregisterClubCommands(
   guildId: string,
   botToken: string,
   skipApplicationId?: string
@@ -106,7 +124,10 @@ export async function unregisterPlayerCommand(
     "Discord rejected the command list",
     botToken
   );
-  if (!Array.isArray(existing) || !existing.some((cmd) => cmd.name === PLAYER_COMMAND.name)) {
+  if (
+    !Array.isArray(existing) ||
+    !existing.some((cmd) => cmd.name && CLUB_COMMAND_NAMES.has(cmd.name))
+  ) {
     return false;
   }
 
